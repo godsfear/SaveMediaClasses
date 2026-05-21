@@ -1,0 +1,38 @@
+{
+    "settings": {
+        "download_path": "d:\\Downloads",
+        "proxy_address": "socks5://127.0.0.1:1080",
+        "proxy_enabled": false,
+        "yt_dlp_args": "-f bestvideo+bestaudio/best --merge-output-format mp4",
+        "audio_only": false,
+        "cookies_browser": "yandex",
+        "cookies_enabled": false,
+        "embed_metadata": true,
+        "playlist_enabled": true,
+        "clean_titles": true,
+        "save_to_source_folder": true,
+        "minimize_to_tray": true,
+        "urls": {
+            "yt_api": "https://api.github.com/repos/yt-dlp/yt-dlp/releases/latest",
+            "yt_download": "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe",
+            "ffmpeg_version": "https://www.gyan.dev/ffmpeg/builds/release-version",
+            "ffmpeg_download": "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip"
+        }
+    },
+    "window": {
+        "width": 600,
+        "height": 650,
+        "left": 3349,
+        "top": 618
+    },
+    "theme": {
+        "accent_color": "00B4D8",
+        "switch_color": "00BCD4",
+        "header_color": "00B4D8",
+        "text_color": "E0E0E0",
+        "progress_color": "4CAF50",
+        "button_color": "009688",
+        "appbar_color": "1c1c1c",
+        "card_color": "161616"
+    }
+}
