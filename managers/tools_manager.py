@@ -19,9 +19,8 @@ class ToolsManager:
         self._ext = ".exe" if os.name == "nt" else ""
 
     def resolve_tool_path(self, filename: str) -> str:
-        p_root  = os.path.join(self.base_dir,  filename)
         p_tools = os.path.join(self.tools_dir, filename)
-        return p_root if os.path.exists(p_root) else (p_tools if os.path.exists(p_tools) else "")
+        return p_tools if os.path.exists(p_tools) else ""
 
     # Оригинальная get_local_tool_version
     async def get_local_tool_version(self, tool_path: str, tool_name: str) -> str:

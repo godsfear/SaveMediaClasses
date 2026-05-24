@@ -16,9 +16,8 @@ class Downloader:
 
     def resolve_yt_dlp(self) -> str:
         filename = f"yt-dlp{self._ext}"
-        p_root   = os.path.join(self.base_dir,  filename)
         p_tools  = os.path.join(self.tools_dir, filename)
-        return p_root if os.path.exists(p_root) else (p_tools if os.path.exists(p_tools) else "")
+        return p_tools if os.path.exists(p_tools) and os.path.getsize(p_tools) > 0 else ""
 
     # Оригинальная сборка команды из start_media_download
     def build_command(self, yt_dlp_exe: str, url: str, download_path: str,
