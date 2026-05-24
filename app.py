@@ -45,7 +45,7 @@ class SaveMediaApp:
         page.window.height = geo["height"]
         page.window.left   = geo["left"]
         page.window.top    = geo["top"]
-        page.window.icon   = "SaveMedia.png"
+        page.window.icon   = "vload.png"
 
         if page.platform in [ft.PagePlatform.WINDOWS, ft.PagePlatform.MACOS, ft.PagePlatform.LINUX]:
             page.window.min_width     = 500
@@ -97,6 +97,7 @@ class SaveMediaApp:
                 sw.active_color = switch_c
 
             main_screen.download_btn.bgcolor        = button_c
+            settings_screen.update_btn.bgcolor      = button_c
             main_screen.main_progress_text.color    = progress_c
             main_screen.main_progress_bar.color     = progress_c
             settings_screen.progress_text.color     = progress_c
@@ -276,6 +277,7 @@ class SaveMediaApp:
             }
 
         main_screen.set_download_opts_provider(get_download_opts)
+        settings_screen.set_notify_main_callback(main_screen.notify_tools_status)
 
         # ── Загрузка конфига (оригинальная логика) ────────────────────────────
         def load_config():

@@ -1,4 +1,5 @@
 import asyncio
+import os
 
 import flet as ft
 
@@ -141,8 +142,8 @@ class MainScreen:
 
         yt_dlp_exe = self._dl.resolve_yt_dlp()
         if not yt_dlp_exe:
-            self.main_progress_text.value = "Критическая ошибка: Движок yt-dlp отсутствует!"
-            self.main_progress_text.color = ft.Colors.RED
+            self.main_progress_text.value = "yt-dlp не найден — перейдите в настройки и нажмите «Обновить скрипты»"
+            self.main_progress_text.color = ft.Colors.ORANGE
             self.download_btn.disabled    = False
             self._safe_update()
             return
@@ -150,7 +151,6 @@ class MainScreen:
         # Параметры берём через колбэк из App
         opts = self._get_download_opts()
         if opts["download_path"]:
-            import os
             try:
                 os.makedirs(opts["download_path"], exist_ok=True)
             except Exception:
@@ -215,6 +215,21 @@ class MainScreen:
         self.download_btn.disabled     = False
         self._page.update()
 
-    # Колбэк назначается из App после инициализации
+    # Колбэки назначаются из App после инициализации
     def set_download_opts_provider(self, provider) -> None:
         self._get_download_opts = provider
+
+    def notify_tools_status(self, needs_update: bool) -> None:
+        # Показывает предупреждение если скрипты требуют обновления
+        if needs_update:
+            self.main_progress_text.value = (
+                "Доступны обновления скриптов — "
+                "перейдите в настройки и нажмите «Обновить скрипты»"
+            )
+            self.main_progress_text.color = ft.Colors.ORANGE
+        else:
+            if not self.download_btn.disabled:
+                self.main_progress_text.value = "Ожидание ссылки для начала загрузки"
+                self.main_progress_text.color = ft.Colors.GREEN_400
+        self._safe_update()
+

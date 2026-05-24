@@ -1,5 +1,4 @@
 import asyncio
-import os
 
 import flet as ft
 
@@ -11,10 +10,6 @@ from managers.tools_manager import ToolsManager
 
 
 class SettingsScreen:
-    """
-    Экран настроек: сеть, правила, зависимости, тема, URL.
-    Все виджеты и вся логика взяты из оригинала без изменений.
-    """
 
     def __init__(self, page: ft.Page, tools: ToolsManager, safe_update,
                  current_theme: dict, save_config) -> None:
@@ -80,7 +75,7 @@ class SettingsScreen:
         self.update_btn_text = ft.Text("Проверить версии", color=ft.Colors.WHITE, weight=ft.FontWeight.BOLD)
         self.update_btn = ft.Button(
             content=ft.Row([self.update_btn_icon, self.update_btn_text], tight=True, spacing=8),
-            bgcolor=ft.Colors.BLUE_700,
+            bgcolor=ft.Colors.GREEN,
             style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=8), elevation=2),
             on_click=self._handle_update_button_click
         )
@@ -304,7 +299,8 @@ class SettingsScreen:
             on_remote_done=on_remote_done,
         )
 
-        if self._tools.yt_needs_update or self._tools.ffmpeg_needs_update:
+        needs = self._tools.yt_needs_update or self._tools.ffmpeg_needs_update
+        if needs:
             self.update_btn_text.value = "Обновить скрипты"
             self.update_btn_icon.name  = ft.Icons.DOWNLOAD_ROUNDED
             self.progress_text.value   = "Доступны новые обновления утилит!"
@@ -316,6 +312,7 @@ class SettingsScreen:
             self.progress_text.color   = ft.Colors.GREEN_400
 
         self.update_btn.disabled = False
+        self._notify_main_callback(needs)
         self._safe_update()
 
     async def _update_tools(self, proxy_enabled: bool) -> None:
@@ -399,6 +396,10 @@ class SettingsScreen:
 
     def set_proxy_enabled_callback(self, callback) -> None:
         self._get_proxy_enabled_callback = callback
+
+    def set_notify_main_callback(self, callback) -> None:
+        # callback(needs_update: bool) — вызывается после каждой check_tools
+        self._notify_main_callback = callback
 
     # ── Лэйаут ────────────────────────────────────────────────────────────────
 
