@@ -12,6 +12,7 @@
         "clean_titles": true,
         "save_to_source_folder": true,
         "minimize_to_tray": true,
+        "last_check_time": 1779686995.1630507,
         "urls": {
             "yt_api": "https://api.github.com/repos/yt-dlp/yt-dlp/releases/latest",
             "yt_download": "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe",
@@ -22,8 +23,8 @@
     "window": {
         "width": 600,
         "height": 650,
-        "left": 3088,
-        "top": 428
+        "left": 3139,
+        "top": 474
     },
     "theme": {
         "accent_color": "00B4D8",

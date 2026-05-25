@@ -3,21 +3,23 @@ import os
 
 import flet as ft
 
-from config import safe_str
+from config import safe_str, hex_to_flet
 from managers.downloader import Downloader
 
 
 class MainScreen:
     """
-    Главный экран: URL-поле, кнопка скачать, переключатели, прогресс, лог.
-    Все виджеты и вся логика взяты из оригинала без изменений.
+    Главный экран: URL-поле, кнопка скачать/отмена, переключатели, прогресс, лог.
     """
 
+    _POST_PROCESSING_TAGS = ["[Merger]", "[Metadata]", "[Thumbnails]", "[ExtractAudio]", "[Modify]"]
+
     def __init__(self, page: ft.Page, downloader: Downloader, safe_update, current_theme: dict) -> None:
-        self._page         = page
-        self._dl           = downloader
-        self._safe_update  = safe_update
+        self._page          = page
+        self._dl            = downloader
+        self._safe_update   = safe_update
         self._current_theme = current_theme
+        self._cancelled     = False  # флаг отмены (пункт 1)
 
         self._build_widgets()
         self._build_layout()
@@ -31,27 +33,28 @@ class MainScreen:
             expand=True,
             border_radius=8,
             focused_border_color=ft.Colors.BLUE,
+            on_change=self._on_url_change,
             suffix=ft.IconButton(
                 icon=ft.Icons.CANCEL_ROUNDED,
                 icon_color=ft.Colors.GREY_500,
                 icon_size=18,
                 tooltip="Очистить",
-                on_click=lambda _: [setattr(self.url_input, "value", ""), self._page.update()]
+                on_click=lambda _: [setattr(self.url_input, "value", ""), self._on_url_change(None), self._page.update()]
             )
         )
 
         self.audio_only_switch      = ft.Switch(label="Только аудио (MP3)", active_color=ft.Colors.GREEN)
         self.cookies_enabled_switch = ft.Switch(label="Использовать куки", active_color=ft.Colors.GREEN, value=False)
 
+        # Кнопка меняется между «Скачать» и «Отмена» (пункт 1)
+        self._btn_icon = ft.Icon(ft.Icons.DOWNLOAD_ROUNDED, color=ft.Colors.WHITE)
+        self._btn_text = ft.Text("Скачать", color=ft.Colors.WHITE, weight=ft.FontWeight.BOLD)
         self.download_btn = ft.Button(
-            content=ft.Row([
-                ft.Icon(ft.Icons.DOWNLOAD_ROUNDED, color=ft.Colors.WHITE),
-                ft.Text("Скачать", color=ft.Colors.WHITE, weight=ft.FontWeight.BOLD)
-            ], tight=True, spacing=8),
+            content=ft.Row([self._btn_icon, self._btn_text], tight=True, spacing=8),
             bgcolor=ft.Colors.GREEN,
             tooltip="Начать загрузку",
             style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=8), elevation=0),
-            on_click=self._start_media_download
+            on_click=self._on_download_or_cancel
         )
 
         self.main_progress_text = ft.Text("Ожидание ссылки для начала загрузки", size=13, color=ft.Colors.GREEN_400)
@@ -109,7 +112,47 @@ class MainScreen:
             self.log_container
         ], visible=True, expand=True, spacing=15, horizontal_alignment=ft.CrossAxisAlignment.STRETCH)
 
-    # ── Обработчики (оригинальная логика) ─────────────────────────────────────
+    # ── Обработчики ───────────────────────────────────────────────────────────
+
+    def _on_url_change(self, _) -> None:
+        """Валидация URL в реальном времени (пункт 5)."""
+        val = safe_str(self.url_input.value).strip()
+        if not val:
+            self.url_input.border_color = None
+        elif Downloader.is_valid_url(val):
+            self.url_input.border_color = ft.Colors.GREEN_400
+        else:
+            self.url_input.border_color = ft.Colors.RED_400
+        self._safe_update()
+
+    async def _on_download_or_cancel(self, _) -> None:
+        """Единый обработчик кнопки: запуск или отмена (пункт 1)."""
+        if self._cancelled is False and not self.download_btn.disabled:
+            # Кнопка в режиме «Скачать» — запускаем
+            await self._start_media_download()
+        else:
+            # Кнопка в режиме «Отмена»
+            self._cancelled = True
+            self._dl.cancel()
+            self.main_progress_text.value = "Отмена загрузки..."
+            self.main_progress_text.color = ft.Colors.ORANGE
+            self._safe_update()
+
+    def _set_download_mode(self) -> None:
+        """Переключает кнопку в режим «Скачать»."""
+        self._btn_icon.name    = ft.Icons.DOWNLOAD_ROUNDED
+        self._btn_text.value   = "Скачать"
+        self.download_btn.bgcolor  = hex_to_flet(self._current_theme.get("button_color", "4CAF50"))
+        self.download_btn.disabled = False
+        self.download_btn.tooltip  = "Начать загрузку"
+
+    def _set_cancel_mode(self) -> None:
+        """Переключает кнопку в режим «Отмена»."""
+        self._btn_icon.name    = ft.Icons.STOP_ROUNDED
+        self._btn_text.value   = "Отмена"
+        self.download_btn.bgcolor  = ft.Colors.RED_700
+        self.download_btn.disabled = False
+        self.download_btn.tooltip  = "Остановить загрузку"
 
     async def _copy_log_to_clipboard(self, _):
         lines = [c.value for c in self.log_box.controls if hasattr(c, "value") and c.value]
@@ -124,31 +167,41 @@ class MainScreen:
             self._safe_update()
         self._page.run_task(reset_icon)
 
-    async def _start_media_download(self, _):
+    async def _start_media_download(self) -> None:
         url_str = safe_str(self.url_input.value).strip()
+
+        # Пункт 5: валидация URL перед запуском
         if not url_str:
             self.main_progress_text.value = "Ошибка: Ссылка для загрузки пуста!"
             self.main_progress_text.color = ft.Colors.RED
             self._safe_update()
             return
-
-        self.download_btn.disabled     = True
-        self.main_progress_bar.visible = True
-        self.main_progress_bar.value   = 0.0
-        self.main_progress_text.value  = "Анализ источника и метаданных..."
-        self.main_progress_text.color  = ft.Colors.GREEN_400
-        self.log_box.controls.clear()
-        self._safe_update()
+        if not Downloader.is_valid_url(url_str):
+            self.main_progress_text.value = "Ошибка: Некорректная ссылка — должна начинаться с http:// или https://"
+            self.main_progress_text.color = ft.Colors.RED
+            self.url_input.border_color   = ft.Colors.RED_400
+            self._safe_update()
+            return
 
         yt_dlp_exe = self._dl.resolve_yt_dlp()
         if not yt_dlp_exe:
             self.main_progress_text.value = "yt-dlp не найден — перейдите в настройки и нажмите «Обновить скрипты»"
             self.main_progress_text.color = ft.Colors.ORANGE
-            self.download_btn.disabled    = False
             self._safe_update()
             return
 
-        # Параметры берём через колбэк из App
+        # Переключаем кнопку в режим «Отмена» (пункт 1)
+        self._cancelled = False
+        self._set_cancel_mode()
+        self.main_progress_bar.visible = True
+        self.main_progress_bar.value   = 0.0
+        self.main_progress_bar.color   = ft.Colors.GREEN
+        self.main_progress_text.value  = "Анализ источника и метаданных..."
+        self.main_progress_text.color  = ft.Colors.GREEN_400
+        self.log_box.controls.clear()
+        self.url_input.border_color    = None
+        self._safe_update()
+
         opts = self._get_download_opts()
         if opts["download_path"]:
             try:
@@ -156,11 +209,7 @@ class MainScreen:
             except Exception:
                 pass
 
-        cmd_args = self._dl.build_command(
-            yt_dlp_exe=yt_dlp_exe,
-            url=url_str,
-            **opts
-        )
+        cmd_args = self._dl.build_command(yt_dlp_exe=yt_dlp_exe, url=url_str, **opts)
 
         returncode_holder = [0]
 
@@ -183,13 +232,15 @@ class MainScreen:
             pct = Downloader.parse_progress(line_text)
             if pct is not None:
                 self.main_progress_bar.value  = pct
+                self.main_progress_bar.color  = ft.Colors.GREEN  # пункт 8
                 self.main_progress_text.value = f"Загрузка: {line_text.replace('[download]', '').strip()}"
             else:
                 if len(line_text) < 75:
                     self.main_progress_text.value = line_text
-                post_processing_tags = ["[Merger]", "[Metadata]", "[Thumbnails]", "[ExtractAudio]", "[Modify]"]
-                if any(tag in line_text for tag in post_processing_tags):
+                # Пункт 8: синий цвет прогресс-бара при постобработке
+                if any(tag in line_text for tag in self._POST_PROCESSING_TAGS):
                     self.main_progress_bar.value  = None
+                    self.main_progress_bar.color  = ft.Colors.BLUE_400
                     self.main_progress_text.value = "Постобработка и сведение тяжелых потоков медиа..."
 
             self._page.update()
@@ -200,7 +251,11 @@ class MainScreen:
 
         try:
             await self._dl.run(cmd_args, on_line, on_finish)
-            if returncode_holder[0] == 0:
+            if self._cancelled:
+                self.main_progress_text.value = "Загрузка отменена пользователем"
+                self.main_progress_text.color = ft.Colors.ORANGE
+                self.main_progress_bar.value  = 0.0
+            elif returncode_holder[0] == 0:
                 self.main_progress_text.value = "Процесс загрузки успешно завершен!"
                 self.main_progress_text.color = ft.Colors.GREEN
                 self.main_progress_bar.value  = 1.0
@@ -212,15 +267,18 @@ class MainScreen:
             self.main_progress_text.color = ft.Colors.RED
 
         self.main_progress_bar.visible = False
-        self.download_btn.disabled     = False
+        self.main_progress_bar.color   = ft.Colors.GREEN  # сброс цвета (пункт 8)
+        self._cancelled                = False
+        self._set_download_mode()
         self._page.update()
 
-    # Колбэки назначаются из App после инициализации
+    # ── Колбэки, назначаются из App ───────────────────────────────────────────
+
     def set_download_opts_provider(self, provider) -> None:
         self._get_download_opts = provider
 
     def notify_tools_status(self, needs_update: bool) -> None:
-        # Показывает предупреждение если скрипты требуют обновления
+        """Показывает предупреждение если скрипты требуют обновления."""
         if needs_update:
             self.main_progress_text.value = (
                 "Доступны обновления скриптов — "
@@ -228,8 +286,7 @@ class MainScreen:
             )
             self.main_progress_text.color = ft.Colors.ORANGE
         else:
-            if not self.download_btn.disabled:
+            if not self._cancelled and self._dl._sub_proc is None:
                 self.main_progress_text.value = "Ожидание ссылки для начала загрузки"
                 self.main_progress_text.color = ft.Colors.GREEN_400
         self._safe_update()
-

@@ -19,6 +19,12 @@ class SettingsScreen:
         self._current_theme = current_theme
         self._save_config  = save_config
 
+        # Заглушки колбэков — перезаписываются из App
+        self._notify_main_callback       = lambda needs: None
+        self._on_check_done_callback     = lambda: None
+        self._on_cookies_change_callback = lambda: None
+        self._get_proxy_enabled_callback = lambda: False
+
         self._build_widgets()
         self._build_theme_section()
         self._build_layout()
@@ -313,6 +319,7 @@ class SettingsScreen:
 
         self.update_btn.disabled = False
         self._notify_main_callback(needs)
+        self._on_check_done_callback()
         self._safe_update()
 
     async def _update_tools(self, proxy_enabled: bool) -> None:
@@ -400,6 +407,10 @@ class SettingsScreen:
     def set_notify_main_callback(self, callback) -> None:
         # callback(needs_update: bool) — вызывается после каждой check_tools
         self._notify_main_callback = callback
+
+    def set_on_check_done_callback(self, callback) -> None:
+        # callback() — вызывается после завершения check_tools для обновления last_check_time
+        self._on_check_done_callback = callback
 
     # ── Лэйаут ────────────────────────────────────────────────────────────────
 
