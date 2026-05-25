@@ -1,6 +1,9 @@
 import os
 from typing import Any, Dict
 
+# Интервал автопроверки версий в часах (пункт 6)
+CHECK_INTERVAL_HOURS = 6
+
 DEFAULT_CONFIG: Dict[str, Any] = {
     "settings": {
         "download_path": "",
@@ -15,6 +18,7 @@ DEFAULT_CONFIG: Dict[str, Any] = {
         "clean_titles": False,
         "save_to_source_folder": False,
         "minimize_to_tray": False,
+        "last_check_time": 0.0,
         "urls": {
             "yt_api": "https://api.github.com/repos/yt-dlp/yt-dlp/releases/latest",
             "yt_download": "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe" if os.name == "nt" else "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp",

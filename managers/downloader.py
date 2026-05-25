@@ -13,13 +13,21 @@ class Downloader:
         self.base_dir  = base_dir
         self.tools_dir = tools_dir
         self._ext      = ".exe" if os.name == "nt" else ""
+        self._sub_proc = None  # текущий подпроцесс — для отмены (пункт 1)
 
     def resolve_yt_dlp(self) -> str:
         filename = f"yt-dlp{self._ext}"
         p_tools  = os.path.join(self.tools_dir, filename)
         return p_tools if os.path.exists(p_tools) and os.path.getsize(p_tools) > 0 else ""
 
-    # Оригинальная сборка команды из start_media_download
+    def cancel(self) -> None:
+        """Прерывает текущую загрузку (пункт 1)."""
+        if self._sub_proc and self._sub_proc.returncode is None:
+            try:
+                self._sub_proc.terminate()
+            except Exception:
+                pass
+
     def build_command(self, yt_dlp_exe: str, url: str, download_path: str,
                       proxy_enabled: bool, proxy_address: str,
                       cookies_enabled: bool, cookies_browser: str,
@@ -64,14 +72,13 @@ class Downloader:
         env["PATH"] = f"{self.tools_dir}{sep}{self.base_dir}{sep}{env.get('PATH', '')}"
         return env
 
-    # Оригинальный запуск процесса из start_media_download
     async def run(self, cmd_args: list, on_line, on_finish) -> None:
         proc_startup = None
         if os.name == "nt":
             proc_startup = subprocess.STARTUPINFO()
             proc_startup.dwFlags |= subprocess.STARTF_USESHOWWINDOW
 
-        sub_proc = await asyncio.create_subprocess_exec(
+        self._sub_proc = await asyncio.create_subprocess_exec(
             *cmd_args,
             stdout=asyncio.subprocess.PIPE,
             stderr=subprocess.STDOUT,
@@ -80,14 +87,15 @@ class Downloader:
         )
 
         while True:
-            line_raw = await sub_proc.stdout.readline()
+            line_raw = await self._sub_proc.stdout.readline()
             if not line_raw: break
             line_text = line_raw.decode('utf-8', errors='replace').strip()
             if line_text:
                 on_line(line_text)
 
-        await sub_proc.wait()
-        on_finish(sub_proc.returncode)
+        await self._sub_proc.wait()
+        on_finish(self._sub_proc.returncode)
+        self._sub_proc = None
 
     @staticmethod
     def parse_progress(line: str) -> float | None:
@@ -99,3 +107,8 @@ class Downloader:
                 except ValueError:
                     pass
         return None
+
+    @staticmethod
+    def is_valid_url(url: str) -> bool:
+        """Базовая валидация URL (пункт 5)."""
+        return url.startswith("http://") or url.startswith("https://")

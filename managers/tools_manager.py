@@ -82,14 +82,21 @@ class ToolsManager:
             local_versions[name] = ver
             on_local_version(name, ver)
 
-        async with httpx.AsyncClient(proxy=proxy_url, timeout=5.0) as client:
+        timeout = httpx.Timeout(connect=5.0, read=8.0, write=5.0, pool=5.0)
+        async with httpx.AsyncClient(proxy=proxy_url, timeout=timeout) as client:
             try:
-                res = await client.get(yt_api_url, headers={"User-Agent": "Mozilla/5.0"})
+                res = await asyncio.wait_for(
+                    client.get(yt_api_url, headers={"User-Agent": "Mozilla/5.0"}),
+                    timeout=8.0
+                )
                 remote_yt = safe_str(res.json().get("tag_name", "Неизвестно")).lstrip('v')
             except Exception:
                 remote_yt = "[Ошибка]"
             try:
-                res = await client.get(ffmpeg_version_url, headers={"User-Agent": "Mozilla/5.0"})
+                res = await asyncio.wait_for(
+                    client.get(ffmpeg_version_url, headers={"User-Agent": "Mozilla/5.0"}),
+                    timeout=8.0
+                )
                 remote_ff = res.text.strip()
             except Exception:
                 remote_ff = "[Ошибка]"

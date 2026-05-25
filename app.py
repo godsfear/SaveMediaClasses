@@ -7,7 +7,8 @@ import flet as ft
 from PIL import Image, ImageDraw
 import pystray
 
-from config import DEFAULT_CONFIG, THEME_FIELDS, hex_to_flet, safe_str, safe_int, get_fallback_bool
+import time
+from config import DEFAULT_CONFIG, THEME_FIELDS, CHECK_INTERVAL_HOURS, hex_to_flet, safe_str, safe_int, get_fallback_bool
 from managers.config_manager import ConfigManager
 from managers.tools_manager import ToolsManager
 from managers.downloader import Downloader
@@ -59,8 +60,9 @@ class SaveMediaApp:
         page.padding   = 15
         page.safe_area = True
 
-        download_path = ""
-        proxy_enabled = False
+        download_path   = ""
+        proxy_enabled   = False
+        last_check_time = 0.0  # timestamp последней проверки версий
 
         # ── Экраны ────────────────────────────────────────────────────────────
         main_screen     = MainScreen(page, downloader, safe_update, current_theme)
@@ -151,6 +153,7 @@ class SaveMediaApp:
                     "clean_titles":          bool(settings_screen.clean_titles_switch.value),
                     "save_to_source_folder": bool(settings_screen.save_to_source_switch.value),
                     "minimize_to_tray":      bool(settings_screen.minimize_to_tray_switch.value),
+                    "last_check_time":       last_check_time,
                     "urls": {
                         "yt_api":          safe_str(settings_screen.yt_api_input.value),
                         "yt_download":     safe_str(settings_screen.yt_download_input.value),
@@ -279,6 +282,13 @@ class SaveMediaApp:
         main_screen.set_download_opts_provider(get_download_opts)
         settings_screen.set_notify_main_callback(main_screen.notify_tools_status)
 
+        def on_check_done():
+            nonlocal last_check_time
+            last_check_time = time.time()
+            save_config()
+
+        settings_screen.set_on_check_done_callback(on_check_done)
+
         # ── Загрузка конфига (оригинальная логика) ────────────────────────────
         def load_config():
             nonlocal download_path, proxy_enabled
@@ -323,6 +333,9 @@ class SaveMediaApp:
             settings_screen.yt_download_input.value     = fb_str(urls, "yt_download",     str(DEFAULT_CONFIG["settings"]["urls"]["yt_download"]))
             settings_screen.ffmpeg_version_input.value  = fb_str(urls, "ffmpeg_version",  str(DEFAULT_CONFIG["settings"]["urls"]["ffmpeg_version"]))
             settings_screen.ffmpeg_download_input.value = fb_str(urls, "ffmpeg_download", str(DEFAULT_CONFIG["settings"]["urls"]["ffmpeg_download"]))
+
+            nonlocal last_check_time
+            last_check_time = float(cfg.get("last_check_time", 0.0))
 
             if download_path:
                 main_screen.folder_label.value = f"Папка назначения: {download_path}"
@@ -412,4 +425,19 @@ class SaveMediaApp:
         page.update()
 
         await asyncio.sleep(0.1)
-        await settings_screen.check_tools(proxy_enabled)
+
+        # Пункт 6: проверяем версии только если прошло больше CHECK_INTERVAL_HOURS
+        now = time.time()
+        if now - last_check_time >= CHECK_INTERVAL_HOURS * 3600:
+            await settings_screen.check_tools(proxy_enabled)
+            last_check_time = now
+            save_config()
+        else:
+            mins_left = int((CHECK_INTERVAL_HOURS * 3600 - (now - last_check_time)) / 60)
+            settings_screen.progress_text.value = (
+                f"Версии проверены недавно — следующая проверка через {mins_left} мин"
+            )
+            settings_screen.progress_text.color = ft.Colors.GREY_400
+            main_screen.main_progress_text.value = "Ожидание ссылки для начала загрузки"
+            main_screen.main_progress_text.color = ft.Colors.GREEN_400
+            safe_update()
