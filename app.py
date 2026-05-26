@@ -1,11 +1,10 @@
 import asyncio
 import os
-from typing import Any, Dict
+import time
 
 import flet as ft
 
-import time
-from config import DEFAULT_CONFIG, THEME_FIELDS, CHECK_INTERVAL_HOURS, hex_to_flet, safe_str, safe_int, get_fallback_bool
+from config import DEFAULT_CONFIG, THEME_FIELDS, CHECK_INTERVAL_HOURS, hex_to_flet, safe_str
 from managers.config_manager import ConfigManager
 from managers.tools_manager import ToolsManager
 from screens.main_screen import MainScreen
@@ -28,14 +27,11 @@ class SaveMediaApp:
             except Exception:
                 pass
 
-        config_mgr  = ConfigManager(os.path.join(base_dir, "config.json"))
-        tools       = ToolsManager(base_dir, tools_dir)
-        current_theme: Dict[str, str] = dict(DEFAULT_CONFIG["theme"])
+        config_mgr = ConfigManager(os.path.join(base_dir, "config.json"))
+        tools      = ToolsManager(base_dir, tools_dir)
 
-        # ── Геометрия окна (оригинальная логика) ──────────────────────────────
+        # ── Геометрия окна — читаем до создания экранов ───────────────────────
         geo = config_mgr.load_window_geometry()
-        current_geometry = dict(geo)
-
         page.window.width  = geo["width"]
         page.window.height = geo["height"]
         page.window.left   = geo["left"]
@@ -49,21 +45,40 @@ class SaveMediaApp:
             page.window.visible       = False
 
         page.update()
-
         page.title     = "SaveMedia"
         page.padding   = 15
         page.safe_area = True
 
-        download_path   = ""
-        proxy_enabled   = False
-        last_check_time   = 0.0    # timestamp последней проверки версий
-        last_needs_update = False  # результат последней проверки
+        # ── Загружаем состояние ───────────────────────────────────────────────
+        state = config_mgr.load()
 
-        # ── Экраны ────────────────────────────────────────────────────────────
-        main_screen     = MainScreen(page, base_dir, tools_dir, safe_update, current_theme)
-        settings_screen = SettingsScreen(page, tools, safe_update, current_theme, lambda: save_config())
+        # ── Экраны получают state — никаких колбэков для передачи данных ──────
+        main_screen     = MainScreen(page, base_dir, tools_dir, safe_update, state)
+        settings_screen = SettingsScreen(page, tools, safe_update, state)
 
-        # Все переключатели для apply_theme
+        # ── Синхронизируем виджеты из state ──────────────────────────────────
+        main_screen.sync_from_state()
+        settings_screen.sync_from_state()
+        settings_screen.refresh_theme_fields()
+
+        # ── Сохранение ────────────────────────────────────────────────────────
+
+        def _sync_window_to_state():
+            w, h, l, t = page.window.width, page.window.height, page.window.left, page.window.top
+            if w and w > 10: state.window["width"]  = int(w)
+            if h and h > 10: state.window["height"] = int(h)
+            if l is not None: state.window["left"]  = int(l)
+            if t is not None: state.window["top"]   = int(t)
+
+        def save_config():
+            # Снимаем актуальные значения со всех виджетов перед записью
+            main_screen.sync_to_state()
+            settings_screen.sync_to_state()
+            _sync_window_to_state()
+            config_mgr.save(state)
+
+        # ── Тема ──────────────────────────────────────────────────────────────
+
         all_headers = [
             main_screen.header_folder, main_screen.header_main, main_screen.header_queue,
             settings_screen.header_net, settings_screen.header_rules,
@@ -77,16 +92,16 @@ class SaveMediaApp:
             settings_screen.save_to_source_switch,
         ]
 
-        # ── Применение темы (оригинальная логика) ────────────────────────────
         def apply_theme():
-            accent     = hex_to_flet(current_theme.get("accent_color",   "00B4D8"))
-            switch_c   = hex_to_flet(current_theme.get("switch_color",   "4CAF50"))
-            header_c   = hex_to_flet(current_theme.get("header_color",   "00B4D8"))
-            text_c     = hex_to_flet(current_theme.get("text_color",     "E0E0E0"))
-            progress_c = hex_to_flet(current_theme.get("progress_color", "4CAF50"))
-            button_c   = hex_to_flet(current_theme.get("button_color",   "4CAF50"))
-            appbar_c   = hex_to_flet(current_theme.get("appbar_color",   "1c1c1c"))
-            card_c     = hex_to_flet(current_theme.get("card_color",     "161616"))
+            t = state.theme
+            accent     = hex_to_flet(t.get("accent_color",   "00B4D8"))
+            switch_c   = hex_to_flet(t.get("switch_color",   "4CAF50"))
+            header_c   = hex_to_flet(t.get("header_color",   "00B4D8"))
+            text_c     = hex_to_flet(t.get("text_color",     "E0E0E0"))
+            progress_c = hex_to_flet(t.get("progress_color", "4CAF50"))
+            button_c   = hex_to_flet(t.get("button_color",   "4CAF50"))
+            appbar_c   = hex_to_flet(t.get("appbar_color",   "1c1c1c"))
+            card_c     = hex_to_flet(t.get("card_color",     "161616"))
 
             for h in all_headers:
                 h.color = header_c
@@ -112,58 +127,34 @@ class SaveMediaApp:
             if page.appbar:
                 page.appbar.bgcolor = appbar_c
 
-            if hasattr(main_screen.layout, "controls") and main_screen.layout.controls:
-                for ctrl in main_screen.layout.controls:
-                    if isinstance(ctrl, ft.Container):
-                        ctrl.bgcolor = card_c
-            if hasattr(settings_screen.layout, "controls") and settings_screen.layout.controls:
-                for ctrl in settings_screen.layout.controls:
-                    if isinstance(ctrl, ft.Container):
-                        ctrl.bgcolor = card_c
+            for layout in [main_screen.layout, settings_screen.layout]:
+                if hasattr(layout, "controls"):
+                    for ctrl in layout.controls:
+                        if isinstance(ctrl, ft.Container):
+                            ctrl.bgcolor = card_c
 
-        settings_screen.set_apply_theme_callback(apply_theme)
+        # ── Колбэки экранов — только смысловые ───────────────────────────────
 
-        # ── Сохранение конфига (оригинальная логика) ─────────────────────────
-        def synchronize_geometry_cache():
-            w, h, l, t = page.window.width, page.window.height, page.window.left, page.window.top
-            if w is not None and w > 10: current_geometry["width"]  = int(w)
-            if h is not None and h > 10: current_geometry["height"] = int(h)
-            if l is not None: current_geometry["left"] = int(l)
-            if t is not None: current_geometry["top"]  = int(t)
+        settings_screen.set_on_theme_changed(apply_theme)
+        settings_screen.set_on_notify_main(main_screen.notify_tools_status)
+        settings_screen.set_on_settings_changed(save_config)
+        settings_screen.set_on_check_done(lambda: (
+            setattr(state, "last_check_time",   time.time()),
+            setattr(state, "last_needs_update",
+                    settings_screen._tools.yt_needs_update or settings_screen._tools.ffmpeg_needs_update),
+            save_config()
+        ))
 
-        def save_config():
-            nonlocal download_path
-            synchronize_geometry_cache()
-            config_data = {
-                "settings": {
-                    "download_path":         download_path,
-                    "proxy_address":         safe_str(settings_screen.proxy_input.value),
-                    "proxy_enabled":         proxy_enabled,
-                    "yt_dlp_args":           safe_str(settings_screen.yt_args_input.value),
-                    "audio_only":            bool(main_screen.audio_only_switch.value),
-                    "cookies_browser":       safe_str(settings_screen.cookies_browser_dropdown.value),
-                    "cookies_enabled":       bool(main_screen.cookies_enabled_switch.value),
-                    "embed_metadata":        bool(settings_screen.embed_metadata_switch.value),
-                    "playlist_enabled":      bool(settings_screen.playlist_switch.value),
-                    "clean_titles":          bool(settings_screen.clean_titles_switch.value),
-                    "save_to_source_folder": bool(settings_screen.save_to_source_switch.value),
-                    "last_check_time":       last_check_time,
-                    "last_needs_update":     last_needs_update,
-                    "urls": {
-                        "yt_api":          safe_str(settings_screen.yt_api_input.value),
-                        "yt_download":     safe_str(settings_screen.yt_download_input.value),
-                        "ffmpeg_version":  safe_str(settings_screen.ffmpeg_version_input.value),
-                        "ffmpeg_download": safe_str(settings_screen.ffmpeg_download_input.value),
-                    },
-                },
-                "window": current_geometry,
-                "theme":  dict(current_theme),
-            }
-            config_mgr.save(config_data)
+        main_screen._on_status = lambda msg, color: (
+            setattr(status_bar_text, "value", msg),
+            setattr(status_bar_text, "color", color),
+            safe_update()
+        )
 
         # ── Кнопки тулбара ────────────────────────────────────────────────────
+
         def update_proxy_button_ui():
-            if proxy_enabled:
+            if state.proxy_enabled:
                 proxy_btn.icon       = ft.Icons.SHIELD_ROUNDED
                 proxy_btn.icon_color = ft.Colors.GREEN_400
                 proxy_btn.tooltip    = "Прокси: ВКЛ"
@@ -174,9 +165,6 @@ class SaveMediaApp:
 
         def update_cookies_ui():
             settings_screen.update_cookies_ui(main_screen.cookies_enabled_switch)
-
-        settings_screen.set_cookies_change_callback(update_cookies_ui)
-        settings_screen.set_proxy_enabled_callback(lambda: proxy_enabled)
 
         folder_btn   = ft.IconButton(icon=ft.Icons.FOLDER_OPEN_ROUNDED, icon_color=ft.Colors.WHITE, tooltip="Выбрать папку")
         proxy_btn    = ft.IconButton(icon=ft.Icons.SHIELD_OUTLINED,     icon_color=ft.Colors.WHITE, tooltip="Прокси")
@@ -195,20 +183,15 @@ class SaveMediaApp:
 
         exit_btn.on_click = force_exit_app
 
-        # ── Навигация (оригинальная логика) ───────────────────────────────────
+        # ── Навигация ─────────────────────────────────────────────────────────
+
         status_bar_text = ft.Text("", size=12, color=ft.Colors.GREEN_400)
         main_status_container = ft.Container(
             content=status_bar_text, padding=ft.Padding(left=10, right=10)
         )
-
-        def notify_status(message: str, color) -> None:
-            status_bar_text.value = message
-            status_bar_text.color = color
-            safe_update()
-
-        main_screen.set_status_notify_callback(notify_status)
         settings_status_container = ft.Container(
-            content=ft.Column([settings_screen.progress_text, settings_screen.progress_bar], spacing=4, tight=True),
+            content=ft.Column([settings_screen.progress_text, settings_screen.progress_bar],
+                              spacing=4, tight=True),
             padding=ft.Padding(left=10, right=10)
         )
 
@@ -217,7 +200,7 @@ class SaveMediaApp:
             settings_screen.layout.visible = True
             page.appbar = ft.AppBar(
                 title=ft.Text("Настройки конфигурации", size=18, weight=ft.FontWeight.W_600),
-                bgcolor=hex_to_flet(current_theme.get("appbar_color", "1c1c1c")),
+                bgcolor=hex_to_flet(state.theme.get("appbar_color", "1c1c1c")),
                 leading=ft.IconButton(
                     icon=ft.Icons.ARROW_BACK_IOS_NEW_ROUNDED,
                     icon_color=ft.Colors.WHITE,
@@ -235,7 +218,7 @@ class SaveMediaApp:
             settings_screen.layout.visible = False
             page.appbar = ft.AppBar(
                 title=ft.Text("SaveMedia [yt-dlp GUI]", size=18, weight=ft.FontWeight.W_600),
-                bgcolor=hex_to_flet(current_theme.get("appbar_color", "1c1c1c")),
+                bgcolor=hex_to_flet(state.theme.get("appbar_color", "1c1c1c")),
                 actions=[settings_btn, proxy_btn, folder_btn, exit_btn]
             )
             page.bottom_appbar.content = main_status_container
@@ -244,20 +227,18 @@ class SaveMediaApp:
         async def open_folder_picker(_):
             path = await ft.FilePicker().get_directory_path(dialog_title="Выберите папку сохранения медиа")
             if path:
-                nonlocal download_path
-                download_path = str(path)
-                main_screen.folder_label.value = f"{path}"
+                state.download_path            = str(path)
+                main_screen.folder_label.value = str(path)
                 main_screen.folder_label.color = ft.Colors.GREEN_400
                 try:
-                    os.makedirs(download_path, exist_ok=True)
+                    os.makedirs(state.download_path, exist_ok=True)
                 except Exception:
                     pass
                 save_config()
                 safe_update()
 
         def toggle_proxy(_):
-            nonlocal proxy_enabled
-            proxy_enabled = not proxy_enabled
+            state.proxy_enabled = not state.proxy_enabled
             update_proxy_button_ui()
             save_config()
             safe_update()
@@ -266,87 +247,7 @@ class SaveMediaApp:
         proxy_btn.on_click    = toggle_proxy
         settings_btn.on_click = show_settings
 
-        # Провайдер параметров загрузки для MainScreen
-        def get_download_opts() -> dict:
-            return {
-                "download_path":   download_path,
-                "proxy_enabled":   proxy_enabled,
-                "proxy_address":   safe_str(settings_screen.proxy_input.value),
-                "cookies_enabled": bool(main_screen.cookies_enabled_switch.value),
-                "cookies_browser": safe_str(settings_screen.cookies_browser_dropdown.value),
-                "playlist_enabled":bool(settings_screen.playlist_switch.value),
-                "embed_metadata":  bool(settings_screen.embed_metadata_switch.value),
-                "audio_only":      bool(main_screen.audio_only_switch.value),
-                "yt_dlp_args":     safe_str(settings_screen.yt_args_input.value),
-                "clean_titles":    bool(settings_screen.clean_titles_switch.value),
-                "save_to_source":  bool(settings_screen.save_to_source_switch.value),
-            }
-
-        main_screen.set_download_opts_provider(get_download_opts)
-        settings_screen.set_notify_main_callback(main_screen.notify_tools_status)
-
-        def on_check_done():
-            nonlocal last_check_time, last_needs_update
-            last_check_time   = time.time()
-            last_needs_update = settings_screen._tools.yt_needs_update or settings_screen._tools.ffmpeg_needs_update
-            save_config()
-
-        settings_screen.set_on_check_done_callback(on_check_done)
-
-        # ── Загрузка конфига (оригинальная логика) ────────────────────────────
-        def load_config():
-            nonlocal download_path, proxy_enabled
-            config_data = config_mgr.load()
-
-            saved_theme = config_data.get("theme", {})
-            if isinstance(saved_theme, dict):
-                for key in DEFAULT_CONFIG["theme"]:
-                    current_theme[key] = (
-                        safe_str(saved_theme.get(key, DEFAULT_CONFIG["theme"][key]))
-                        or DEFAULT_CONFIG["theme"][key]
-                    )
-
-            cfg = config_data.get("settings", {})
-            download_path = safe_str(cfg.get("download_path", ""))
-            if not download_path:
-                download_path = os.path.join(os.path.expanduser("~"), "Downloads")
-            try:
-                os.makedirs(download_path, exist_ok=True)
-            except Exception:
-                pass
-
-            def fb_str(d, k, def_val):
-                return def_val if d.get(k) is None or d.get(k) == "" else str(d.get(k))
-
-            settings_screen.proxy_input.value    = fb_str(cfg, "proxy_address", str(DEFAULT_CONFIG["settings"]["proxy_address"]))
-            proxy_enabled                         = bool(cfg.get("proxy_enabled", DEFAULT_CONFIG["settings"]["proxy_enabled"]))
-            settings_screen.yt_args_input.value  = fb_str(cfg, "yt_dlp_args",  str(DEFAULT_CONFIG["settings"]["yt_dlp_args"]))
-
-            main_screen.audio_only_switch.value          = get_fallback_bool(cfg, "audio_only",           bool(DEFAULT_CONFIG["settings"]["audio_only"]))
-            settings_screen.clean_titles_switch.value    = get_fallback_bool(cfg, "clean_titles",          bool(DEFAULT_CONFIG["settings"]["clean_titles"]))
-            settings_screen.playlist_switch.value        = get_fallback_bool(cfg, "playlist_enabled",      bool(DEFAULT_CONFIG["settings"]["playlist_enabled"]))
-            settings_screen.embed_metadata_switch.value  = get_fallback_bool(cfg, "embed_metadata",        bool(DEFAULT_CONFIG["settings"]["embed_metadata"]))
-            settings_screen.save_to_source_switch.value  = get_fallback_bool(cfg, "save_to_source_folder", bool(DEFAULT_CONFIG["settings"]["save_to_source_folder"]))
-
-            settings_screen.cookies_browser_dropdown.value = fb_str(cfg, "cookies_browser", str(DEFAULT_CONFIG["settings"]["cookies_browser"]))
-            main_screen.cookies_enabled_switch.value        = get_fallback_bool(cfg, "cookies_enabled", bool(DEFAULT_CONFIG["settings"]["cookies_enabled"]))
-
-            urls = cfg.get("urls", {})
-            settings_screen.yt_api_input.value          = fb_str(urls, "yt_api",          str(DEFAULT_CONFIG["settings"]["urls"]["yt_api"]))
-            settings_screen.yt_download_input.value     = fb_str(urls, "yt_download",     str(DEFAULT_CONFIG["settings"]["urls"]["yt_download"]))
-            settings_screen.ffmpeg_version_input.value  = fb_str(urls, "ffmpeg_version",  str(DEFAULT_CONFIG["settings"]["urls"]["ffmpeg_version"]))
-            settings_screen.ffmpeg_download_input.value = fb_str(urls, "ffmpeg_download", str(DEFAULT_CONFIG["settings"]["urls"]["ffmpeg_download"]))
-
-            nonlocal last_check_time, last_needs_update
-            last_check_time   = float(cfg.get("last_check_time", 0.0))
-            last_needs_update = bool(cfg.get("last_needs_update", False))
-
-            if download_path:
-                main_screen.folder_label.value = f"{download_path}"
-                main_screen.folder_label.color = ft.Colors.GREEN_400
-
-            update_proxy_button_ui()
-            update_cookies_ui()
+        # ── Закрытие окна ─────────────────────────────────────────────────────
 
         async def handle_window_event(e):
             ev = str(getattr(e, "type", None) or getattr(e, "data", None)).lower()
@@ -371,8 +272,8 @@ class SaveMediaApp:
         page.bottom_appbar = ft.BottomAppBar(content=main_status_container, bgcolor="#141414")
 
         # ── Финальная инициализация ───────────────────────────────────────────
-        load_config()
-        settings_screen.refresh_theme_fields()
+        update_proxy_button_ui()
+        update_cookies_ui()
         apply_theme()
         page.add(main_screen.layout, settings_screen.layout)
 
@@ -382,24 +283,20 @@ class SaveMediaApp:
 
         await asyncio.sleep(0.1)
 
-        # Пункт 6: проверяем версии только если прошло больше CHECK_INTERVAL_HOURS
+        # ── Фоновая проверка версий ───────────────────────────────────────────
         now = time.time()
-        if now - last_check_time >= CHECK_INTERVAL_HOURS * 3600:
-            # run_task — проверка идёт в фоне, UI не блокируется
+        if now - state.last_check_time >= CHECK_INTERVAL_HOURS * 3600:
             async def _do_check():
-                nonlocal last_check_time
-                await settings_screen.check_tools(proxy_enabled)
-                last_check_time = time.time()
-                save_config()
+                await settings_screen.check_tools()
             page.run_task(_do_check)
         else:
-            mins_left = int((CHECK_INTERVAL_HOURS * 3600 - (now - last_check_time)) / 60)
+            mins_left = int((CHECK_INTERVAL_HOURS * 3600 - (now - state.last_check_time)) / 60)
             settings_screen.progress_text.value = (
                 f"Версии проверены недавно — следующая проверка через {mins_left} мин"
             )
             settings_screen.progress_text.color = ft.Colors.GREY_400
-            # Восстанавливаем статус кнопки и уведомление из сохранённого результата
-            if last_needs_update:
+
+            if state.last_needs_update:
                 settings_screen.update_btn_text.value = "Обновить скрипты"
                 settings_screen.update_btn_icon.name  = ft.Icons.DOWNLOAD_ROUNDED
                 settings_screen._tools.yt_needs_update = True
@@ -410,6 +307,7 @@ class SaveMediaApp:
                 settings_screen.update_btn_icon.name  = ft.Icons.REFRESH_ROUNDED
                 tool_msg   = "Актуально"
                 tool_color = ft.Colors.GREEN_400
+
             for w, name in [
                 (settings_screen.yt_status,      "yt-dlp"),
                 (settings_screen.ffmpeg_status,  "ffmpeg"),
@@ -418,5 +316,6 @@ class SaveMediaApp:
             ]:
                 w.value = f"{name}: {tool_msg}"
                 w.color = tool_color
-            main_screen.notify_tools_status(last_needs_update)
+
+            main_screen.notify_tools_status(state.last_needs_update)
             safe_update()

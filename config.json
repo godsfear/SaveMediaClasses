@@ -11,7 +11,7 @@
         "playlist_enabled": true,
         "clean_titles": true,
         "save_to_source_folder": true,
-        "last_check_time": 1779787121.9733658,
+        "last_check_time": 1779835254.3861434,
         "last_needs_update": false,
         "urls": {
             "yt_api": "https://api.github.com/repos/yt-dlp/yt-dlp/releases/latest",
@@ -23,8 +23,8 @@
     "window": {
         "width": 643,
         "height": 1098,
-        "left": 2300,
-        "top": 199
+        "left": 3561,
+        "top": 228
     },
     "theme": {
         "accent_color": "00B4D8",
