@@ -61,10 +61,10 @@ class SettingsScreen:
         )
         self.cookies_browser_dropdown.on_change = self._on_browser_dropdown_change
 
-        self.yt_status      = ft.Text("yt-dlp: Проверка...",  color=ft.Colors.ORANGE_400, size=13, weight=ft.FontWeight.BOLD)
-        self.ffmpeg_status  = ft.Text("ffmpeg: Проверка...",  color=ft.Colors.ORANGE_400, size=13, weight=ft.FontWeight.BOLD)
-        self.ffplay_status  = ft.Text("ffplay: Проверка...",  color=ft.Colors.ORANGE_400, size=13, weight=ft.FontWeight.BOLD)
-        self.ffprobe_status = ft.Text("ffprobe: Проверка...", color=ft.Colors.ORANGE_400, size=13, weight=ft.FontWeight.BOLD)
+        self.yt_status      = ft.Text("yt-dlp: —",  color=ft.Colors.GREY_600, size=13, weight=ft.FontWeight.BOLD)
+        self.ffmpeg_status  = ft.Text("ffmpeg: —",  color=ft.Colors.GREY_600, size=13, weight=ft.FontWeight.BOLD)
+        self.ffplay_status  = ft.Text("ffplay: —",  color=ft.Colors.GREY_600, size=13, weight=ft.FontWeight.BOLD)
+        self.ffprobe_status = ft.Text("ffprobe: —", color=ft.Colors.GREY_600, size=13, weight=ft.FontWeight.BOLD)
 
         self.progress_text = ft.Text("Компоненты: ожидание действий", size=12, color=ft.Colors.GREEN_400)
         self.progress_bar  = ft.ProgressBar(
@@ -263,7 +263,6 @@ class SettingsScreen:
     async def check_tools(self, proxy_enabled: bool) -> None:
         self.progress_text.value = "Проверка версий..."
         self.progress_text.color = ft.Colors.GREEN_400
-        self._safe_update()
         await asyncio.sleep(0.02)
 
         tool_status_map = {
@@ -276,7 +275,8 @@ class SettingsScreen:
         def on_local_version(name: str, version: str):
             tool_status_map[name].value = f"{name}: Локально: {version} | Сеть: опрос..."
             tool_status_map[name].color = ft.Colors.ORANGE_400
-            self._safe_update()
+            # Не вызываем _safe_update() — экран может быть закрыт,
+            # финальное обновление будет в конце check_tools
 
         def on_remote_done(name: str, loc: str, rem: str):
             tool_status_map[name].value = f"{name}: Локально: {loc} | Сеть: {rem}"
@@ -293,7 +293,7 @@ class SettingsScreen:
                 tool_status_map[name].color = ft.Colors.GREEN_400
             else:
                 tool_status_map[name].color = ft.Colors.ORANGE_400
-            self._safe_update()
+            # Не вызываем _safe_update() — финальное обновление в конце check_tools
 
         proxy_url = safe_str(self.proxy_input.value).strip() if proxy_enabled else None
 
@@ -320,7 +320,8 @@ class SettingsScreen:
         self.update_btn.disabled = False
         self._notify_main_callback(needs)
         self._on_check_done_callback()
-        self._safe_update()
+        # page.update() напрямую — обновляет виджеты даже если layout невидим
+        self._page.update()
 
     async def _update_tools(self, proxy_enabled: bool) -> None:
         self.update_btn.disabled       = True

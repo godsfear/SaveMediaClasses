@@ -1,7 +1,7 @@
 {
     "settings": {
         "download_path": "d:\\Downloads",
-        "proxy_address": "socks5://127.0.0.1:1080",
+        "proxy_address": "socks5://127.0.0.1:9050",
         "proxy_enabled": false,
         "yt_dlp_args": "-f bestvideo+bestaudio/best --merge-output-format mp4",
         "audio_only": false,
@@ -12,7 +12,8 @@
         "clean_titles": true,
         "save_to_source_folder": true,
         "minimize_to_tray": true,
-        "last_check_time": 1779686995.1630507,
+        "last_check_time": 1779787121.9733658,
+        "last_needs_update": false,
         "urls": {
             "yt_api": "https://api.github.com/repos/yt-dlp/yt-dlp/releases/latest",
             "yt_download": "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe",
@@ -22,9 +23,9 @@
     },
     "window": {
         "width": 600,
-        "height": 650,
-        "left": 3139,
-        "top": 474
+        "height": 1098,
+        "left": 3717,
+        "top": 152
     },
     "theme": {
         "accent_color": "00B4D8",

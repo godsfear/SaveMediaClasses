@@ -8,12 +8,13 @@ from config import safe_str
 
 
 class Downloader:
+    """Один экземпляр = одна загрузка. Для параллельных загрузок создаётся несколько экземпляров."""
 
     def __init__(self, base_dir: str, tools_dir: str) -> None:
         self.base_dir  = base_dir
         self.tools_dir = tools_dir
         self._ext      = ".exe" if os.name == "nt" else ""
-        self._sub_proc = None  # текущий подпроцесс — для отмены (пункт 1)
+        self._sub_proc = None
 
     def resolve_yt_dlp(self) -> str:
         filename = f"yt-dlp{self._ext}"
@@ -21,7 +22,6 @@ class Downloader:
         return p_tools if os.path.exists(p_tools) and os.path.getsize(p_tools) > 0 else ""
 
     def cancel(self) -> None:
-        """Прерывает текущую загрузку (пункт 1)."""
         if self._sub_proc and self._sub_proc.returncode is None:
             try:
                 self._sub_proc.terminate()
@@ -110,5 +110,4 @@ class Downloader:
 
     @staticmethod
     def is_valid_url(url: str) -> bool:
-        """Базовая валидация URL (пункт 5)."""
         return url.startswith("http://") or url.startswith("https://")
