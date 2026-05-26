@@ -11,7 +11,6 @@
         "playlist_enabled": true,
         "clean_titles": true,
         "save_to_source_folder": true,
-        "minimize_to_tray": true,
         "last_check_time": 1779787121.9733658,
         "last_needs_update": false,
         "urls": {
@@ -22,10 +21,10 @@
         }
     },
     "window": {
-        "width": 845,
+        "width": 643,
         "height": 1098,
-        "left": 3407,
-        "top": 170
+        "left": 2300,
+        "top": 199
     },
     "theme": {
         "accent_color": "00B4D8",

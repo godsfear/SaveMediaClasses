@@ -1,11 +1,8 @@
 import asyncio
 import os
-import threading
 from typing import Any, Dict
 
 import flet as ft
-from PIL import Image, ImageDraw
-import pystray
 
 import time
 from config import DEFAULT_CONFIG, THEME_FIELDS, CHECK_INTERVAL_HOURS, hex_to_flet, safe_str, safe_int, get_fallback_bool
@@ -75,7 +72,7 @@ class SaveMediaApp:
         ]
         all_switches = [
             main_screen.audio_only_switch, main_screen.cookies_enabled_switch,
-            settings_screen.minimize_to_tray_switch, settings_screen.clean_titles_switch,
+            settings_screen.clean_titles_switch,
             settings_screen.playlist_switch, settings_screen.embed_metadata_switch,
             settings_screen.save_to_source_switch,
         ]
@@ -150,7 +147,6 @@ class SaveMediaApp:
                     "playlist_enabled":      bool(settings_screen.playlist_switch.value),
                     "clean_titles":          bool(settings_screen.clean_titles_switch.value),
                     "save_to_source_folder": bool(settings_screen.save_to_source_switch.value),
-                    "minimize_to_tray":      bool(settings_screen.minimize_to_tray_switch.value),
                     "last_check_time":       last_check_time,
                     "last_needs_update":     last_needs_update,
                     "urls": {
@@ -331,7 +327,6 @@ class SaveMediaApp:
             settings_screen.playlist_switch.value        = get_fallback_bool(cfg, "playlist_enabled",      bool(DEFAULT_CONFIG["settings"]["playlist_enabled"]))
             settings_screen.embed_metadata_switch.value  = get_fallback_bool(cfg, "embed_metadata",        bool(DEFAULT_CONFIG["settings"]["embed_metadata"]))
             settings_screen.save_to_source_switch.value  = get_fallback_bool(cfg, "save_to_source_folder", bool(DEFAULT_CONFIG["settings"]["save_to_source_folder"]))
-            settings_screen.minimize_to_tray_switch.value = get_fallback_bool(cfg, "minimize_to_tray",     bool(DEFAULT_CONFIG["settings"]["minimize_to_tray"]))
 
             settings_screen.cookies_browser_dropdown.value = fb_str(cfg, "cookies_browser", str(DEFAULT_CONFIG["settings"]["cookies_browser"]))
             main_screen.cookies_enabled_switch.value        = get_fallback_bool(cfg, "cookies_enabled", bool(DEFAULT_CONFIG["settings"]["cookies_enabled"]))
@@ -353,48 +348,6 @@ class SaveMediaApp:
             update_proxy_button_ui()
             update_cookies_ui()
 
-        # ── Трей (оригинальная логика) ────────────────────────────────────────
-        def show_tray():
-            try:
-                if os.path.exists("SaveMedia.png"):
-                    image = Image.open("SaveMedia.png")
-                else:
-                    raise FileNotFoundError
-            except Exception:
-                image = Image.new("RGBA", (64, 64), color=(30, 30, 30, 255))
-                draw  = ImageDraw.Draw(image)
-                draw.ellipse([10, 10, 54, 54], fill=(0, 119, 255, 255))
-
-            def on_restore(icon, item):
-                icon.stop()
-                async def restore_ui():
-                    page.window.visible   = True
-                    page.window.minimized = False
-                    page.update()
-                page.run_task(restore_ui)
-
-            def on_quit(icon, item):
-                icon.stop()
-                try:
-                    save_config()
-                except Exception:
-                    pass
-                async def kill_window():
-                    page.window.prevent_close = False
-                    page.window.on_event      = None
-                    page.update()
-                    await page.window.destroy()
-                page.run_task(kill_window)
-
-            menu = pystray.Menu(
-                pystray.MenuItem("Развернуть", on_restore, default=True),
-                pystray.MenuItem("Выход", on_quit)
-            )
-            icon = pystray.Icon("SaveMedia", image, "SaveMedia", menu)
-            page.window.visible = False
-            page.update()
-            threading.Thread(target=icon.run, daemon=True).start()
-
         async def handle_window_event(e):
             ev = str(getattr(e, "type", None) or getattr(e, "data", None)).lower()
             if "close" in ev:
@@ -402,16 +355,10 @@ class SaveMediaApp:
                     save_config()
                 except Exception:
                     pass
-                if settings_screen.minimize_to_tray_switch.value:
-                    show_tray()
-                else:
-                    page.window.prevent_close = False
-                    page.window.on_event      = None
-                    page.update()
-                    await page.window.destroy()
-            elif "minimize" in ev:
-                if settings_screen.minimize_to_tray_switch.value:
-                    show_tray()
+                page.window.prevent_close = False
+                page.window.on_event      = None
+                page.update()
+                await page.window.destroy()
 
         page.window.on_event = handle_window_event
 

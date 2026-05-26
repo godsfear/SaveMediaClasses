@@ -40,7 +40,6 @@ class SettingsScreen:
             label="Параметры качества / Аргументы yt-dlp", border_radius=8,
             focused_border_color=ft.Colors.BLUE
         )
-        self.minimize_to_tray_switch = ft.Switch(label="Сворачивать в трей при закрытии", active_color=ft.Colors.GREEN, value=False)
         self.clean_titles_switch     = ft.Switch(label="Чистые названия файлов (без ID)", active_color=ft.Colors.GREEN)
         self.playlist_switch         = ft.Switch(label="Скачивать плейлисты целиком",     active_color=ft.Colors.GREEN)
         self.embed_metadata_switch   = ft.Switch(label="Обогащать файлы (метаданные/обложка)", active_color=ft.Colors.GREEN)
@@ -422,7 +421,6 @@ class SettingsScreen:
                     self.header_net,
                     self.proxy_input,
                     self.cookies_browser_dropdown,
-                    ft.Column([self.minimize_to_tray_switch], spacing=10)
                 ], spacing=12, horizontal_alignment=ft.CrossAxisAlignment.STRETCH),
                 bgcolor="#161616", border_radius=8, padding=15
             ),
