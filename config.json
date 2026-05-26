@@ -22,10 +22,10 @@
         }
     },
     "window": {
-        "width": 600,
+        "width": 845,
         "height": 1098,
-        "left": 3717,
-        "top": 152
+        "left": 3407,
+        "top": 170
     },
     "theme": {
         "accent_color": "00B4D8",

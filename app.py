@@ -417,7 +417,7 @@ class SaveMediaApp:
 
         # ── AppBar / BottomAppBar ──────────────────────────────────────────────
         page.appbar = ft.AppBar(
-            title=ft.Text("SaveMedia Dashboard", size=18, weight=ft.FontWeight.W_600),
+            title=ft.Text("SaveMedia [yt-dlp GUI]", size=18, weight=ft.FontWeight.W_600),
             bgcolor="#1c1c1c",
             actions=[settings_btn, proxy_btn, folder_btn, exit_btn]
         )
