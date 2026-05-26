@@ -17,7 +17,6 @@ DEFAULT_CONFIG: Dict[str, Any] = {
         "playlist_enabled": False,
         "clean_titles": False,
         "save_to_source_folder": False,
-        "minimize_to_tray": False,
         "last_check_time": 0.0,
         "last_needs_update": False,
         "urls": {
