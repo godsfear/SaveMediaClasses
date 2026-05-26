@@ -1,5 +1,7 @@
 import asyncio
 import os
+import subprocess
+import sys
 
 import flet as ft
 
@@ -136,11 +138,18 @@ class MainScreen:
         )
 
         # Список карточек загрузок
-        self._cards_column = ft.Column(spacing=6, visible=False)
+        self._cards_column = ft.Column(spacing=6)
 
         self.header_folder = ft.Text("Папка назначения", size=14, weight=ft.FontWeight.BOLD, color=ft.Colors.CYAN_400)
         self.header_main   = ft.Text("Управление загрузкой", size=14, weight=ft.FontWeight.BOLD, color=ft.Colors.CYAN_400)
         self.header_queue  = ft.Text("Очередь загрузок", size=14, weight=ft.FontWeight.BOLD, color=ft.Colors.CYAN_400)
+        self._log_btn = ft.IconButton(
+            icon=ft.Icons.RECEIPT_LONG_ROUNDED,
+            icon_color=ft.Colors.GREY_500,
+            icon_size=18,
+            tooltip="Открыть лог",
+            on_click=lambda _: self._open_log(os.path.join(self._base_dir, "savemedia.log"))
+        )
 
     def _build_layout(self) -> None:
         # Карточка папки назначения
@@ -166,11 +175,12 @@ class MainScreen:
         # Контейнер очереди загрузок
         self._queue_card = ft.Container(
             content=ft.Column([
-                self.header_queue,
+                ft.Row([self.header_queue, self._log_btn],
+                       alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                       vertical_alignment=ft.CrossAxisAlignment.CENTER),
                 self._cards_column,
             ], spacing=10, horizontal_alignment=ft.CrossAxisAlignment.STRETCH),
             bgcolor="#161616", border_radius=8, padding=15,
-            visible=False
         )
 
         self.layout = ft.Column([
@@ -198,8 +208,6 @@ class MainScreen:
     def _add_card(self, card: DownloadCard) -> None:
         self._cards.append(card)
         self._cards_column.controls.append(card.container)
-        self._cards_column.visible = True
-        self._queue_card.visible   = True
         self._update_download_btn()
         self._safe_update()
 
@@ -208,9 +216,6 @@ class MainScreen:
             self._cards.remove(card)
         if card.container in self._cards_column.controls:
             self._cards_column.controls.remove(card.container)
-        if not self._cards:
-            self._cards_column.visible = False
-            self._queue_card.visible   = False
         self._update_download_btn()
         self._safe_update()
 
@@ -288,14 +293,16 @@ class MainScreen:
             if card.cancelled:
                 return
 
-            # Пишем в лог-файл
-            try:
-                with open(log_path, "a", encoding="utf-8") as lf:
-                    lf.write(line_text + "\n")
-            except Exception:
-                pass
-
             pct = Downloader.parse_progress(line_text)
+
+            # Пишем в лог-файл — строки с прогрессом пропускаем
+            if pct is None:
+                try:
+                    with open(log_path, "a", encoding="utf-8") as lf:
+                        lf.write(line_text + "\n")
+                except Exception:
+                    pass
+
             if pct is not None:
                 # Извлекаем имя файла из строки прогресса если есть
                 status = line_text.replace("[download]", "").strip()
@@ -330,6 +337,20 @@ class MainScreen:
         self._safe_update()
         await asyncio.sleep(3)
         self._remove_card(card)
+
+    # ── Утилиты ───────────────────────────────────────────────────────────────
+
+    @staticmethod
+    def _open_log(path: str) -> None:
+        try:
+            if sys.platform == "win32":
+                os.startfile(path)
+            elif sys.platform == "darwin":
+                subprocess.Popen(["open", path])
+            else:
+                subprocess.Popen(["xdg-open", path])
+        except Exception:
+            pass
 
     # ── Уведомление в статус-бар (через колбэк из App) ───────────────────────
 
