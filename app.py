@@ -11,7 +11,6 @@ import time
 from config import DEFAULT_CONFIG, THEME_FIELDS, CHECK_INTERVAL_HOURS, hex_to_flet, safe_str, safe_int, get_fallback_bool
 from managers.config_manager import ConfigManager
 from managers.tools_manager import ToolsManager
-from managers.downloader import Downloader
 from screens.main_screen import MainScreen
 from screens.settings_screen import SettingsScreen
 
@@ -34,8 +33,6 @@ class SaveMediaApp:
 
         config_mgr  = ConfigManager(os.path.join(base_dir, "config.json"))
         tools       = ToolsManager(base_dir, tools_dir)
-        downloader  = Downloader(base_dir, tools_dir)
-
         current_theme: Dict[str, str] = dict(DEFAULT_CONFIG["theme"])
 
         # ── Геометрия окна (оригинальная логика) ──────────────────────────────
@@ -62,15 +59,16 @@ class SaveMediaApp:
 
         download_path   = ""
         proxy_enabled   = False
-        last_check_time = 0.0  # timestamp последней проверки версий
+        last_check_time   = 0.0    # timestamp последней проверки версий
+        last_needs_update = False  # результат последней проверки
 
         # ── Экраны ────────────────────────────────────────────────────────────
-        main_screen     = MainScreen(page, downloader, safe_update, current_theme)
+        main_screen     = MainScreen(page, base_dir, tools_dir, safe_update, current_theme)
         settings_screen = SettingsScreen(page, tools, safe_update, current_theme, lambda: save_config())
 
         # Все переключатели для apply_theme
         all_headers = [
-            main_screen.header_main, main_screen.header_log,
+            main_screen.header_folder, main_screen.header_main, main_screen.header_queue,
             settings_screen.header_net, settings_screen.header_rules,
             settings_screen.header_deps, settings_screen.header_theme,
             settings_screen.header_urls,
@@ -100,8 +98,6 @@ class SaveMediaApp:
 
             main_screen.download_btn.bgcolor        = button_c
             settings_screen.update_btn.bgcolor      = button_c
-            main_screen.main_progress_text.color    = progress_c
-            main_screen.main_progress_bar.color     = progress_c
             settings_screen.progress_text.color     = progress_c
             settings_screen.progress_bar.color      = progress_c
 
@@ -120,7 +116,9 @@ class SaveMediaApp:
                 page.appbar.bgcolor = appbar_c
 
             if hasattr(main_screen.layout, "controls") and main_screen.layout.controls:
-                main_screen.layout.controls[0].bgcolor = card_c
+                for ctrl in main_screen.layout.controls:
+                    if isinstance(ctrl, ft.Container):
+                        ctrl.bgcolor = card_c
             if hasattr(settings_screen.layout, "controls") and settings_screen.layout.controls:
                 for ctrl in settings_screen.layout.controls:
                     if isinstance(ctrl, ft.Container):
@@ -154,6 +152,7 @@ class SaveMediaApp:
                     "save_to_source_folder": bool(settings_screen.save_to_source_switch.value),
                     "minimize_to_tray":      bool(settings_screen.minimize_to_tray_switch.value),
                     "last_check_time":       last_check_time,
+                    "last_needs_update":     last_needs_update,
                     "urls": {
                         "yt_api":          safe_str(settings_screen.yt_api_input.value),
                         "yt_download":     safe_str(settings_screen.yt_download_input.value),
@@ -201,9 +200,17 @@ class SaveMediaApp:
         exit_btn.on_click = force_exit_app
 
         # ── Навигация (оригинальная логика) ───────────────────────────────────
+        status_bar_text = ft.Text("", size=12, color=ft.Colors.GREEN_400)
         main_status_container = ft.Container(
-            content=main_screen.folder_label, padding=ft.Padding(left=10, right=10)
+            content=status_bar_text, padding=ft.Padding(left=10, right=10)
         )
+
+        def notify_status(message: str, color) -> None:
+            status_bar_text.value = message
+            status_bar_text.color = color
+            safe_update()
+
+        main_screen.set_status_notify_callback(notify_status)
         settings_status_container = ft.Container(
             content=ft.Column([settings_screen.progress_text, settings_screen.progress_bar], spacing=4, tight=True),
             padding=ft.Padding(left=10, right=10)
@@ -231,7 +238,7 @@ class SaveMediaApp:
             main_screen.layout.visible     = True
             settings_screen.layout.visible = False
             page.appbar = ft.AppBar(
-                title=ft.Text("SaveMedia Dashboard", size=18, weight=ft.FontWeight.W_600),
+                title=ft.Text("SaveMedia [yt-dlp GUI]", size=18, weight=ft.FontWeight.W_600),
                 bgcolor=hex_to_flet(current_theme.get("appbar_color", "1c1c1c")),
                 actions=[settings_btn, proxy_btn, folder_btn, exit_btn]
             )
@@ -243,7 +250,7 @@ class SaveMediaApp:
             if path:
                 nonlocal download_path
                 download_path = str(path)
-                main_screen.folder_label.value = f"Папка назначения: {path}"
+                main_screen.folder_label.value = f"{path}"
                 main_screen.folder_label.color = ft.Colors.GREEN_400
                 try:
                     os.makedirs(download_path, exist_ok=True)
@@ -283,8 +290,9 @@ class SaveMediaApp:
         settings_screen.set_notify_main_callback(main_screen.notify_tools_status)
 
         def on_check_done():
-            nonlocal last_check_time
-            last_check_time = time.time()
+            nonlocal last_check_time, last_needs_update
+            last_check_time   = time.time()
+            last_needs_update = settings_screen._tools.yt_needs_update or settings_screen._tools.ffmpeg_needs_update
             save_config()
 
         settings_screen.set_on_check_done_callback(on_check_done)
@@ -334,11 +342,12 @@ class SaveMediaApp:
             settings_screen.ffmpeg_version_input.value  = fb_str(urls, "ffmpeg_version",  str(DEFAULT_CONFIG["settings"]["urls"]["ffmpeg_version"]))
             settings_screen.ffmpeg_download_input.value = fb_str(urls, "ffmpeg_download", str(DEFAULT_CONFIG["settings"]["urls"]["ffmpeg_download"]))
 
-            nonlocal last_check_time
-            last_check_time = float(cfg.get("last_check_time", 0.0))
+            nonlocal last_check_time, last_needs_update
+            last_check_time   = float(cfg.get("last_check_time", 0.0))
+            last_needs_update = bool(cfg.get("last_needs_update", False))
 
             if download_path:
-                main_screen.folder_label.value = f"Папка назначения: {download_path}"
+                main_screen.folder_label.value = f"{download_path}"
                 main_screen.folder_label.color = ft.Colors.GREEN_400
 
             update_proxy_button_ui()
@@ -429,15 +438,38 @@ class SaveMediaApp:
         # Пункт 6: проверяем версии только если прошло больше CHECK_INTERVAL_HOURS
         now = time.time()
         if now - last_check_time >= CHECK_INTERVAL_HOURS * 3600:
-            await settings_screen.check_tools(proxy_enabled)
-            last_check_time = now
-            save_config()
+            # run_task — проверка идёт в фоне, UI не блокируется
+            async def _do_check():
+                nonlocal last_check_time
+                await settings_screen.check_tools(proxy_enabled)
+                last_check_time = time.time()
+                save_config()
+            page.run_task(_do_check)
         else:
             mins_left = int((CHECK_INTERVAL_HOURS * 3600 - (now - last_check_time)) / 60)
             settings_screen.progress_text.value = (
                 f"Версии проверены недавно — следующая проверка через {mins_left} мин"
             )
             settings_screen.progress_text.color = ft.Colors.GREY_400
-            main_screen.main_progress_text.value = "Ожидание ссылки для начала загрузки"
-            main_screen.main_progress_text.color = ft.Colors.GREEN_400
+            # Восстанавливаем статус кнопки и уведомление из сохранённого результата
+            if last_needs_update:
+                settings_screen.update_btn_text.value = "Обновить скрипты"
+                settings_screen.update_btn_icon.name  = ft.Icons.DOWNLOAD_ROUNDED
+                settings_screen._tools.yt_needs_update = True
+                tool_msg   = "Доступны обновления"
+                tool_color = ft.Colors.ORANGE_400
+            else:
+                settings_screen.update_btn_text.value = "Проверить версии"
+                settings_screen.update_btn_icon.name  = ft.Icons.REFRESH_ROUNDED
+                tool_msg   = "Актуально"
+                tool_color = ft.Colors.GREEN_400
+            for w, name in [
+                (settings_screen.yt_status,      "yt-dlp"),
+                (settings_screen.ffmpeg_status,  "ffmpeg"),
+                (settings_screen.ffplay_status,  "ffplay"),
+                (settings_screen.ffprobe_status, "ffprobe"),
+            ]:
+                w.value = f"{name}: {tool_msg}"
+                w.color = tool_color
+            main_screen.notify_tools_status(last_needs_update)
             safe_update()

@@ -19,6 +19,7 @@ DEFAULT_CONFIG: Dict[str, Any] = {
         "save_to_source_folder": False,
         "minimize_to_tray": False,
         "last_check_time": 0.0,
+        "last_needs_update": False,
         "urls": {
             "yt_api": "https://api.github.com/repos/yt-dlp/yt-dlp/releases/latest",
             "yt_download": "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe" if os.name == "nt" else "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp",
