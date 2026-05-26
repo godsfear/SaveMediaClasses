@@ -7,6 +7,7 @@ import flet as ft
 
 from config import safe_str, hex_to_flet
 from managers.downloader import Downloader
+from state import AppState
 
 MAX_PARALLEL = 5
 _POST_PROCESSING_TAGS = ["[Merger]", "[Metadata]", "[Thumbnails]", "[ExtractAudio]", "[Modify]"]
@@ -81,14 +82,16 @@ class DownloadCard:
 class MainScreen:
 
     def __init__(self, page: ft.Page, base_dir: str, tools_dir: str,
-                 safe_update, current_theme: dict) -> None:
-        self._page         = page
-        self._base_dir     = base_dir
-        self._tools_dir    = tools_dir
-        self._safe_update  = safe_update
-        self._current_theme = current_theme
+                 safe_update, state: AppState) -> None:
+        self._page        = page
+        self._base_dir    = base_dir
+        self._tools_dir   = tools_dir
+        self._safe_update = safe_update
+        self._state       = state          # единственный источник истины
 
-        # Активные карточки загрузок
+        # Колбэк уведомления статус-бара — назначается из App
+        self._on_status: callable = lambda msg, color: None
+
         self._cards: list[DownloadCard] = []
 
         self._build_widgets()
@@ -97,13 +100,11 @@ class MainScreen:
     # ── Виджеты ───────────────────────────────────────────────────────────────
 
     def _build_widgets(self) -> None:
-        # Папка назначения
         self.folder_label = ft.Text(
             "Папка не выбрана", color=ft.Colors.GREY_400, size=12, weight=ft.FontWeight.W_500,
             expand=True, no_wrap=True, overflow=ft.TextOverflow.ELLIPSIS
         )
 
-        # URL-поле
         self.url_input = ft.TextField(
             label="URL медиафайла или плейлиста",
             hint_text="Вставьте ссылку для скачивания...",
@@ -137,12 +138,11 @@ class MainScreen:
             on_click=self._on_download_click
         )
 
-        # Список карточек загрузок
         self._cards_column = ft.Column(spacing=6)
 
-        self.header_folder = ft.Text("Папка назначения", size=14, weight=ft.FontWeight.BOLD, color=ft.Colors.CYAN_400)
+        self.header_folder = ft.Text("Папка назначения",    size=14, weight=ft.FontWeight.BOLD, color=ft.Colors.CYAN_400)
         self.header_main   = ft.Text("Управление загрузкой", size=14, weight=ft.FontWeight.BOLD, color=ft.Colors.CYAN_400)
-        self.header_queue  = ft.Text("Очередь загрузок", size=14, weight=ft.FontWeight.BOLD, color=ft.Colors.CYAN_400)
+        self.header_queue  = ft.Text("Очередь загрузок",    size=14, weight=ft.FontWeight.BOLD, color=ft.Colors.CYAN_400)
         self._log_btn = ft.IconButton(
             icon=ft.Icons.RECEIPT_LONG_ROUNDED,
             icon_color=ft.Colors.GREY_500,
@@ -152,7 +152,6 @@ class MainScreen:
         )
 
     def _build_layout(self) -> None:
-        # Карточка папки назначения
         self.folder_card = ft.Container(
             content=ft.Column([
                 self.header_folder,
@@ -161,7 +160,6 @@ class MainScreen:
             bgcolor="#161616", border_radius=8, padding=15
         )
 
-        # Карточка управления загрузкой
         self.main_card = ft.Container(
             content=ft.Column([
                 self.header_main,
@@ -172,7 +170,6 @@ class MainScreen:
             bgcolor="#161616", border_radius=8, padding=15
         )
 
-        # Контейнер очереди загрузок
         self._queue_card = ft.Container(
             content=ft.Column([
                 ft.Row([self.header_queue, self._log_btn],
@@ -190,6 +187,22 @@ class MainScreen:
         ], visible=True, expand=True, spacing=15,
             horizontal_alignment=ft.CrossAxisAlignment.STRETCH,
             scroll=ft.ScrollMode.AUTO)
+
+    # ── Синхронизация виджетов ← state ───────────────────────────────────────
+
+    def sync_from_state(self) -> None:
+        """Переносит значения из AppState в виджеты. Вызывается один раз при старте."""
+        s = self._state
+        self.audio_only_switch.value      = s.audio_only
+        self.cookies_enabled_switch.value = s.cookies_enabled
+        if s.download_path:
+            self.folder_label.value = s.download_path
+            self.folder_label.color = ft.Colors.GREEN_400
+
+    def sync_to_state(self) -> None:
+        """Переносит значения из виджетов в AppState. Вызывается перед сохранением."""
+        self._state.audio_only      = bool(self.audio_only_switch.value)
+        self._state.cookies_enabled = bool(self.cookies_enabled_switch.value)
 
     # ── Валидация ─────────────────────────────────────────────────────────────
 
@@ -242,7 +255,6 @@ class MainScreen:
             self._safe_update()
             return
 
-        # Создаём отдельный экземпляр Downloader для этой загрузки
         dl = Downloader(self._base_dir, self._tools_dir)
         yt_dlp_exe = dl.resolve_yt_dlp()
         if not yt_dlp_exe:
@@ -250,8 +262,7 @@ class MainScreen:
                          ft.Colors.ORANGE)
             return
 
-        # Создаём карточку
-        card = DownloadCard(url_str, on_cancel=lambda _, c=None: None)  # заглушка — назначим ниже
+        card = DownloadCard(url_str, on_cancel=lambda _, c=None: None)
         card.downloader = dl
 
         async def do_cancel(_):
@@ -266,52 +277,45 @@ class MainScreen:
 
         self._add_card(card)
 
-        # Очищаем поле после добавления в очередь
         self.url_input.value        = ""
         self.url_input.border_color = None
         self._safe_update()
 
-        # Запускаем загрузку в фоне
         self._page.run_task(self._run_download, card, dl, yt_dlp_exe, url_str)
 
     async def _run_download(self, card: DownloadCard, dl: Downloader,
                             yt_dlp_exe: str, url_str: str) -> None:
-        opts = self._get_download_opts()
+        # Читаем параметры из state — без обращения к другим экранам
+        self.sync_to_state()
+        opts = self._state.download_opts()
+
         if opts["download_path"]:
             try:
                 os.makedirs(opts["download_path"], exist_ok=True)
             except Exception:
                 pass
 
-        # Лог в файл
         log_path = os.path.join(self._base_dir, "savemedia.log")
-
         cmd_args = dl.build_command(yt_dlp_exe=yt_dlp_exe, url=url_str, **opts)
         returncode_holder = [0]
 
         def on_line(line_text: str):
             if card.cancelled:
                 return
-
             pct = Downloader.parse_progress(line_text)
-
-            # Пишем в лог-файл — строки с прогрессом пропускаем
             if pct is None:
                 try:
                     with open(log_path, "a", encoding="utf-8") as lf:
                         lf.write(line_text + "\n")
                 except Exception:
                     pass
-
             if pct is not None:
-                # Извлекаем имя файла из строки прогресса если есть
                 status = line_text.replace("[download]", "").strip()
                 card.set_progress(pct, status[:60] if len(status) > 60 else status)
             elif any(tag in line_text for tag in _POST_PROCESSING_TAGS):
                 card.set_postprocessing()
             elif len(line_text) < 80:
                 card._status.value = line_text[:60]
-
             self._page.update()
 
         def on_finish(rc: int):
@@ -327,7 +331,7 @@ class MainScreen:
             return
 
         if card.cancelled:
-            return  # карточка уже обработана в do_cancel
+            return
 
         if returncode_holder[0] == 0:
             card.set_done(True, "Загрузка завершена!")
@@ -352,19 +356,8 @@ class MainScreen:
         except Exception:
             pass
 
-    # ── Уведомление в статус-бар (через колбэк из App) ───────────────────────
-
     def _notify(self, message: str, color) -> None:
-        if hasattr(self, "_status_notify_callback"):
-            self._status_notify_callback(message, color)
-
-    # ── Колбэки из App ────────────────────────────────────────────────────────
-
-    def set_download_opts_provider(self, provider) -> None:
-        self._get_download_opts = provider
-
-    def set_status_notify_callback(self, callback) -> None:
-        self._status_notify_callback = callback
+        self._on_status(message, color)
 
     def notify_tools_status(self, needs_update: bool) -> None:
         if needs_update:
