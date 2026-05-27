@@ -59,6 +59,15 @@ class ToolsStatusMessageEvent:
     color:   str   # hex или ft.Colors.*
 
 
+@dataclass(frozen=True)
+class ToolsRestoredEvent:
+    """Эмитируется при старте если проверка была недавно — восстанавливает
+    виджеты из сохранённого state без обращения к сети."""
+    needs_update:  bool
+    tool_versions: dict   # {"yt-dlp": (local, remote), "ffmpeg": (local, remote), ...}
+    mins_until_check: int
+
+
 # ── Шина ──────────────────────────────────────────────────────────────────────
 
 class EventBus:
