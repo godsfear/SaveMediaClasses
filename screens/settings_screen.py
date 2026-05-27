@@ -6,6 +6,7 @@ from config import (
     DEFAULT_CONFIG, THEME_FIELDS, PALETTE,
     hex_to_flet, is_valid_hex, safe_str
 )
+from events import EventBus, ToolsCheckedEvent, ToolsStatusMessageEvent
 from managers.tools_manager import ToolsManager
 from state import AppState
 
@@ -13,26 +14,26 @@ from state import AppState
 class SettingsScreen:
 
     def __init__(self, page: ft.Page, tools: ToolsManager, safe_update,
-                 state: AppState) -> None:
+                 state: AppState, bus: EventBus) -> None:
         self._page        = page
         self._tools       = tools
         self._safe_update = safe_update
-        self._state       = state          # единственный источник истины
+        self._state       = state
+        self._bus         = bus
 
-        # Колбэки из App — только смысловые, не передача данных
+        # Единственный оставшийся колбэк — применение темы к виджетам.
+        # Он не передаёт данные, а вызывает перерисовку в app.py,
+        # где есть доступ ко всем виджетам обоих экранов.
         self._on_theme_changed:    callable = lambda: None
-        self._on_notify_main:      callable = lambda needs: None
-        self._on_check_done:       callable = lambda: None
-        self._on_settings_changed: callable = lambda: None  # сохранение при изменении
+        self._on_settings_changed: callable = lambda: None
 
         self._build_widgets()
         self._build_theme_section()
         self._build_layout()
 
-    # ── Синхронизация виджетов ────────────────────────────────────────────────
+    # ── Синхронизация ─────────────────────────────────────────────────────────
 
     def sync_from_state(self) -> None:
-        """Переносит значения из AppState в виджеты. Вызывается один раз при старте."""
         s = self._state
         self.proxy_input.value                 = s.proxy_address
         self.yt_args_input.value               = s.yt_dlp_args
@@ -47,19 +48,18 @@ class SettingsScreen:
         self.ffmpeg_download_input.value       = s.url_ffmpeg_download
 
     def sync_to_state(self) -> None:
-        """Переносит значения из виджетов в AppState. Вызывается перед сохранением."""
         s = self._state
-        s.proxy_address        = safe_str(self.proxy_input.value)
-        s.yt_dlp_args          = safe_str(self.yt_args_input.value)
-        s.clean_titles         = bool(self.clean_titles_switch.value)
-        s.playlist_enabled     = bool(self.playlist_switch.value)
-        s.embed_metadata       = bool(self.embed_metadata_switch.value)
+        s.proxy_address         = safe_str(self.proxy_input.value)
+        s.yt_dlp_args           = safe_str(self.yt_args_input.value)
+        s.clean_titles          = bool(self.clean_titles_switch.value)
+        s.playlist_enabled      = bool(self.playlist_switch.value)
+        s.embed_metadata        = bool(self.embed_metadata_switch.value)
         s.save_to_source_folder = bool(self.save_to_source_switch.value)
-        s.cookies_browser      = safe_str(self.cookies_browser_dropdown.value)
-        s.url_yt_api           = safe_str(self.yt_api_input.value)
-        s.url_yt_download      = safe_str(self.yt_download_input.value)
-        s.url_ffmpeg_version   = safe_str(self.ffmpeg_version_input.value)
-        s.url_ffmpeg_download  = safe_str(self.ffmpeg_download_input.value)
+        s.cookies_browser       = safe_str(self.cookies_browser_dropdown.value)
+        s.url_yt_api            = safe_str(self.yt_api_input.value)
+        s.url_yt_download       = safe_str(self.yt_download_input.value)
+        s.url_ffmpeg_version    = safe_str(self.ffmpeg_version_input.value)
+        s.url_ffmpeg_download   = safe_str(self.ffmpeg_download_input.value)
 
     # ── Виджеты ───────────────────────────────────────────────────────────────
 
@@ -88,7 +88,7 @@ class SettingsScreen:
                 ft.dropdown.Option("firefox", "Mozilla Firefox"),
                 ft.dropdown.Option("edge",    "Microsoft Edge"),
                 ft.dropdown.Option("opera",   "Opera")
-            ]
+            ],
         )
         self.cookies_browser_dropdown.on_change = self._on_browser_dropdown_change
 
@@ -148,17 +148,13 @@ class SettingsScreen:
     def _build_theme_section(self) -> None:
         def make_color_row(key: str, label: str) -> ft.Column:
             preview = ft.Container(
-                width=28, height=28,
-                border_radius=6,
+                width=28, height=28, border_radius=6,
                 bgcolor=hex_to_flet(self._state.theme.get(key, "FFFFFF")),
-                border=ft.Border.all(1, "#555555"),
-                tooltip="Открыть палитру",
+                border=ft.Border.all(1, "#555555"), tooltip="Открыть палитру",
             )
             field = ft.TextField(
                 value=self._state.theme.get(key, "FFFFFF").upper().lstrip("#"),
-                width=100,
-                border_radius=6,
-                text_size=13,
+                width=100, border_radius=6, text_size=13,
                 capitalization=ft.TextCapitalization.CHARACTERS,
                 max_length=6,
                 content_padding=ft.Padding.symmetric(horizontal=8, vertical=6),
@@ -166,12 +162,8 @@ class SettingsScreen:
             )
             palette_grid = ft.Row(wrap=True, spacing=4, run_spacing=4, width=280)
             palette_container = ft.Container(
-                content=palette_grid,
-                bgcolor="#1e1e1e",
-                border_radius=8,
-                padding=8,
-                border=ft.Border.all(1, "#333333"),
-                visible=False,
+                content=palette_grid, bgcolor="#1e1e1e", border_radius=8,
+                padding=8, border=ft.Border.all(1, "#333333"), visible=False,
             )
 
             def apply_color(hex_val: str, f=field, p=preview, pc=palette_container):
@@ -188,20 +180,15 @@ class SettingsScreen:
                 c = color_hex
                 palette_grid.controls.append(
                     ft.Container(
-                        width=24, height=24,
-                        border_radius=4,
-                        bgcolor=f"#{c}",
-                        border=ft.Border.all(1, "#00000044"),
-                        tooltip=f"#{c}",
-                        on_click=lambda e, h=c: apply_color(h),
+                        width=24, height=24, border_radius=4,
+                        bgcolor=f"#{c}", border=ft.Border.all(1, "#00000044"),
+                        tooltip=f"#{c}", on_click=lambda e, h=c: apply_color(h),
                     )
                 )
 
-            def toggle_palette(e, pc=palette_container):
-                pc.visible = not pc.visible
-                self._safe_update()
-
-            preview.on_click = toggle_palette
+            preview.on_click = lambda e, pc=palette_container: (
+                setattr(pc, "visible", not pc.visible), self._safe_update()
+            )
 
             def on_field_change(e, f=field, p=preview):
                 val = safe_str(f.value).strip().lstrip("#").upper()
@@ -217,31 +204,24 @@ class SettingsScreen:
 
             field.on_change = on_field_change
 
-            top_row = ft.Row(
-                [
+            return ft.Column([
+                ft.Row([
                     ft.Text(label, size=12, expand=True, color=ft.Colors.GREY_300),
-                    field,
-                    preview,
-                ],
-                vertical_alignment=ft.CrossAxisAlignment.CENTER,
-                spacing=10,
-            )
-            return ft.Column([top_row, palette_container], spacing=4, tight=True)
+                    field, preview,
+                ], vertical_alignment=ft.CrossAxisAlignment.CENTER, spacing=10),
+                palette_container,
+            ], spacing=4, tight=True)
 
         self.theme_fields_column = ft.Column(
-            [make_color_row(k, l) for k, l in THEME_FIELDS],
-            spacing=10
+            [make_color_row(k, l) for k, l in THEME_FIELDS], spacing=10
         )
-
         self.theme_section = ft.Container(
             content=ft.Column([
                 ft.Row([
                     self.header_theme,
                     ft.IconButton(
-                        icon=ft.Icons.RESTART_ALT_ROUNDED,
-                        icon_color=ft.Colors.GREY_400,
-                        icon_size=18,
-                        tooltip="Сбросить к стандартным цветам",
+                        icon=ft.Icons.RESTART_ALT_ROUNDED, icon_color=ft.Colors.GREY_400,
+                        icon_size=18, tooltip="Сбросить к стандартным цветам",
                         on_click=self._reset_theme
                     )
                 ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
@@ -288,6 +268,7 @@ class SettingsScreen:
         def on_local_version(name: str, version: str):
             tool_status_map[name].value = f"{name}: Локально: {version} | Сеть: опрос..."
             tool_status_map[name].color = ft.Colors.ORANGE_400
+            self._page.update()
 
         def on_remote_done(name: str, loc: str, rem: str):
             tool_status_map[name].value = f"{name}: Локально: {loc} | Сеть: {rem}"
@@ -304,8 +285,8 @@ class SettingsScreen:
                 tool_status_map[name].color = ft.Colors.GREEN_400
             else:
                 tool_status_map[name].color = ft.Colors.ORANGE_400
+            self._page.update()
 
-        # Берём proxy прямо из state — без колбэка
         proxy_url = self._state.proxy_address.strip() if self._state.proxy_enabled else None
 
         await self._tools.check_all(
@@ -329,18 +310,19 @@ class SettingsScreen:
             self.progress_text.color   = ft.Colors.GREEN_400
 
         self.update_btn.disabled = False
-        self._on_notify_main(needs)
-        self._on_check_done()
+
+        # Публикуем результат — app.py сохранит, MainScreen покажет статус
+        self._bus.emit(ToolsCheckedEvent(needs_update=needs))
         self._page.update()
 
     async def _update_tools(self) -> None:
-        self.update_btn.disabled       = True
-        self.update_btn_icon.name      = ft.Icons.HOURGLASS_TOP_ROUNDED
-        self.update_btn_text.value     = "Обновление..."
-        self.progress_bar.visible      = True
-        self.progress_bar.value        = 0.0
-        self.progress_text.value       = "Подготовка фоновой загрузки..."
-        self.progress_text.color       = ft.Colors.GREEN_400
+        self.update_btn.disabled   = True
+        self.update_btn_icon.name  = ft.Icons.HOURGLASS_TOP_ROUNDED
+        self.update_btn_text.value = "Обновление..."
+        self.progress_bar.visible  = True
+        self.progress_bar.value    = 0.0
+        self.progress_text.value   = "Подготовка фоновой загрузки..."
+        self.progress_text.color   = ft.Colors.GREEN_400
         self._safe_update()
 
         proxy_url = self._state.proxy_address.strip() if self._state.proxy_enabled else None
@@ -348,18 +330,16 @@ class SettingsScreen:
         def on_yt_status(message: str, state: str):
             self.yt_status.value = message
             self.yt_status.color = (
-                ft.Colors.ORANGE     if state == "orange" else
-                ft.Colors.GREEN_400  if state == "ok"     else
-                ft.Colors.RED
+                ft.Colors.ORANGE    if state == "orange" else
+                ft.Colors.GREEN_400 if state == "ok"     else ft.Colors.RED
             )
             self._safe_update()
 
         def on_ff_status(message: str, state: str):
             self.ffmpeg_status.value = message
             self.ffmpeg_status.color = (
-                ft.Colors.ORANGE     if state == "orange" else
-                ft.Colors.GREEN_400  if state == "ok"     else
-                ft.Colors.RED
+                ft.Colors.ORANGE    if state == "orange" else
+                ft.Colors.GREEN_400 if state == "ok"     else ft.Colors.RED
             )
             self._safe_update()
 
@@ -373,7 +353,7 @@ class SettingsScreen:
         def on_done(had_errors: bool, critical_err: str = ""):
             result["had_errors"]   = had_errors
             result["critical_err"] = critical_err
-            self.progress_bar.visible      = False
+            self.progress_bar.visible  = False
             if critical_err:
                 self.progress_text.value = f"Критическая ошибка: {critical_err}"
                 self.progress_text.color = ft.Colors.RED_400
@@ -410,22 +390,12 @@ class SettingsScreen:
         else:
             await self._update_tools()
 
-    # ── Колбэки из App (только смысловые) ────────────────────────────────────
+    # ── Колбэки из App (только 2 — тема и сохранение) ────────────────────────
 
     def set_on_theme_changed(self, callback) -> None:
-        """Вызывается когда пользователь меняет тему — App перерисовывает UI."""
         self._on_theme_changed = callback
 
-    def set_on_notify_main(self, callback) -> None:
-        """Вызывается после check_tools(needs_update: bool)."""
-        self._on_notify_main = callback
-
-    def set_on_check_done(self, callback) -> None:
-        """Вызывается после завершения check_tools — App обновляет last_check_time."""
-        self._on_check_done = callback
-
     def set_on_settings_changed(self, callback) -> None:
-        """Вызывается при любом изменении настроек — App сохраняет конфиг."""
         self._on_settings_changed = callback
 
     # ── Лэйаут ────────────────────────────────────────────────────────────────
@@ -454,7 +424,8 @@ class SettingsScreen:
             ft.Container(
                 content=ft.Column([
                     self.header_deps,
-                    ft.Column([self.yt_status, self.ffmpeg_status, self.ffplay_status, self.ffprobe_status], spacing=6),
+                    ft.Column([self.yt_status, self.ffmpeg_status,
+                               self.ffplay_status, self.ffprobe_status], spacing=6),
                     ft.Row([self.update_btn], alignment=ft.MainAxisAlignment.END)
                 ], spacing=12, horizontal_alignment=ft.CrossAxisAlignment.STRETCH),
                 bgcolor="#161616", border_radius=8, padding=15
@@ -471,4 +442,4 @@ class SettingsScreen:
                 )]
             ),
         ], visible=False, scroll=ft.ScrollMode.AUTO, expand=True, spacing=15,
-            horizontal_alignment=ft.CrossAxisAlignment.STRETCH)
+           horizontal_alignment=ft.CrossAxisAlignment.STRETCH)

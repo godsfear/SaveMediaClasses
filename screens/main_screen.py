@@ -2,38 +2,40 @@ import asyncio
 import os
 import subprocess
 import sys
+from typing import Dict
 
 import flet as ft
 
-from config import safe_str, hex_to_flet
+from config import safe_str
+from events import (
+    EventBus,
+    DownloadProgressEvent,
+    DownloadPostprocessingEvent,
+    DownloadCompletedEvent,
+    DownloadCancelledEvent,
+    ToolsCheckedEvent,
+    ToolsStatusMessageEvent,
+)
+from managers.download_manager import DownloadManager, DownloadSnapshot, MAX_PARALLEL
 from managers.downloader import Downloader
 from state import AppState
 
-MAX_PARALLEL = 5
-_POST_PROCESSING_TAGS = ["[Merger]", "[Metadata]", "[Thumbnails]", "[ExtractAudio]", "[Modify]"]
-
 
 class DownloadCard:
-    """
-    Карточка одной загрузки: статус, прогресс-бар с процентом, кнопка отмены.
-    Создаётся при каждом нажатии «Скачать», удаляется через 3с после завершения.
-    """
+    """Карточка одной загрузки. Только отрисовка — никакой логики."""
 
-    def __init__(self, url: str, on_cancel) -> None:
-        self.url        = url
-        self.downloader = None  # назначается из MainScreen
-        self.cancelled  = False
-
-        self._pct_text = ft.Text("0%", size=11, color=ft.Colors.GREY_400, width=36, text_align=ft.TextAlign.RIGHT)
+    def __init__(self, task_id: str, url: str, on_cancel) -> None:
+        self.task_id   = task_id
+        self._pct_text = ft.Text("0%", size=11, color=ft.Colors.GREY_400, width=36,
+                                 text_align=ft.TextAlign.RIGHT)
         self._bar      = ft.ProgressBar(value=0.0, color=ft.Colors.GREEN,
                                         bgcolor=ft.Colors.SURFACE_CONTAINER_HIGHEST, expand=True)
-        self._status   = ft.Text(self._short_url(url), size=11, color=ft.Colors.GREY_300,
+        self._status   = ft.Text(self._short(url), size=11, color=ft.Colors.GREY_300,
                                  expand=True, no_wrap=True, overflow=ft.TextOverflow.ELLIPSIS)
         self._cancel_btn = ft.IconButton(
             icon=ft.Icons.CLOSE_ROUNDED, icon_color=ft.Colors.RED_300,
             icon_size=16, tooltip="Отменить", on_click=on_cancel
         )
-
         self.container = ft.Container(
             content=ft.Column([
                 ft.Row([self._status, self._cancel_btn],
@@ -49,74 +51,126 @@ class DownloadCard:
         )
 
     @staticmethod
-    def _short_url(url: str) -> str:
+    def _short(url: str) -> str:
         return url if len(url) <= 60 else url[:57] + "..."
 
     def set_progress(self, pct: float, status: str) -> None:
-        self._bar.value    = pct
-        self._bar.color    = ft.Colors.GREEN
+        self._bar.value      = pct
+        self._bar.color      = ft.Colors.GREEN
         self._pct_text.value = f"{int(pct * 100)}%"
-        self._status.value = status
+        self._status.value   = status
 
     def set_postprocessing(self) -> None:
-        self._bar.value    = None
-        self._bar.color    = ft.Colors.BLUE_400
+        self._bar.value      = None
+        self._bar.color      = ft.Colors.BLUE_400
         self._pct_text.value = "..."
-        self._status.value = "Постобработка..."
+        self._status.value   = "Постобработка..."
 
     def set_done(self, success: bool, message: str) -> None:
-        self._bar.value      = 1.0 if success else 0.0
-        self._bar.color      = ft.Colors.GREEN if success else ft.Colors.RED_400
-        self._pct_text.value = "100%" if success else "✗"
-        self._status.value   = message
+        self._bar.value          = 1.0 if success else 0.0
+        self._bar.color          = ft.Colors.GREEN if success else ft.Colors.RED_400
+        self._pct_text.value     = "100%" if success else "✗"
+        self._status.value       = message
         self._cancel_btn.visible = False
 
     def set_cancelled(self) -> None:
-        self._bar.value      = 0.0
-        self._bar.color      = ft.Colors.ORANGE
-        self._pct_text.value = "—"
-        self._status.value   = "Отменено"
+        self._bar.value          = 0.0
+        self._bar.color          = ft.Colors.ORANGE
+        self._pct_text.value     = "—"
+        self._status.value       = "Отменено"
         self._cancel_btn.visible = False
 
 
 class MainScreen:
 
-    def __init__(self, page: ft.Page, base_dir: str, tools_dir: str,
-                 safe_update, state: AppState) -> None:
+    def __init__(self, page: ft.Page, base_dir: str,
+                 safe_update, state: AppState,
+                 download_manager: DownloadManager,
+                 bus: EventBus) -> None:
         self._page        = page
         self._base_dir    = base_dir
-        self._tools_dir   = tools_dir
         self._safe_update = safe_update
-        self._state       = state          # единственный источник истины
+        self._state       = state
+        self._dm          = download_manager
+        self._bus         = bus
 
-        # Колбэк уведомления статус-бара — назначается из App
-        self._on_status: callable = lambda msg, color: None
+        self._cards: Dict[str, DownloadCard] = {}
 
-        self._cards: list[DownloadCard] = []
-
+        self._subscribe()
         self._build_widgets()
         self._build_layout()
+
+    # ── Подписка на шину ──────────────────────────────────────────────────────
+
+    def _subscribe(self) -> None:
+        self._bus.on(DownloadProgressEvent,       self._on_progress)
+        self._bus.on(DownloadPostprocessingEvent, self._on_postprocessing)
+        self._bus.on(DownloadCompletedEvent,      self._on_completed)
+        self._bus.on(DownloadCancelledEvent,      self._on_cancelled)
+        self._bus.on(ToolsCheckedEvent,           self._on_tools_checked)
+        self._bus.on(ToolsStatusMessageEvent,     self._on_tools_status_message)
+
+    # ── Обработчики событий ───────────────────────────────────────────────────
+
+    def _on_progress(self, e: DownloadProgressEvent) -> None:
+        card = self._cards.get(e.task_id)
+        if card:
+            card.set_progress(e.pct, e.status)
+            self._page.update()
+
+    def _on_postprocessing(self, e: DownloadPostprocessingEvent) -> None:
+        card = self._cards.get(e.task_id)
+        if card:
+            card.set_postprocessing()
+            self._page.update()
+
+    def _on_completed(self, e: DownloadCompletedEvent) -> None:
+        card = self._cards.get(e.task_id)
+        if card:
+            card.set_done(e.success, e.message)
+            self._safe_update()
+            self._page.run_task(self._remove_card_after_delay, e.task_id)
+
+    def _on_cancelled(self, e: DownloadCancelledEvent) -> None:
+        card = self._cards.get(e.task_id)
+        if card:
+            card.set_cancelled()
+            self._safe_update()
+            self._page.run_task(self._remove_card_after_delay, e.task_id)
+
+    def _on_tools_checked(self, e: ToolsCheckedEvent) -> None:
+        if e.needs_update:
+            self._show_status(
+                "Доступны обновления скриптов — перейдите в настройки и нажмите «Обновить скрипты»",
+                ft.Colors.ORANGE
+            )
+        else:
+            self._show_status("Все компоненты актуальны", ft.Colors.GREEN_400)
+
+    def _on_tools_status_message(self, e: ToolsStatusMessageEvent) -> None:
+        self._show_status(e.message, e.color)
+
+    async def _remove_card_after_delay(self, task_id: str) -> None:
+        await asyncio.sleep(3)
+        self._remove_card(task_id)
 
     # ── Виджеты ───────────────────────────────────────────────────────────────
 
     def _build_widgets(self) -> None:
         self.folder_label = ft.Text(
-            "Папка не выбрана", color=ft.Colors.GREY_400, size=12, weight=ft.FontWeight.W_500,
-            expand=True, no_wrap=True, overflow=ft.TextOverflow.ELLIPSIS
+            "Папка не выбрана", color=ft.Colors.GREY_400, size=12,
+            weight=ft.FontWeight.W_500, expand=True,
+            no_wrap=True, overflow=ft.TextOverflow.ELLIPSIS
         )
-
         self.url_input = ft.TextField(
             label="URL медиафайла или плейлиста",
             hint_text="Вставьте ссылку для скачивания...",
-            expand=True,
-            border_radius=8,
+            expand=True, border_radius=8,
             focused_border_color=ft.Colors.BLUE,
             on_change=self._on_url_change,
             suffix=ft.IconButton(
-                icon=ft.Icons.CANCEL_ROUNDED,
-                icon_color=ft.Colors.GREY_500,
-                icon_size=18,
-                tooltip="Очистить",
+                icon=ft.Icons.CANCEL_ROUNDED, icon_color=ft.Colors.GREY_500,
+                icon_size=18, tooltip="Очистить",
                 on_click=lambda _: [
                     setattr(self.url_input, "value", ""),
                     self._on_url_change(None),
@@ -124,30 +178,25 @@ class MainScreen:
                 ]
             )
         )
-
         self.audio_only_switch      = ft.Switch(label="Только аудио (MP3)", active_color=ft.Colors.GREEN)
-        self.cookies_enabled_switch = ft.Switch(label="Использовать куки", active_color=ft.Colors.GREEN, value=False)
+        self.cookies_enabled_switch = ft.Switch(label="Использовать куки",  active_color=ft.Colors.GREEN, value=False)
 
         self._btn_icon = ft.Icon(ft.Icons.DOWNLOAD_ROUNDED, color=ft.Colors.WHITE)
         self._btn_text = ft.Text("Скачать", color=ft.Colors.WHITE, weight=ft.FontWeight.BOLD)
         self.download_btn = ft.Button(
             content=ft.Row([self._btn_icon, self._btn_text], tight=True, spacing=8),
-            bgcolor=ft.Colors.GREEN,
-            tooltip="Начать загрузку",
+            bgcolor=ft.Colors.GREEN, tooltip="Начать загрузку",
             style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=8), elevation=0),
             on_click=self._on_download_click
         )
 
         self._cards_column = ft.Column(spacing=6)
-
-        self.header_folder = ft.Text("Папка назначения",    size=14, weight=ft.FontWeight.BOLD, color=ft.Colors.CYAN_400)
+        self.header_folder = ft.Text("Папка назначения",     size=14, weight=ft.FontWeight.BOLD, color=ft.Colors.CYAN_400)
         self.header_main   = ft.Text("Управление загрузкой", size=14, weight=ft.FontWeight.BOLD, color=ft.Colors.CYAN_400)
-        self.header_queue  = ft.Text("Очередь загрузок",    size=14, weight=ft.FontWeight.BOLD, color=ft.Colors.CYAN_400)
+        self.header_queue  = ft.Text("Очередь загрузок",     size=14, weight=ft.FontWeight.BOLD, color=ft.Colors.CYAN_400)
         self._log_btn = ft.IconButton(
-            icon=ft.Icons.RECEIPT_LONG_ROUNDED,
-            icon_color=ft.Colors.GREY_500,
-            icon_size=18,
-            tooltip="Открыть лог",
+            icon=ft.Icons.RECEIPT_LONG_ROUNDED, icon_color=ft.Colors.GREY_500,
+            icon_size=18, tooltip="Открыть лог",
             on_click=lambda _: self._open_log(os.path.join(self._base_dir, "savemedia.log"))
         )
 
@@ -159,7 +208,6 @@ class MainScreen:
             ], spacing=8, horizontal_alignment=ft.CrossAxisAlignment.STRETCH),
             bgcolor="#161616", border_radius=8, padding=15
         )
-
         self.main_card = ft.Container(
             content=ft.Column([
                 self.header_main,
@@ -169,7 +217,6 @@ class MainScreen:
             ], spacing=12, horizontal_alignment=ft.CrossAxisAlignment.STRETCH),
             bgcolor="#161616", border_radius=8, padding=15
         )
-
         self._queue_card = ft.Container(
             content=ft.Column([
                 ft.Row([self.header_queue, self._log_btn],
@@ -179,19 +226,15 @@ class MainScreen:
             ], spacing=10, horizontal_alignment=ft.CrossAxisAlignment.STRETCH),
             bgcolor="#161616", border_radius=8, padding=15,
         )
-
         self.layout = ft.Column([
-            self.folder_card,
-            self.main_card,
-            self._queue_card,
+            self.folder_card, self.main_card, self._queue_card,
         ], visible=True, expand=True, spacing=15,
-            horizontal_alignment=ft.CrossAxisAlignment.STRETCH,
-            scroll=ft.ScrollMode.AUTO)
+           horizontal_alignment=ft.CrossAxisAlignment.STRETCH,
+           scroll=ft.ScrollMode.AUTO)
 
-    # ── Синхронизация виджетов ← state ───────────────────────────────────────
+    # ── Синхронизация ─────────────────────────────────────────────────────────
 
     def sync_from_state(self) -> None:
-        """Переносит значения из AppState в виджеты. Вызывается один раз при старте."""
         s = self._state
         self.audio_only_switch.value      = s.audio_only
         self.cookies_enabled_switch.value = s.cookies_enabled
@@ -200,11 +243,10 @@ class MainScreen:
             self.folder_label.color = ft.Colors.GREEN_400
 
     def sync_to_state(self) -> None:
-        """Переносит значения из виджетов в AppState. Вызывается перед сохранением."""
         self._state.audio_only      = bool(self.audio_only_switch.value)
         self._state.cookies_enabled = bool(self.cookies_enabled_switch.value)
 
-    # ── Валидация ─────────────────────────────────────────────────────────────
+    # ── Валидация URL ─────────────────────────────────────────────────────────
 
     def _on_url_change(self, _) -> None:
         val = safe_str(self.url_input.value).strip()
@@ -216,133 +258,83 @@ class MainScreen:
             self.url_input.border_color = ft.Colors.RED_400
         self._safe_update()
 
-    # ── Управление карточками ─────────────────────────────────────────────────
+    # ── Нажатие «Скачать» ────────────────────────────────────────────────────
 
-    def _add_card(self, card: DownloadCard) -> None:
-        self._cards.append(card)
-        self._cards_column.controls.append(card.container)
+    def _on_download_click(self, _) -> None:
+        url = safe_str(self.url_input.value).strip()
+
+        if not url:
+            self._show_status("Ошибка: Ссылка для загрузки пуста!", ft.Colors.RED)
+            return
+        if not Downloader.is_valid_url(url):
+            self._show_status("Ошибка: Ссылка должна начинаться с http:// или https://", ft.Colors.RED)
+            self.url_input.border_color = ft.Colors.RED_400
+            self._safe_update()
+            return
+        if self._dm.at_capacity:
+            self._show_status(f"Максимум {MAX_PARALLEL} загрузок одновременно", ft.Colors.ORANGE)
+            return
+
+        self.sync_to_state()
+        snapshot = DownloadSnapshot(
+            url=url,
+            download_path=self._state.download_path,
+            proxy_enabled=self._state.proxy_enabled,
+            proxy_address=self._state.proxy_address,
+            cookies_enabled=self._state.cookies_enabled,
+            cookies_browser=self._state.cookies_browser,
+            playlist_enabled=self._state.playlist_enabled,
+            embed_metadata=self._state.embed_metadata,
+            audio_only=self._state.audio_only,
+            yt_dlp_args=self._state.yt_dlp_args,
+            clean_titles=self._state.clean_titles,
+            save_to_source=self._state.save_to_source_folder,
+        )
+
+        task_id = self._dm.add(self._page, snapshot)
+        if task_id is None:
+            self._show_status(
+                "yt-dlp не найден — перейдите в настройки и нажмите «Обновить скрипты»",
+                ft.Colors.ORANGE
+            )
+            return
+
+        self._add_card(task_id, url)
+        self.url_input.value        = ""
+        self.url_input.border_color = None
         self._update_download_btn()
         self._safe_update()
 
-    def _remove_card(self, card: DownloadCard) -> None:
-        if card in self._cards:
-            self._cards.remove(card)
-        if card.container in self._cards_column.controls:
+    # ── Карточки ──────────────────────────────────────────────────────────────
+
+    def _add_card(self, task_id: str, url: str) -> None:
+        card = DownloadCard(
+            task_id=task_id, url=url,
+            on_cancel=lambda _: self._dm.cancel(task_id)
+        )
+        self._cards[task_id] = card
+        self._cards_column.controls.append(card.container)
+
+    def _remove_card(self, task_id: str) -> None:
+        card = self._cards.pop(task_id, None)
+        if card and card.container in self._cards_column.controls:
             self._cards_column.controls.remove(card.container)
         self._update_download_btn()
         self._safe_update()
 
     def _update_download_btn(self) -> None:
-        active = len(self._cards)
-        if active >= MAX_PARALLEL:
+        if self._dm.at_capacity:
             self.download_btn.disabled = True
             self.download_btn.tooltip  = f"Максимум {MAX_PARALLEL} загрузок одновременно"
         else:
             self.download_btn.disabled = False
             self.download_btn.tooltip  = "Начать загрузку"
 
-    # ── Запуск загрузки ───────────────────────────────────────────────────────
-
-    async def _on_download_click(self, _) -> None:
-        url_str = safe_str(self.url_input.value).strip()
-
-        if not url_str:
-            self._notify("Ошибка: Ссылка для загрузки пуста!", ft.Colors.RED)
-            return
-        if not Downloader.is_valid_url(url_str):
-            self._notify("Ошибка: Ссылка должна начинаться с http:// или https://", ft.Colors.RED)
-            self.url_input.border_color = ft.Colors.RED_400
-            self._safe_update()
-            return
-
-        dl = Downloader(self._base_dir, self._tools_dir)
-        yt_dlp_exe = dl.resolve_yt_dlp()
-        if not yt_dlp_exe:
-            self._notify("yt-dlp не найден — перейдите в настройки и нажмите «Обновить скрипты»",
-                         ft.Colors.ORANGE)
-            return
-
-        card = DownloadCard(url_str, on_cancel=lambda _, c=None: None)
-        card.downloader = dl
-
-        async def do_cancel(_):
-            card.cancelled = True
-            card.downloader.cancel()
-            card.set_cancelled()
-            self._safe_update()
-            await asyncio.sleep(3)
-            self._remove_card(card)
-
-        card._cancel_btn.on_click = do_cancel
-
-        self._add_card(card)
-
-        self.url_input.value        = ""
-        self.url_input.border_color = None
-        self._safe_update()
-
-        self._page.run_task(self._run_download, card, dl, yt_dlp_exe, url_str)
-
-    async def _run_download(self, card: DownloadCard, dl: Downloader,
-                            yt_dlp_exe: str, url_str: str) -> None:
-        # Читаем параметры из state — без обращения к другим экранам
-        self.sync_to_state()
-        opts = self._state.download_opts()
-
-        if opts["download_path"]:
-            try:
-                os.makedirs(opts["download_path"], exist_ok=True)
-            except Exception:
-                pass
-
-        log_path = os.path.join(self._base_dir, "savemedia.log")
-        cmd_args = dl.build_command(yt_dlp_exe=yt_dlp_exe, url=url_str, **opts)
-        returncode_holder = [0]
-
-        def on_line(line_text: str):
-            if card.cancelled:
-                return
-            pct = Downloader.parse_progress(line_text)
-            if pct is None:
-                try:
-                    with open(log_path, "a", encoding="utf-8") as lf:
-                        lf.write(line_text + "\n")
-                except Exception:
-                    pass
-            if pct is not None:
-                status = line_text.replace("[download]", "").strip()
-                card.set_progress(pct, status[:60] if len(status) > 60 else status)
-            elif any(tag in line_text for tag in _POST_PROCESSING_TAGS):
-                card.set_postprocessing()
-            elif len(line_text) < 80:
-                card._status.value = line_text[:60]
-            self._page.update()
-
-        def on_finish(rc: int):
-            returncode_holder[0] = rc
-
-        try:
-            await dl.run(cmd_args, on_line, on_finish)
-        except Exception as err:
-            card.set_done(False, f"Ошибка ОС: {err}")
-            self._safe_update()
-            await asyncio.sleep(3)
-            self._remove_card(card)
-            return
-
-        if card.cancelled:
-            return
-
-        if returncode_holder[0] == 0:
-            card.set_done(True, "Загрузка завершена!")
-        else:
-            card.set_done(False, f"Ошибка (код {returncode_holder[0]})")
-
-        self._safe_update()
-        await asyncio.sleep(3)
-        self._remove_card(card)
-
     # ── Утилиты ───────────────────────────────────────────────────────────────
+
+    def _show_status(self, message: str, color) -> None:
+        """Отобразить сообщение в статус-баре через шину."""
+        self._bus.emit(ToolsStatusMessageEvent(message=message, color=color))
 
     @staticmethod
     def _open_log(path: str) -> None:
@@ -355,15 +347,3 @@ class MainScreen:
                 subprocess.Popen(["xdg-open", path])
         except Exception:
             pass
-
-    def _notify(self, message: str, color) -> None:
-        self._on_status(message, color)
-
-    def notify_tools_status(self, needs_update: bool) -> None:
-        if needs_update:
-            self._notify(
-                "Доступны обновления скриптов — перейдите в настройки и нажмите «Обновить скрипты»",
-                ft.Colors.ORANGE
-            )
-        else:
-            self._notify("Все компоненты актуальны", ft.Colors.GREEN_400)
