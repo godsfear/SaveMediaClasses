@@ -38,8 +38,8 @@ class AppState:
     # ── Мета-состояние ────────────────────────────────────────────────────────
     last_check_time: float = 0.0
     last_needs_update: bool = False
-    # Результаты последней проверки: {"yt-dlp": (local, remote), "ffmpeg": ...}
-    # Сохраняется в config.json, восстанавливается при перезапуске без сети.
+    # Результаты последней проверки: {"yt-dlp": (local, remote, status_key), ...}
+    # status_key: "ok" | "outdated" | "missing" | "error"
     tool_versions: Dict[str, tuple] = field(default_factory=dict)
 
     # ── Тема ──────────────────────────────────────────────────────────────────

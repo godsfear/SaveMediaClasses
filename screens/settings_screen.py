@@ -254,25 +254,25 @@ class SettingsScreen:
     # ── Проверка / обновление инструментов ────────────────────────────────────
 
     def on_tools_restored(self, e: ToolsRestoredEvent) -> None:
-        """Обработчик ToolsRestoredEvent — восстанавливает виджеты из сохранённого state."""
-        tool_status_map = {
-            "yt-dlp":  self.yt_status,
-            "ffmpeg":  self.ffmpeg_status,
-            "ffplay":  self.ffplay_status,
-            "ffprobe": self.ffprobe_status,
-        }
+        """Восстанавливает виджеты раздела скриптов из сохранённого state при перезапуске."""
         color_map = {
             "ok":      ft.Colors.GREEN_400,
             "outdated": ft.Colors.ORANGE_400,
             "missing":  ft.Colors.RED_400,
             "error":    ft.Colors.AMBER,
         }
+        tool_status_map = {
+            "yt-dlp":  self.yt_status,
+            "ffmpeg":  self.ffmpeg_status,
+            "ffplay":  self.ffplay_status,
+            "ffprobe": self.ffprobe_status,
+        }
         for name, widget in tool_status_map.items():
             pair = e.tool_versions.get(name)
             if pair:
-                loc, rem, status = pair
+                loc, rem, status_key = pair
                 widget.value = f"{name}: Локально: {loc} | Сеть: {rem}"
-                widget.color = color_map.get(status, ft.Colors.GREY_600)
+                widget.color = color_map.get(status_key, ft.Colors.GREY_600)
             else:
                 widget.value = f"{name}: —"
                 widget.color = ft.Colors.GREY_600
@@ -324,7 +324,6 @@ class SettingsScreen:
             else:
                 tool_status_map[name].color = ft.Colors.ORANGE_400
                 status_key = "outdated"
-            # Сохраняем результат в state — будет восстановлен при следующем запуске
             self._state.tool_versions[name] = (loc, rem, status_key)
             self._page.update()
 

@@ -61,10 +61,10 @@ class ToolsStatusMessageEvent:
 
 @dataclass(frozen=True)
 class ToolsRestoredEvent:
-    """Эмитируется при старте если проверка была недавно — восстанавливает
-    виджеты из сохранённого state без обращения к сети."""
-    needs_update:  bool
-    tool_versions: dict   # {"yt-dlp": (local, remote), "ffmpeg": (local, remote), ...}
+    """Эмитируется при старте если проверка была недавно.
+    Восстанавливает виджеты из сохранённого state без обращения к сети."""
+    needs_update:     bool
+    tool_versions:    dict   # {"yt-dlp": (local, remote, status_key), ...}
     mins_until_check: int
 
 

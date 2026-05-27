@@ -17,7 +17,7 @@ from events import (
     ToolsStatusMessageEvent,
 )
 from managers.download_manager import DownloadManager, DownloadSnapshot, MAX_PARALLEL
-from managers.downloader import Downloader
+from managers.providers import YtDlpProvider as _DefaultProvider
 from state import AppState
 
 
@@ -252,7 +252,7 @@ class MainScreen:
         val = safe_str(self.url_input.value).strip()
         if not val:
             self.url_input.border_color = None
-        elif Downloader.is_valid_url(val):
+        elif _DefaultProvider.is_valid_url(val):
             self.url_input.border_color = ft.Colors.GREEN_400
         else:
             self.url_input.border_color = ft.Colors.RED_400
@@ -266,7 +266,7 @@ class MainScreen:
         if not url:
             self._show_status("Ошибка: Ссылка для загрузки пуста!", ft.Colors.RED)
             return
-        if not Downloader.is_valid_url(url):
+        if not _DefaultProvider.is_valid_url(url):
             self._show_status("Ошибка: Ссылка должна начинаться с http:// или https://", ft.Colors.RED)
             self.url_input.border_color = ft.Colors.RED_400
             self._safe_update()
