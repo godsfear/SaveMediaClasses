@@ -154,7 +154,14 @@ class SaveMediaApp:
 
         bus.on(ToolsCheckedEvent,        _on_tools_checked)
         bus.on(ToolsStatusMessageEvent,  _on_status_message)
-        bus.on(ToolsRestoredEvent,       settings_screen.on_tools_restored)
+        _pending_restored: list = []   # хранит последний ToolsRestoredEvent до открытия настроек
+
+        def _on_tools_restored(e):
+            settings_screen.on_tools_restored(e)
+            _pending_restored.clear()
+            _pending_restored.append(e)
+
+        bus.on(ToolsRestoredEvent, _on_tools_restored)
 
         # ── Кнопки тулбара ────────────────────────────────────────────────────
 
@@ -200,6 +207,9 @@ class SaveMediaApp:
         def show_settings(_):
             main_screen.layout.visible     = False
             settings_screen.layout.visible = True
+            # Применяем восстановление после того как layout стал видимым
+            if _pending_restored:
+                settings_screen.on_tools_restored(_pending_restored[-1])
             page.appbar = ft.AppBar(
                 title=ft.Text("Настройки конфигурации", size=18, weight=ft.FontWeight.W_600),
                 bgcolor=hex_to_flet(state.theme.get("appbar_color", "1c1c1c")),
