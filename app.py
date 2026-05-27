@@ -5,7 +5,7 @@ import time
 import flet as ft
 
 from config import DEFAULT_CONFIG, CHECK_INTERVAL_HOURS, hex_to_flet
-from events import EventBus, ToolsCheckedEvent, ToolsStatusMessageEvent
+from events import EventBus, ToolsCheckedEvent, ToolsRestoredEvent, ToolsStatusMessageEvent
 from managers.config_manager import ConfigManager
 from managers.download_manager import DownloadManager
 from managers.tools_manager import ToolsManager
@@ -153,6 +153,7 @@ class SaveMediaApp:
 
         bus.on(ToolsCheckedEvent,        _on_tools_checked)
         bus.on(ToolsStatusMessageEvent,  _on_status_message)
+        bus.on(ToolsRestoredEvent,       settings_screen.on_tools_restored)
 
         # ── Кнопки тулбара ────────────────────────────────────────────────────
 
@@ -283,32 +284,9 @@ class SaveMediaApp:
             page.run_task(settings_screen.check_tools)
         else:
             mins_left = int((CHECK_INTERVAL_HOURS * 3600 - (now - state.last_check_time)) / 60)
-            settings_screen.progress_text.value = (
-                f"Версии проверены недавно — следующая проверка через {mins_left} мин"
-            )
-            settings_screen.progress_text.color = ft.Colors.GREY_400
-
-            tool_msg, tool_color = (
-                ("Доступны обновления", ft.Colors.ORANGE_400) if state.last_needs_update
-                else ("Актуально", ft.Colors.GREEN_400)
-            )
-            if state.last_needs_update:
-                settings_screen.update_btn_text.value = "Обновить скрипты"
-                settings_screen.update_btn_icon.name  = ft.Icons.DOWNLOAD_ROUNDED
-                settings_screen._tools.yt_needs_update = True
-            else:
-                settings_screen.update_btn_text.value = "Проверить версии"
-                settings_screen.update_btn_icon.name  = ft.Icons.REFRESH_ROUNDED
-
-            for w, name in [
-                (settings_screen.yt_status,      "yt-dlp"),
-                (settings_screen.ffmpeg_status,  "ffmpeg"),
-                (settings_screen.ffplay_status,  "ffplay"),
-                (settings_screen.ffprobe_status, "ffprobe"),
-            ]:
-                w.value = f"{name}: {tool_msg}"
-                w.color = tool_color
-
-            # Восстанавливаем статус-бар через шину — как и все остальные сообщения
-            bus.emit(ToolsCheckedEvent(needs_update=state.last_needs_update))
+            bus.emit(ToolsRestoredEvent(
+                needs_update=state.last_needs_update,
+                tool_versions=state.tool_versions,
+                mins_until_check=mins_left,
+            ))
             safe_update()

@@ -38,6 +38,9 @@ class AppState:
     # ── Мета-состояние ────────────────────────────────────────────────────────
     last_check_time: float = 0.0
     last_needs_update: bool = False
+    # Результаты последней проверки: {"yt-dlp": (local, remote), "ffmpeg": ...}
+    # Сохраняется в config.json, восстанавливается при перезапуске без сети.
+    tool_versions: Dict[str, tuple] = field(default_factory=dict)
 
     # ── Тема ──────────────────────────────────────────────────────────────────
     theme: Dict[str, str] = field(default_factory=lambda: dict(DEFAULT_CONFIG["theme"]))

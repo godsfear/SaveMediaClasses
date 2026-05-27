@@ -11,8 +11,30 @@
         "playlist_enabled": true,
         "clean_titles": true,
         "save_to_source_folder": true,
-        "last_check_time": 1779921183.4429085,
+        "last_check_time": 1779921699.3954463,
         "last_needs_update": false,
+        "tool_versions": {
+            "yt-dlp": [
+                "2026.03.17",
+                "2026.03.17",
+                "ok"
+            ],
+            "ffmpeg": [
+                "8.1.1",
+                "8.1.1",
+                "ok"
+            ],
+            "ffplay": [
+                "8.1.1",
+                "8.1.1",
+                "ok"
+            ],
+            "ffprobe": [
+                "8.1.1",
+                "8.1.1",
+                "ok"
+            ]
+        },
         "urls": {
             "yt_api": "https://api.github.com/repos/yt-dlp/yt-dlp/releases/latest",
             "yt_download": "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe",
@@ -23,8 +45,8 @@
     "window": {
         "width": 643,
         "height": 1098,
-        "left": 3153,
-        "top": 201
+        "left": 3303,
+        "top": 206
     },
     "theme": {
         "accent_color": "00B4D8",

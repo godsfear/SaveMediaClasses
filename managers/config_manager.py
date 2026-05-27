@@ -69,6 +69,10 @@ class ConfigManager:
             url_yt_download     = fb_str(urls, "yt_download",     defaults.url_yt_download),
             url_ffmpeg_version  = fb_str(urls, "ffmpeg_version",  defaults.url_ffmpeg_version),
             url_ffmpeg_download = fb_str(urls, "ffmpeg_download", defaults.url_ffmpeg_download),
+            tool_versions       = {
+                k: tuple(v) for k, v in cfg.get("tool_versions", {}).items()
+                if isinstance(v, (list, tuple)) and len(v) == 3
+            },
             last_check_time     = float(cfg.get("last_check_time",   defaults.last_check_time)),
             last_needs_update   = bool(cfg.get("last_needs_update",  defaults.last_needs_update)),
             theme               = theme,
@@ -106,6 +110,7 @@ class ConfigManager:
                 "save_to_source_folder": state.save_to_source_folder,
                 "last_check_time":       state.last_check_time,
                 "last_needs_update":     state.last_needs_update,
+                "tool_versions":         state.tool_versions,
                 "urls": {
                     "yt_api":          state.url_yt_api,
                     "yt_download":     state.url_yt_download,

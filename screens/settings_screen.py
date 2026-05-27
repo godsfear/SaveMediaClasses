@@ -6,7 +6,7 @@ from config import (
     DEFAULT_CONFIG, THEME_FIELDS, PALETTE,
     hex_to_flet, is_valid_hex, safe_str
 )
-from events import EventBus, ToolsCheckedEvent, ToolsStatusMessageEvent
+from events import EventBus, ToolsCheckedEvent, ToolsRestoredEvent, ToolsStatusMessageEvent
 from managers.tools_manager import ToolsManager
 from state import AppState
 
@@ -253,6 +253,41 @@ class SettingsScreen:
 
     # ── Проверка / обновление инструментов ────────────────────────────────────
 
+    def on_tools_restored(self, e: ToolsRestoredEvent) -> None:
+        """Обработчик ToolsRestoredEvent — восстанавливает виджеты из сохранённого state."""
+        tool_status_map = {
+            "yt-dlp":  self.yt_status,
+            "ffmpeg":  self.ffmpeg_status,
+            "ffplay":  self.ffplay_status,
+            "ffprobe": self.ffprobe_status,
+        }
+        color_map = {
+            "ok":      ft.Colors.GREEN_400,
+            "outdated": ft.Colors.ORANGE_400,
+            "missing":  ft.Colors.RED_400,
+            "error":    ft.Colors.AMBER,
+        }
+        for name, widget in tool_status_map.items():
+            pair = e.tool_versions.get(name)
+            if pair:
+                loc, rem, status = pair
+                widget.value = f"{name}: Локально: {loc} | Сеть: {rem}"
+                widget.color = color_map.get(status, ft.Colors.GREY_600)
+            else:
+                widget.value = f"{name}: —"
+                widget.color = ft.Colors.GREY_600
+
+        if e.needs_update:
+            self.update_btn_text.value = "Обновить скрипты"
+            self.update_btn_icon.name  = ft.Icons.DOWNLOAD_ROUNDED
+            self.progress_text.value   = f"Есть обновления — следующая проверка через {e.mins_until_check} мин"
+            self.progress_text.color   = ft.Colors.ORANGE_400
+        else:
+            self.update_btn_text.value = "Проверить версии"
+            self.update_btn_icon.name  = ft.Icons.REFRESH_ROUNDED
+            self.progress_text.value   = f"Все актуально — следующая проверка через {e.mins_until_check} мин"
+            self.progress_text.color   = ft.Colors.GREEN_400
+
     async def check_tools(self) -> None:
         self.progress_text.value = "Проверка версий..."
         self.progress_text.color = ft.Colors.GREEN_400
@@ -279,12 +314,18 @@ class SettingsScreen:
             )
             if "Отсутствует" in loc:
                 tool_status_map[name].color = ft.Colors.RED_400
+                status_key = "missing"
             elif "[" in loc or "Ошибка" in rem or "[" in rem:
                 tool_status_map[name].color = ft.Colors.AMBER
+                status_key = "error"
             elif is_equal:
                 tool_status_map[name].color = ft.Colors.GREEN_400
+                status_key = "ok"
             else:
                 tool_status_map[name].color = ft.Colors.ORANGE_400
+                status_key = "outdated"
+            # Сохраняем результат в state — будет восстановлен при следующем запуске
+            self._state.tool_versions[name] = (loc, rem, status_key)
             self._page.update()
 
         proxy_url = self._state.proxy_address.strip() if self._state.proxy_enabled else None
