@@ -4,8 +4,10 @@ import time
 
 import flet as ft
 
-from config import DEFAULT_CONFIG, THEME_FIELDS, CHECK_INTERVAL_HOURS, hex_to_flet, safe_str
+from config import DEFAULT_CONFIG, CHECK_INTERVAL_HOURS, hex_to_flet
+from events import EventBus, ToolsCheckedEvent, ToolsStatusMessageEvent
 from managers.config_manager import ConfigManager
+from managers.download_manager import DownloadManager
 from managers.tools_manager import ToolsManager
 from screens.main_screen import MainScreen
 from screens.settings_screen import SettingsScreen
@@ -27,10 +29,17 @@ class SaveMediaApp:
             except Exception:
                 pass
 
+        # ── Инфраструктура ────────────────────────────────────────────────────
+        bus        = EventBus()
         config_mgr = ConfigManager(os.path.join(base_dir, "config.json"))
         tools      = ToolsManager(base_dir, tools_dir)
+        dm         = DownloadManager(
+            base_dir=base_dir, tools_dir=tools_dir,
+            log_path=os.path.join(base_dir, "savemedia.log"),
+            bus=bus,
+        )
 
-        # ── Геометрия окна — читаем до создания экранов ───────────────────────
+        # ── Геометрия окна ────────────────────────────────────────────────────
         geo = config_mgr.load_window_geometry()
         page.window.width  = geo["width"]
         page.window.height = geo["height"]
@@ -49,14 +58,13 @@ class SaveMediaApp:
         page.padding   = 15
         page.safe_area = True
 
-        # ── Загружаем состояние ───────────────────────────────────────────────
+        # ── Состояние ─────────────────────────────────────────────────────────
         state = config_mgr.load()
 
-        # ── Экраны получают state — никаких колбэков для передачи данных ──────
-        main_screen     = MainScreen(page, base_dir, tools_dir, safe_update, state)
-        settings_screen = SettingsScreen(page, tools, safe_update, state)
+        # ── Экраны ────────────────────────────────────────────────────────────
+        main_screen     = MainScreen(page, base_dir, safe_update, state, dm, bus)
+        settings_screen = SettingsScreen(page, tools, safe_update, state, bus)
 
-        # ── Синхронизируем виджеты из state ──────────────────────────────────
         main_screen.sync_from_state()
         settings_screen.sync_from_state()
         settings_screen.refresh_theme_fields()
@@ -71,7 +79,6 @@ class SaveMediaApp:
             if t is not None: state.window["top"]   = int(t)
 
         def save_config():
-            # Снимаем актуальные значения со всех виджетов перед записью
             main_screen.sync_to_state()
             settings_screen.sync_to_state()
             _sync_window_to_state()
@@ -87,13 +94,12 @@ class SaveMediaApp:
         ]
         all_switches = [
             main_screen.audio_only_switch, main_screen.cookies_enabled_switch,
-            settings_screen.clean_titles_switch,
-            settings_screen.playlist_switch, settings_screen.embed_metadata_switch,
-            settings_screen.save_to_source_switch,
+            settings_screen.clean_titles_switch, settings_screen.playlist_switch,
+            settings_screen.embed_metadata_switch, settings_screen.save_to_source_switch,
         ]
 
         def apply_theme():
-            t = state.theme
+            t          = state.theme
             accent     = hex_to_flet(t.get("accent_color",   "00B4D8"))
             switch_c   = hex_to_flet(t.get("switch_color",   "4CAF50"))
             header_c   = hex_to_flet(t.get("header_color",   "00B4D8"))
@@ -103,53 +109,50 @@ class SaveMediaApp:
             appbar_c   = hex_to_flet(t.get("appbar_color",   "1c1c1c"))
             card_c     = hex_to_flet(t.get("card_color",     "161616"))
 
-            for h in all_headers:
-                h.color = header_c
-            for sw in all_switches:
-                sw.active_color = switch_c
+            for h in all_headers: h.color = header_c
+            for sw in all_switches: sw.active_color = switch_c
 
             main_screen.download_btn.bgcolor        = button_c
             settings_screen.update_btn.bgcolor      = button_c
             settings_screen.progress_text.color     = progress_c
             settings_screen.progress_bar.color      = progress_c
 
-            main_screen.url_input.focused_border_color                        = accent
-            settings_screen.proxy_input.focused_border_color                  = accent
-            settings_screen.yt_args_input.focused_border_color                = accent
-            settings_screen.cookies_browser_dropdown.focused_border_color     = accent
-            settings_screen.yt_api_input.focused_border_color                 = accent
-            settings_screen.yt_download_input.focused_border_color            = accent
-            settings_screen.ffmpeg_version_input.focused_border_color         = accent
-            settings_screen.ffmpeg_download_input.focused_border_color        = accent
+            for inp in [
+                main_screen.url_input,
+                settings_screen.proxy_input, settings_screen.yt_args_input,
+                settings_screen.cookies_browser_dropdown,
+                settings_screen.yt_api_input, settings_screen.yt_download_input,
+                settings_screen.ffmpeg_version_input, settings_screen.ffmpeg_download_input,
+            ]:
+                inp.focused_border_color = accent
 
             main_screen.folder_label.color = text_c
-
             if page.appbar:
                 page.appbar.bgcolor = appbar_c
-
             for layout in [main_screen.layout, settings_screen.layout]:
-                if hasattr(layout, "controls"):
-                    for ctrl in layout.controls:
-                        if isinstance(ctrl, ft.Container):
-                            ctrl.bgcolor = card_c
-
-        # ── Колбэки экранов — только смысловые ───────────────────────────────
+                for ctrl in getattr(layout, "controls", []):
+                    if isinstance(ctrl, ft.Container):
+                        ctrl.bgcolor = card_c
 
         settings_screen.set_on_theme_changed(apply_theme)
-        settings_screen.set_on_notify_main(main_screen.notify_tools_status)
         settings_screen.set_on_settings_changed(save_config)
-        settings_screen.set_on_check_done(lambda: (
-            setattr(state, "last_check_time",   time.time()),
-            setattr(state, "last_needs_update",
-                    settings_screen._tools.yt_needs_update or settings_screen._tools.ffmpeg_needs_update),
-            save_config()
-        ))
 
-        main_screen._on_status = lambda msg, color: (
-            setattr(status_bar_text, "value", msg),
-            setattr(status_bar_text, "color", color),
+        # ── Подписки app.py на шину ───────────────────────────────────────────
+
+        status_bar_text = ft.Text("", size=12, color=ft.Colors.GREEN_400)
+
+        def _on_tools_checked(e: ToolsCheckedEvent) -> None:
+            state.last_check_time   = time.time()
+            state.last_needs_update = e.needs_update
+            save_config()
+
+        def _on_status_message(e: ToolsStatusMessageEvent) -> None:
+            status_bar_text.value = e.message
+            status_bar_text.color = e.color
             safe_update()
-        )
+
+        bus.on(ToolsCheckedEvent,        _on_tools_checked)
+        bus.on(ToolsStatusMessageEvent,  _on_status_message)
 
         # ── Кнопки тулбара ────────────────────────────────────────────────────
 
@@ -172,10 +175,8 @@ class SaveMediaApp:
         exit_btn     = ft.IconButton(icon=ft.Icons.POWER_SETTINGS_NEW_ROUNDED, icon_color=ft.Colors.RED_400, tooltip="Полный выход")
 
         async def force_exit_app(_):
-            try:
-                save_config()
-            except Exception:
-                pass
+            try: save_config()
+            except Exception: pass
             page.window.prevent_close = False
             page.window.on_event      = None
             page.update()
@@ -185,7 +186,6 @@ class SaveMediaApp:
 
         # ── Навигация ─────────────────────────────────────────────────────────
 
-        status_bar_text = ft.Text("", size=12, color=ft.Colors.GREEN_400)
         main_status_container = ft.Container(
             content=status_bar_text, padding=ft.Padding(left=10, right=10)
         )
@@ -202,10 +202,8 @@ class SaveMediaApp:
                 title=ft.Text("Настройки конфигурации", size=18, weight=ft.FontWeight.W_600),
                 bgcolor=hex_to_flet(state.theme.get("appbar_color", "1c1c1c")),
                 leading=ft.IconButton(
-                    icon=ft.Icons.ARROW_BACK_IOS_NEW_ROUNDED,
-                    icon_color=ft.Colors.WHITE,
-                    icon_size=16,
-                    on_click=show_main
+                    icon=ft.Icons.ARROW_BACK_IOS_NEW_ROUNDED, icon_color=ft.Colors.WHITE,
+                    icon_size=16, on_click=show_main
                 )
             )
             page.bottom_appbar.content = settings_status_container
@@ -230,10 +228,8 @@ class SaveMediaApp:
                 state.download_path            = str(path)
                 main_screen.folder_label.value = str(path)
                 main_screen.folder_label.color = ft.Colors.GREEN_400
-                try:
-                    os.makedirs(state.download_path, exist_ok=True)
-                except Exception:
-                    pass
+                try: os.makedirs(state.download_path, exist_ok=True)
+                except Exception: pass
                 save_config()
                 safe_update()
 
@@ -252,10 +248,8 @@ class SaveMediaApp:
         async def handle_window_event(e):
             ev = str(getattr(e, "type", None) or getattr(e, "data", None)).lower()
             if "close" in ev:
-                try:
-                    save_config()
-                except Exception:
-                    pass
+                try: save_config()
+                except Exception: pass
                 page.window.prevent_close = False
                 page.window.on_event      = None
                 page.update()
@@ -263,7 +257,7 @@ class SaveMediaApp:
 
         page.window.on_event = handle_window_event
 
-        # ── AppBar / BottomAppBar ──────────────────────────────────────────────
+        # ── AppBar / BottomAppBar ─────────────────────────────────────────────
         page.appbar = ft.AppBar(
             title=ft.Text("SaveMedia [yt-dlp GUI]", size=18, weight=ft.FontWeight.W_600),
             bgcolor="#1c1c1c",
@@ -286,9 +280,7 @@ class SaveMediaApp:
         # ── Фоновая проверка версий ───────────────────────────────────────────
         now = time.time()
         if now - state.last_check_time >= CHECK_INTERVAL_HOURS * 3600:
-            async def _do_check():
-                await settings_screen.check_tools()
-            page.run_task(_do_check)
+            page.run_task(settings_screen.check_tools)
         else:
             mins_left = int((CHECK_INTERVAL_HOURS * 3600 - (now - state.last_check_time)) / 60)
             settings_screen.progress_text.value = (
@@ -296,17 +288,17 @@ class SaveMediaApp:
             )
             settings_screen.progress_text.color = ft.Colors.GREY_400
 
+            tool_msg, tool_color = (
+                ("Доступны обновления", ft.Colors.ORANGE_400) if state.last_needs_update
+                else ("Актуально", ft.Colors.GREEN_400)
+            )
             if state.last_needs_update:
                 settings_screen.update_btn_text.value = "Обновить скрипты"
                 settings_screen.update_btn_icon.name  = ft.Icons.DOWNLOAD_ROUNDED
                 settings_screen._tools.yt_needs_update = True
-                tool_msg   = "Доступны обновления"
-                tool_color = ft.Colors.ORANGE_400
             else:
                 settings_screen.update_btn_text.value = "Проверить версии"
                 settings_screen.update_btn_icon.name  = ft.Icons.REFRESH_ROUNDED
-                tool_msg   = "Актуально"
-                tool_color = ft.Colors.GREEN_400
 
             for w, name in [
                 (settings_screen.yt_status,      "yt-dlp"),
@@ -317,5 +309,6 @@ class SaveMediaApp:
                 w.value = f"{name}: {tool_msg}"
                 w.color = tool_color
 
-            main_screen.notify_tools_status(state.last_needs_update)
+            # Восстанавливаем статус-бар через шину — как и все остальные сообщения
+            bus.emit(ToolsCheckedEvent(needs_update=state.last_needs_update))
             safe_update()
