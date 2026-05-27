@@ -287,6 +287,8 @@ class SettingsScreen:
             self.update_btn_icon.name  = ft.Icons.REFRESH_ROUNDED
             self.progress_text.value   = f"Все актуально — следующая проверка через {e.mins_until_check} мин"
             self.progress_text.color   = ft.Colors.GREEN_400
+        # layout может быть невидим — safe_update всё равно фиксирует значения в дереве
+        self._safe_update()
 
     async def check_tools(self) -> None:
         self.progress_text.value = "Проверка версий..."
