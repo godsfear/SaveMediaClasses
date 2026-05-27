@@ -8,6 +8,7 @@ from config import DEFAULT_CONFIG, CHECK_INTERVAL_HOURS, hex_to_flet
 from events import EventBus, ToolsCheckedEvent, ToolsRestoredEvent, ToolsStatusMessageEvent
 from managers.config_manager import ConfigManager
 from managers.download_manager import DownloadManager
+from managers.providers import YtDlpProvider
 from managers.tools_manager import ToolsManager
 from screens.main_screen import MainScreen
 from screens.settings_screen import SettingsScreen
@@ -33,8 +34,8 @@ class SaveMediaApp:
         bus        = EventBus()
         config_mgr = ConfigManager(os.path.join(base_dir, "config.json"))
         tools      = ToolsManager(base_dir, tools_dir)
-        dm         = DownloadManager(
-            base_dir=base_dir, tools_dir=tools_dir,
+        dm = DownloadManager(
+            provider_factory=lambda: YtDlpProvider(base_dir, tools_dir),
             log_path=os.path.join(base_dir, "savemedia.log"),
             bus=bus,
         )
@@ -280,13 +281,18 @@ class SaveMediaApp:
 
         # ── Фоновая проверка версий ───────────────────────────────────────────
         now = time.time()
-        if now - state.last_check_time >= CHECK_INTERVAL_HOURS * 3600:
+        # Принудительная проверка если tool_versions пустой (первый запуск с новым кодом)
+        force_check = not state.tool_versions
+        if force_check or now - state.last_check_time >= CHECK_INTERVAL_HOURS * 3600:
             page.run_task(settings_screen.check_tools)
         else:
             mins_left = int((CHECK_INTERVAL_HOURS * 3600 - (now - state.last_check_time)) / 60)
+            # ToolsRestoredEvent — восстанавливает виджеты settings_screen из state
+            # ToolsCheckedEvent  — обновляет статус-бар главного окна
             bus.emit(ToolsRestoredEvent(
                 needs_update=state.last_needs_update,
                 tool_versions=state.tool_versions,
                 mins_until_check=mins_left,
             ))
+            bus.emit(ToolsCheckedEvent(needs_update=state.last_needs_update))
             safe_update()
