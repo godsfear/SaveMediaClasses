@@ -8,18 +8,18 @@ from config import (
 )
 from events import EventBus, ToolsCheckedEvent, ToolsRestoredEvent, ToolsStatusMessageEvent
 from managers.tools_manager import ToolsManager
+from services import Services
 from state import AppState
 
 
 class SettingsScreen:
 
-    def __init__(self, page: ft.Page, tools: ToolsManager, safe_update,
-                 state: AppState, bus: EventBus) -> None:
+    def __init__(self, page: ft.Page, svc: Services) -> None:
         self._page        = page
-        self._tools       = tools
-        self._safe_update = safe_update
-        self._state       = state
-        self._bus         = bus
+        self._tools       = svc.tools
+        self._safe_update = svc.safe_update
+        self._state       = svc.state
+        self._bus         = svc.bus
 
         # Единственный оставшийся колбэк — применение темы к виджетам.
         # Он не передаёт данные, а вызывает перерисовку в app.py,
