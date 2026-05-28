@@ -4,7 +4,7 @@ import time
 
 import flet as ft
 
-from config import DEFAULT_CONFIG, CHECK_INTERVAL_HOURS, hex_to_flet
+from config import CHECK_INTERVAL_HOURS, hex_to_flet
 from events import EventBus, ToolsCheckedEvent, ToolsRestoredEvent, ToolsStatusMessageEvent
 from managers.config_manager import ConfigManager
 from managers.download_manager import DownloadManager
@@ -42,10 +42,10 @@ class SaveMediaApp:
 
         # ── Геометрия окна ────────────────────────────────────────────────────
         geo = config_mgr.load_window_geometry()
-        page.window.width  = geo["width"]
-        page.window.height = geo["height"]
-        page.window.left   = geo["left"]
-        page.window.top    = geo["top"]
+        page.window.width  = geo.width
+        page.window.height = geo.height
+        page.window.left   = geo.left
+        page.window.top    = geo.top
         page.window.icon   = "vload.png"
 
         if page.platform in [ft.PagePlatform.WINDOWS, ft.PagePlatform.MACOS, ft.PagePlatform.LINUX]:
@@ -74,10 +74,10 @@ class SaveMediaApp:
 
         def _sync_window_to_state():
             w, h, l, t = page.window.width, page.window.height, page.window.left, page.window.top
-            if w and w > 10: state.window["width"]  = int(w)
-            if h and h > 10: state.window["height"] = int(h)
-            if l is not None: state.window["left"]  = int(l)
-            if t is not None: state.window["top"]   = int(t)
+            if w and w > 10: state.window.width  = int(w)
+            if h and h > 10: state.window.height = int(h)
+            if l is not None: state.window.left  = int(l)
+            if t is not None: state.window.top   = int(t)
 
         def save_config():
             main_screen.sync_to_state()
@@ -101,14 +101,14 @@ class SaveMediaApp:
 
         def apply_theme():
             t          = state.theme
-            accent     = hex_to_flet(t.get("accent_color",   "00B4D8"))
-            switch_c   = hex_to_flet(t.get("switch_color",   "4CAF50"))
-            header_c   = hex_to_flet(t.get("header_color",   "00B4D8"))
-            text_c     = hex_to_flet(t.get("text_color",     "E0E0E0"))
-            progress_c = hex_to_flet(t.get("progress_color", "4CAF50"))
-            button_c   = hex_to_flet(t.get("button_color",   "4CAF50"))
-            appbar_c   = hex_to_flet(t.get("appbar_color",   "1c1c1c"))
-            card_c     = hex_to_flet(t.get("card_color",     "161616"))
+            accent     = hex_to_flet(t.accent_color)
+            switch_c   = hex_to_flet(t.switch_color)
+            header_c   = hex_to_flet(t.header_color)
+            text_c     = hex_to_flet(t.text_color)
+            progress_c = hex_to_flet(t.progress_color)
+            button_c   = hex_to_flet(t.button_color)
+            appbar_c   = hex_to_flet(t.appbar_color)
+            card_c     = hex_to_flet(t.card_color)
 
             for h in all_headers: h.color = header_c
             for sw in all_switches: sw.active_color = switch_c
@@ -212,7 +212,7 @@ class SaveMediaApp:
                 settings_screen.on_tools_restored(_pending_restored[-1])
             page.appbar = ft.AppBar(
                 title=ft.Text("Настройки конфигурации", size=18, weight=ft.FontWeight.W_600),
-                bgcolor=hex_to_flet(state.theme.get("appbar_color", "1c1c1c")),
+                bgcolor=hex_to_flet(state.theme.appbar_color),
                 leading=ft.IconButton(
                     icon=ft.Icons.ARROW_BACK_IOS_NEW_ROUNDED, icon_color=ft.Colors.WHITE,
                     icon_size=16, on_click=show_main
@@ -228,7 +228,7 @@ class SaveMediaApp:
             settings_screen.layout.visible = False
             page.appbar = ft.AppBar(
                 title=ft.Text("SaveMedia [yt-dlp GUI]", size=18, weight=ft.FontWeight.W_600),
-                bgcolor=hex_to_flet(state.theme.get("appbar_color", "1c1c1c")),
+                bgcolor=hex_to_flet(state.theme.appbar_color),
                 actions=[settings_btn, proxy_btn, folder_btn, exit_btn]
             )
             page.bottom_appbar.content = main_status_container

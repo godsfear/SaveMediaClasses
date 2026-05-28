@@ -3,7 +3,7 @@ import asyncio
 import flet as ft
 
 from config import (
-    DEFAULT_CONFIG, THEME_FIELDS, PALETTE,
+    THEME_FIELDS, PALETTE, ThemeConfig,
     hex_to_flet, is_valid_hex, safe_str
 )
 from events import EventBus, ToolsCheckedEvent, ToolsRestoredEvent, ToolsStatusMessageEvent
@@ -149,11 +149,11 @@ class SettingsScreen:
         def make_color_row(key: str, label: str) -> ft.Column:
             preview = ft.Container(
                 width=28, height=28, border_radius=6,
-                bgcolor=hex_to_flet(self._state.theme.get(key, "FFFFFF")),
+                bgcolor=hex_to_flet(getattr(self._state.theme, key, "FFFFFF")),
                 border=ft.Border.all(1, "#555555"), tooltip="Открыть палитру",
             )
             field = ft.TextField(
-                value=self._state.theme.get(key, "FFFFFF").upper().lstrip("#"),
+                value=getattr(self._state.theme, key, "FFFFFF").upper().lstrip("#"),
                 width=100, border_radius=6, text_size=13,
                 capitalization=ft.TextCapitalization.CHARACTERS,
                 max_length=6,
@@ -167,7 +167,7 @@ class SettingsScreen:
             )
 
             def apply_color(hex_val: str, f=field, p=preview, pc=palette_container):
-                self._state.theme[key] = hex_val
+                setattr(self._state.theme, key, hex_val)
                 f.value        = hex_val.upper()
                 f.border_color = None
                 p.bgcolor      = hex_to_flet(hex_val)
@@ -193,7 +193,7 @@ class SettingsScreen:
             def on_field_change(e, f=field, p=preview):
                 val = safe_str(f.value).strip().lstrip("#").upper()
                 if is_valid_hex(val):
-                    self._state.theme[key] = val
+                    setattr(self._state.theme, key, val)
                     p.bgcolor      = hex_to_flet(val)
                     f.border_color = None
                     self._on_theme_changed()
@@ -232,8 +232,9 @@ class SettingsScreen:
         )
 
     def _reset_theme(self, _):
-        for key, val in DEFAULT_CONFIG["theme"].items():
-            self._state.theme[key] = val
+        defaults = ThemeConfig()
+        for key in vars(defaults):
+            setattr(self._state.theme, key, getattr(defaults, key))
         self.refresh_theme_fields()
         self._on_theme_changed()
         self._on_settings_changed()
@@ -247,9 +248,9 @@ class SettingsScreen:
                     label_text = top_row.controls[0].value
                     key = next((k for k, l in THEME_FIELDS if l == label_text), None)
                     if key:
-                        top_row.controls[1].value        = self._state.theme[key].upper().lstrip("#")
+                        top_row.controls[1].value        = getattr(self._state.theme, key).upper().lstrip("#")
                         top_row.controls[1].border_color = None
-                        top_row.controls[2].bgcolor      = hex_to_flet(self._state.theme[key])
+                        top_row.controls[2].bgcolor      = hex_to_flet(getattr(self._state.theme, key))
 
     # ── Проверка / обновление инструментов ────────────────────────────────────
 
