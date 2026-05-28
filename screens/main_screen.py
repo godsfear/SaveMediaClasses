@@ -8,6 +8,7 @@ import flet as ft
 
 from config import safe_str
 from events import (
+    EventBus,
     DownloadProgressEvent,
     DownloadPostprocessingEvent,
     DownloadCompletedEvent,
@@ -15,9 +16,10 @@ from events import (
     ToolsCheckedEvent,
     ToolsStatusMessageEvent,
 )
-from managers.download_manager import DownloadSnapshot, MAX_PARALLEL
-from managers.providers import YtDlpProvider as _DefaultProvider
+from managers.download_manager import DownloadManager, DownloadSnapshot, MAX_PARALLEL
 from services import Services
+from managers.providers import YtDlpProvider as _DefaultProvider
+from state import AppState
 
 
 class DownloadCard:

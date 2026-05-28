@@ -17,12 +17,13 @@ Services создаётся один раз в app.py и передаётся в
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Callable
 
 from events import EventBus
 from managers.config_manager import ConfigManager
 from managers.download_manager import DownloadManager
+from managers.download_repository import DownloadRepository
 from managers.tools_manager import ToolsManager
 from state import AppState
 
@@ -40,10 +41,17 @@ class Services:
     tools:      ToolsManager
     dm:         DownloadManager
 
+    # ── Персистентность ──────────────────────────────────────────────────────
+    db: DownloadRepository
+
     # ── Состояние приложения ──────────────────────────────────────────────────
     state: AppState
 
     # ── Вспомогательные свойства ──────────────────────────────────────────────
+
+    @property
+    def db_path(self) -> str:
+        return os.path.join(self.base_dir, "savemedia.db")
 
     @property
     def log_path(self) -> str:
@@ -82,6 +90,8 @@ class Services:
             bus=bus,
         )
         state = config_mgr.load()
+        db_path = os.path.join(base_dir, "savemedia.db")
+        db      = DownloadRepository(db_path=db_path, bus=bus)
 
         return Services(
             base_dir=base_dir,
@@ -91,5 +101,6 @@ class Services:
             config_mgr=config_mgr,
             tools=tools,
             dm=dm,
+            db=db,
             state=state,
         )
