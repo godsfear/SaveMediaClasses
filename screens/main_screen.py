@@ -17,6 +17,7 @@ from events import (
     ToolsStatusMessageEvent,
 )
 from managers.download_manager import DownloadManager, DownloadSnapshot, MAX_PARALLEL
+from services import Services
 from managers.providers import YtDlpProvider as _DefaultProvider
 from state import AppState
 
@@ -83,16 +84,13 @@ class DownloadCard:
 
 class MainScreen:
 
-    def __init__(self, page: ft.Page, base_dir: str,
-                 safe_update, state: AppState,
-                 download_manager: DownloadManager,
-                 bus: EventBus) -> None:
+    def __init__(self, page: ft.Page, svc: Services) -> None:
         self._page        = page
-        self._base_dir    = base_dir
-        self._safe_update = safe_update
-        self._state       = state
-        self._dm          = download_manager
-        self._bus         = bus
+        self._base_dir    = svc.base_dir
+        self._safe_update = svc.safe_update
+        self._state       = svc.state
+        self._dm          = svc.dm
+        self._bus         = svc.bus
 
         self._cards: Dict[str, DownloadCard] = {}
 

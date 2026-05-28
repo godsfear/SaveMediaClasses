@@ -5,21 +5,16 @@ import time
 import flet as ft
 
 from config import CHECK_INTERVAL_HOURS, hex_to_flet
-from events import EventBus, ToolsCheckedEvent, ToolsRestoredEvent, ToolsStatusMessageEvent
-from managers.config_manager import ConfigManager
-from managers.download_manager import DownloadManager
-from managers.providers import YtDlpProvider
-from managers.tools_manager import ToolsManager
+from events import ToolsCheckedEvent, ToolsRestoredEvent, ToolsStatusMessageEvent
 from screens.main_screen import MainScreen
 from screens.settings_screen import SettingsScreen
+from services import Services
 
 
 class SaveMediaApp:
 
     async def main(self, page: ft.Page) -> None:
-        base_dir  = os.path.dirname(os.path.abspath(__file__))
-        tools_dir = os.path.join(base_dir, "tools")
-        os.makedirs(tools_dir, exist_ok=True)
+        base_dir = os.path.dirname(os.path.abspath(__file__))
 
         page.theme_mode = ft.ThemeMode.DARK
         page.theme      = ft.Theme(color_scheme_seed=ft.Colors.BLUE)
@@ -30,18 +25,8 @@ class SaveMediaApp:
             except Exception:
                 pass
 
-        # ── Инфраструктура ────────────────────────────────────────────────────
-        bus        = EventBus()
-        config_mgr = ConfigManager(os.path.join(base_dir, "config.json"))
-        tools      = ToolsManager(base_dir, tools_dir)
-        dm = DownloadManager(
-            provider_factory=lambda: YtDlpProvider(base_dir, tools_dir),
-            log_path=os.path.join(base_dir, "savemedia.log"),
-            bus=bus,
-        )
-
-        # ── Геометрия окна ────────────────────────────────────────────────────
-        geo = config_mgr.load_window_geometry()
+        # ── Геометрия окна — до создания Services (нужна до page.add) ─────────
+        geo = Services.create(base_dir, safe_update).config_mgr.load_window_geometry()
         page.window.width  = geo.width
         page.window.height = geo.height
         page.window.left   = geo.left
@@ -59,12 +44,12 @@ class SaveMediaApp:
         page.padding   = 15
         page.safe_area = True
 
-        # ── Состояние ─────────────────────────────────────────────────────────
-        state = config_mgr.load()
+        # ── Контейнер зависимостей ────────────────────────────────────────────
+        svc = Services.create(base_dir, safe_update)
 
         # ── Экраны ────────────────────────────────────────────────────────────
-        main_screen     = MainScreen(page, base_dir, safe_update, state, dm, bus)
-        settings_screen = SettingsScreen(page, tools, safe_update, state, bus)
+        main_screen     = MainScreen(page, svc)
+        settings_screen = SettingsScreen(page, svc)
 
         main_screen.sync_from_state()
         settings_screen.sync_from_state()
@@ -72,18 +57,10 @@ class SaveMediaApp:
 
         # ── Сохранение ────────────────────────────────────────────────────────
 
-        def _sync_window_to_state():
-            w, h, l, t = page.window.width, page.window.height, page.window.left, page.window.top
-            if w and w > 10: state.window.width  = int(w)
-            if h and h > 10: state.window.height = int(h)
-            if l is not None: state.window.left  = int(l)
-            if t is not None: state.window.top   = int(t)
-
         def save_config():
             main_screen.sync_to_state()
             settings_screen.sync_to_state()
-            _sync_window_to_state()
-            config_mgr.save(state)
+            svc.save_config(page)
 
         # ── Тема ──────────────────────────────────────────────────────────────
 
@@ -100,7 +77,7 @@ class SaveMediaApp:
         ]
 
         def apply_theme():
-            t          = state.theme
+            t          = svc.state.theme
             accent     = hex_to_flet(t.accent_color)
             switch_c   = hex_to_flet(t.switch_color)
             header_c   = hex_to_flet(t.header_color)
@@ -110,13 +87,13 @@ class SaveMediaApp:
             appbar_c   = hex_to_flet(t.appbar_color)
             card_c     = hex_to_flet(t.card_color)
 
-            for h in all_headers: h.color = header_c
+            for h in all_headers:  h.color        = header_c
             for sw in all_switches: sw.active_color = switch_c
 
-            main_screen.download_btn.bgcolor        = button_c
-            settings_screen.update_btn.bgcolor      = button_c
-            settings_screen.progress_text.color     = progress_c
-            settings_screen.progress_bar.color      = progress_c
+            main_screen.download_btn.bgcolor    = button_c
+            settings_screen.update_btn.bgcolor  = button_c
+            settings_screen.progress_text.color = progress_c
+            settings_screen.progress_bar.color  = progress_c
 
             for inp in [
                 main_screen.url_input,
@@ -138,13 +115,13 @@ class SaveMediaApp:
         settings_screen.set_on_theme_changed(apply_theme)
         settings_screen.set_on_settings_changed(save_config)
 
-        # ── Подписки app.py на шину ───────────────────────────────────────────
+        # ── Подписки на шину ──────────────────────────────────────────────────
 
         status_bar_text = ft.Text("", size=12, color=ft.Colors.GREEN_400)
 
         def _on_tools_checked(e: ToolsCheckedEvent) -> None:
-            state.last_check_time   = time.time()
-            state.last_needs_update = e.needs_update
+            svc.state.last_check_time   = time.time()
+            svc.state.last_needs_update = e.needs_update
             save_config()
 
         def _on_status_message(e: ToolsStatusMessageEvent) -> None:
@@ -152,21 +129,21 @@ class SaveMediaApp:
             status_bar_text.color = e.color
             safe_update()
 
-        bus.on(ToolsCheckedEvent,        _on_tools_checked)
-        bus.on(ToolsStatusMessageEvent,  _on_status_message)
-        _pending_restored: list = []   # хранит последний ToolsRestoredEvent до открытия настроек
+        _pending_restored: list = []
 
-        def _on_tools_restored(e):
+        def _on_tools_restored(e: ToolsRestoredEvent) -> None:
             settings_screen.on_tools_restored(e)
             _pending_restored.clear()
             _pending_restored.append(e)
 
-        bus.on(ToolsRestoredEvent, _on_tools_restored)
+        svc.bus.on(ToolsCheckedEvent,       _on_tools_checked)
+        svc.bus.on(ToolsStatusMessageEvent, _on_status_message)
+        svc.bus.on(ToolsRestoredEvent,      _on_tools_restored)
 
         # ── Кнопки тулбара ────────────────────────────────────────────────────
 
         def update_proxy_button_ui():
-            if state.proxy_enabled:
+            if svc.state.proxy_enabled:
                 proxy_btn.icon       = ft.Icons.SHIELD_ROUNDED
                 proxy_btn.icon_color = ft.Colors.GREEN_400
                 proxy_btn.tooltip    = "Прокси: ВКЛ"
@@ -207,12 +184,11 @@ class SaveMediaApp:
         def show_settings(_):
             main_screen.layout.visible     = False
             settings_screen.layout.visible = True
-            # Применяем восстановление после того как layout стал видимым
             if _pending_restored:
                 settings_screen.on_tools_restored(_pending_restored[-1])
             page.appbar = ft.AppBar(
                 title=ft.Text("Настройки конфигурации", size=18, weight=ft.FontWeight.W_600),
-                bgcolor=hex_to_flet(state.theme.appbar_color),
+                bgcolor=hex_to_flet(svc.state.theme.appbar_color),
                 leading=ft.IconButton(
                     icon=ft.Icons.ARROW_BACK_IOS_NEW_ROUNDED, icon_color=ft.Colors.WHITE,
                     icon_size=16, on_click=show_main
@@ -228,7 +204,7 @@ class SaveMediaApp:
             settings_screen.layout.visible = False
             page.appbar = ft.AppBar(
                 title=ft.Text("SaveMedia [yt-dlp GUI]", size=18, weight=ft.FontWeight.W_600),
-                bgcolor=hex_to_flet(state.theme.appbar_color),
+                bgcolor=hex_to_flet(svc.state.theme.appbar_color),
                 actions=[settings_btn, proxy_btn, folder_btn, exit_btn]
             )
             page.bottom_appbar.content = main_status_container
@@ -237,16 +213,16 @@ class SaveMediaApp:
         async def open_folder_picker(_):
             path = await ft.FilePicker().get_directory_path(dialog_title="Выберите папку сохранения медиа")
             if path:
-                state.download_path            = str(path)
+                svc.state.download_path        = str(path)
                 main_screen.folder_label.value = str(path)
                 main_screen.folder_label.color = ft.Colors.GREEN_400
-                try: os.makedirs(state.download_path, exist_ok=True)
+                try: os.makedirs(svc.state.download_path, exist_ok=True)
                 except Exception: pass
                 save_config()
                 safe_update()
 
         def toggle_proxy(_):
-            state.proxy_enabled = not state.proxy_enabled
+            svc.state.proxy_enabled = not svc.state.proxy_enabled
             update_proxy_button_ui()
             save_config()
             safe_update()
@@ -291,18 +267,15 @@ class SaveMediaApp:
 
         # ── Фоновая проверка версий ───────────────────────────────────────────
         now = time.time()
-        # Принудительная проверка если tool_versions пустой (первый запуск с новым кодом)
-        force_check = not state.tool_versions
-        if force_check or now - state.last_check_time >= CHECK_INTERVAL_HOURS * 3600:
+        force_check = not svc.state.tool_versions
+        if force_check or now - svc.state.last_check_time >= CHECK_INTERVAL_HOURS * 3600:
             page.run_task(settings_screen.check_tools)
         else:
-            mins_left = int((CHECK_INTERVAL_HOURS * 3600 - (now - state.last_check_time)) / 60)
-            # ToolsRestoredEvent — восстанавливает виджеты settings_screen из state
-            # ToolsCheckedEvent  — обновляет статус-бар главного окна
-            bus.emit(ToolsRestoredEvent(
-                needs_update=state.last_needs_update,
-                tool_versions=state.tool_versions,
+            mins_left = int((CHECK_INTERVAL_HOURS * 3600 - (now - svc.state.last_check_time)) / 60)
+            svc.bus.emit(ToolsRestoredEvent(
+                needs_update=svc.state.last_needs_update,
+                tool_versions=svc.state.tool_versions,
                 mins_until_check=mins_left,
             ))
-            bus.emit(ToolsCheckedEvent(needs_update=state.last_needs_update))
+            svc.bus.emit(ToolsCheckedEvent(needs_update=svc.state.last_needs_update))
             safe_update()
