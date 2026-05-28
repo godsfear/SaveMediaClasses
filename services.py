@@ -17,7 +17,7 @@ Services создаётся один раз в app.py и передаётся в
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Callable
 
 from events import EventBus
