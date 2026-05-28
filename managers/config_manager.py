@@ -2,7 +2,10 @@ import json
 import os
 from typing import Any, Dict
 
-from config import DEFAULT_CONFIG, safe_str, safe_int, get_fallback_bool
+from config import (
+    ThemeConfig, WindowConfig,
+    safe_str, safe_int, get_fallback_bool,
+)
 from state import AppState
 
 
@@ -16,7 +19,7 @@ class ConfigManager:
     def load(self) -> AppState:
         """Читает config.json и возвращает заполненный AppState.
         При любой ошибке возвращает AppState с дефолтами."""
-        defaults = AppState.defaults()
+        defaults = AppState()
         raw = self._read_raw()
         if raw is None:
             return defaults
@@ -31,65 +34,42 @@ class ConfigManager:
         def fb_bool(d: dict, k: str, default: bool) -> bool:
             return get_fallback_bool(d, k, default)
 
-        # Разбираем тему
-        saved_theme = raw.get("theme", {})
-        theme = dict(DEFAULT_CONFIG["theme"])
-        if isinstance(saved_theme, dict):
-            for key in theme:
-                v = safe_str(saved_theme.get(key, theme[key]))
-                theme[key] = v if v else theme[key]
-
-        # Разбираем геометрию окна
-        window_raw = raw.get("window", {})
-        window = dict(DEFAULT_CONFIG["window"])
-        if isinstance(window_raw, dict):
-            window["width"]  = safe_int(window_raw.get("width"),  window["width"])
-            window["height"] = safe_int(window_raw.get("height"), window["height"])
-            window["left"]   = safe_int(window_raw.get("left"),   window["left"])
-            window["top"]    = safe_int(window_raw.get("top"),    window["top"])
-
-        # download_path: если пусто — дефолт
         dp = fb_str(cfg, "download_path", "")
         if not dp:
             dp = defaults.download_path
 
         return AppState(
-            download_path       = dp,
-            proxy_enabled       = fb_bool(cfg, "proxy_enabled",       defaults.proxy_enabled),
-            proxy_address       = fb_str(cfg,  "proxy_address",        defaults.proxy_address),
-            audio_only          = fb_bool(cfg, "audio_only",           defaults.audio_only),
-            cookies_enabled     = fb_bool(cfg, "cookies_enabled",      defaults.cookies_enabled),
-            cookies_browser     = fb_str(cfg,  "cookies_browser",      defaults.cookies_browser),
-            playlist_enabled    = fb_bool(cfg, "playlist_enabled",     defaults.playlist_enabled),
-            embed_metadata      = fb_bool(cfg, "embed_metadata",       defaults.embed_metadata),
-            yt_dlp_args         = fb_str(cfg,  "yt_dlp_args",          defaults.yt_dlp_args),
-            clean_titles        = fb_bool(cfg, "clean_titles",         defaults.clean_titles),
+            download_path         = dp,
+            proxy_enabled         = fb_bool(cfg, "proxy_enabled",       defaults.proxy_enabled),
+            proxy_address         = fb_str(cfg,  "proxy_address",        defaults.proxy_address),
+            audio_only            = fb_bool(cfg, "audio_only",           defaults.audio_only),
+            cookies_enabled       = fb_bool(cfg, "cookies_enabled",      defaults.cookies_enabled),
+            cookies_browser       = fb_str(cfg,  "cookies_browser",      defaults.cookies_browser),
+            playlist_enabled      = fb_bool(cfg, "playlist_enabled",     defaults.playlist_enabled),
+            embed_metadata        = fb_bool(cfg, "embed_metadata",       defaults.embed_metadata),
+            yt_dlp_args           = fb_str(cfg,  "yt_dlp_args",          defaults.yt_dlp_args),
+            clean_titles          = fb_bool(cfg, "clean_titles",         defaults.clean_titles),
             save_to_source_folder = fb_bool(cfg, "save_to_source_folder", defaults.save_to_source_folder),
-            url_yt_api          = fb_str(urls, "yt_api",          defaults.url_yt_api),
-            url_yt_download     = fb_str(urls, "yt_download",     defaults.url_yt_download),
-            url_ffmpeg_version  = fb_str(urls, "ffmpeg_version",  defaults.url_ffmpeg_version),
-            url_ffmpeg_download = fb_str(urls, "ffmpeg_download", defaults.url_ffmpeg_download),
-            tool_versions       = {
+            url_yt_api            = fb_str(urls, "yt_api",          defaults.url_yt_api),
+            url_yt_download       = fb_str(urls, "yt_download",     defaults.url_yt_download),
+            url_ffmpeg_version    = fb_str(urls, "ffmpeg_version",  defaults.url_ffmpeg_version),
+            url_ffmpeg_download   = fb_str(urls, "ffmpeg_download", defaults.url_ffmpeg_download),
+            last_check_time       = float(cfg.get("last_check_time",  defaults.last_check_time)),
+            last_needs_update     = bool(cfg.get("last_needs_update", defaults.last_needs_update)),
+            tool_versions         = {
                 k: tuple(v) for k, v in cfg.get("tool_versions", {}).items()
                 if isinstance(v, (list, tuple)) and len(v) == 3
             },
-            last_check_time     = float(cfg.get("last_check_time",   defaults.last_check_time)),
-            last_needs_update   = bool(cfg.get("last_needs_update",  defaults.last_needs_update)),
-            theme               = theme,
-            window              = window,
+            theme  = ThemeConfig.from_dict(raw.get("theme", {})),
+            window = WindowConfig.from_dict(raw.get("window", {})),
         )
 
-    def load_window_geometry(self) -> Dict[str, int]:
-        """Быстрое чтение только геометрии окна (вызывается до полной загрузки)."""
-        window = dict(DEFAULT_CONFIG["window"])
+    def load_window_geometry(self) -> WindowConfig:
+        """Быстрое чтение только геометрии окна до полной загрузки."""
         raw = self._read_raw()
         if raw and isinstance(raw.get("window"), dict):
-            w = raw["window"]
-            window["width"]  = safe_int(w.get("width"),  window["width"])
-            window["height"] = safe_int(w.get("height"), window["height"])
-            window["left"]   = safe_int(w.get("left"),   window["left"])
-            window["top"]    = safe_int(w.get("top"),    window["top"])
-        return window
+            return WindowConfig.from_dict(raw["window"])
+        return WindowConfig()
 
     # ── Сохранение ────────────────────────────────────────────────────────────
 
@@ -118,8 +98,8 @@ class ConfigManager:
                     "ffmpeg_download": state.url_ffmpeg_download,
                 },
             },
-            "window": state.window,
-            "theme":  state.theme,
+            "window": state.window.to_dict(),
+            "theme":  state.theme.to_dict(),
         }
         try:
             with open(self.config_file, "w", encoding="utf-8") as f:

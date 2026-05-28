@@ -1,48 +1,88 @@
 import os
+from dataclasses import dataclass
 from typing import Any, Dict
 
-# Интервал автопроверки версий в часах (пункт 6)
+# ── Константы приложения ──────────────────────────────────────────────────────
+
 CHECK_INTERVAL_HOURS = 6
 
-DEFAULT_CONFIG: Dict[str, Any] = {
-    "settings": {
-        "download_path": "",
-        "proxy_address": "socks5://127.0.0.1:1080",
-        "proxy_enabled": False,
-        "yt_dlp_args": "-f bestvideo+bestaudio/best --merge-output-format mp4",
-        "audio_only": False,
-        "cookies_browser": "none",
-        "cookies_enabled": False,
-        "embed_metadata": True,
-        "playlist_enabled": False,
-        "clean_titles": False,
-        "save_to_source_folder": False,
-        "last_check_time": 0.0,
-        "last_needs_update": False,
-        "urls": {
-            "yt_api": "https://api.github.com/repos/yt-dlp/yt-dlp/releases/latest",
-            "yt_download": "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe" if os.name == "nt" else "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp",
-            "ffmpeg_version": "https://www.gyan.dev/ffmpeg/builds/release-version",
-            "ffmpeg_download": "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-full.zip"
+DEFAULT_DOWNLOAD_PATH = os.path.join(os.path.expanduser("~"), "Downloads")
+DEFAULT_PROXY_ADDRESS = "socks5://127.0.0.1:1080"
+DEFAULT_YT_DLP_ARGS   = "-f bestvideo+bestaudio/best --merge-output-format mp4"
+
+DEFAULT_YT_API_URL          = "https://api.github.com/repos/yt-dlp/yt-dlp/releases/latest"
+DEFAULT_YT_DOWNLOAD_URL     = (
+    "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe"
+    if os.name == "nt" else
+    "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp"
+)
+DEFAULT_FFMPEG_VERSION_URL  = "https://www.gyan.dev/ffmpeg/builds/release-version"
+DEFAULT_FFMPEG_DOWNLOAD_URL = "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-full.zip"
+
+
+# ── Typed конфиги (вместо Dict) ───────────────────────────────────────────────
+
+@dataclass
+class ThemeConfig:
+    accent_color:   str = "00B4D8"
+    switch_color:   str = "4CAF50"
+    header_color:   str = "00B4D8"
+    text_color:     str = "E0E0E0"
+    progress_color: str = "4CAF50"
+    button_color:   str = "4CAF50"
+    appbar_color:   str = "1c1c1c"
+    card_color:     str = "161616"
+
+    def to_dict(self) -> Dict[str, str]:
+        return {
+            "accent_color":   self.accent_color,
+            "switch_color":   self.switch_color,
+            "header_color":   self.header_color,
+            "text_color":     self.text_color,
+            "progress_color": self.progress_color,
+            "button_color":   self.button_color,
+            "appbar_color":   self.appbar_color,
+            "card_color":     self.card_color,
         }
-    },
-    "window": {
-        "width": 600,
-        "height": 650,
-        "left": 100,
-        "top": 100
-    },
-    "theme": {
-        "accent_color": "00B4D8",
-        "switch_color": "4CAF50",
-        "header_color": "00B4D8",
-        "text_color": "E0E0E0",
-        "progress_color": "4CAF50",
-        "button_color": "4CAF50",
-        "appbar_color": "1c1c1c",
-        "card_color": "161616"
-    }
-}
+
+    @staticmethod
+    def from_dict(d: Dict[str, str]) -> "ThemeConfig":
+        defaults = ThemeConfig()
+        return ThemeConfig(
+            accent_color   = safe_str(d.get("accent_color"))   or defaults.accent_color,
+            switch_color   = safe_str(d.get("switch_color"))   or defaults.switch_color,
+            header_color   = safe_str(d.get("header_color"))   or defaults.header_color,
+            text_color     = safe_str(d.get("text_color"))     or defaults.text_color,
+            progress_color = safe_str(d.get("progress_color")) or defaults.progress_color,
+            button_color   = safe_str(d.get("button_color"))   or defaults.button_color,
+            appbar_color   = safe_str(d.get("appbar_color"))   or defaults.appbar_color,
+            card_color     = safe_str(d.get("card_color"))     or defaults.card_color,
+        )
+
+
+@dataclass
+class WindowConfig:
+    width:  int = 600
+    height: int = 650
+    left:   int = 100
+    top:    int = 100
+
+    def to_dict(self) -> Dict[str, int]:
+        return {"width": self.width, "height": self.height,
+                "left": self.left,  "top":    self.top}
+
+    @staticmethod
+    def from_dict(d: Dict[str, Any]) -> "WindowConfig":
+        defaults = WindowConfig()
+        return WindowConfig(
+            width  = safe_int(d.get("width"),  defaults.width),
+            height = safe_int(d.get("height"), defaults.height),
+            left   = safe_int(d.get("left"),   defaults.left),
+            top    = safe_int(d.get("top"),     defaults.top),
+        )
+
+
+# ── UI-метаданные темы (порядок полей для Settings) ──────────────────────────
 
 THEME_FIELDS = [
     ("accent_color",   "Акцент (обводка полей, фокус)"),
@@ -66,6 +106,8 @@ PALETTE = [
     "1c1c1c","161616","0d0d0d","1A237E","B71C1C","1B5E20",
 ]
 
+
+# ── Утилиты ───────────────────────────────────────────────────────────────────
 
 def hex_to_flet(hex_str: str) -> str:
     h = hex_str.strip().lstrip("#").upper()
