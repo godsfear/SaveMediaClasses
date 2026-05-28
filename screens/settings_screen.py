@@ -6,10 +6,8 @@ from config import (
     THEME_FIELDS, PALETTE, ThemeConfig,
     hex_to_flet, is_valid_hex, safe_str
 )
-from events import EventBus, ToolsCheckedEvent, ToolsRestoredEvent, ToolsStatusMessageEvent
-from managers.tools_manager import ToolsManager
+from events import ToolsCheckedEvent, ToolsRestoredEvent
 from services import Services
-from state import AppState
 
 
 class SettingsScreen:

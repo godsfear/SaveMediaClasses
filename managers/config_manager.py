@@ -4,7 +4,7 @@ from typing import Any, Dict
 
 from config import (
     ThemeConfig, WindowConfig,
-    safe_str, safe_int, get_fallback_bool,
+    get_fallback_bool,
 )
 from state import AppState
 
