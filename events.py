@@ -40,6 +40,14 @@ class DownloadCompletedEvent:
     source:  str = "yt-dlp"
 
 @dataclass(frozen=True)
+class DownloadStartedEvent:
+    """Эмитируется в момент старта загрузки — содержит полный снимок параметров.
+    DownloadRepository использует его для записи в БД."""
+    task_id:  str
+    snapshot: object   # DownloadSnapshot — избегаем циклического импорта
+    source:   str = "yt-dlp"
+
+@dataclass(frozen=True)
 class DownloadCancelledEvent:
     task_id: str
     source:  str = "yt-dlp"

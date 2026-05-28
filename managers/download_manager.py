@@ -13,6 +13,7 @@ from typing import Callable, Dict, Optional, TYPE_CHECKING
 
 from events import (
     EventBus,
+    DownloadStartedEvent,
     DownloadProgressEvent,
     DownloadPostprocessingEvent,
     DownloadCompletedEvent,
@@ -119,6 +120,13 @@ class DownloadManager:
             provider = task.provider
             snap     = task.snapshot
             exe      = provider.resolve_exe()
+
+            # Сообщаем репозиторию о старте — он запишет snapshot в БД
+            self._bus.emit(DownloadStartedEvent(
+                task_id=task.task_id,
+                snapshot=snap,
+                source=type(provider).__name__,
+            ))
 
             if snap.download_path:
                 try:
