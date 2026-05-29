@@ -6,6 +6,7 @@ import flet as ft
 
 from config import CHECK_INTERVAL_HOURS, hex_to_flet
 from events import ToolsCheckedEvent, ToolsRestoredEvent, ToolsStatusMessageEvent
+from screens.history_screen import HistoryScreen
 from screens.main_screen import MainScreen
 from screens.settings_screen import SettingsScreen
 from services import Services
@@ -50,6 +51,7 @@ class SaveMediaApp:
         # ── Экраны ────────────────────────────────────────────────────────────
         main_screen     = MainScreen(page, svc)
         settings_screen = SettingsScreen(page, svc)
+        history_screen  = HistoryScreen(page, svc)
 
         main_screen.sync_from_state()
         settings_screen.sync_from_state()
@@ -155,6 +157,7 @@ class SaveMediaApp:
         def update_cookies_ui():
             settings_screen.update_cookies_ui(main_screen.cookies_enabled_switch)
 
+        history_btn  = ft.IconButton(icon=ft.Icons.HISTORY_ROUNDED, icon_color=ft.Colors.WHITE, tooltip="История загрузок")
         folder_btn   = ft.IconButton(icon=ft.Icons.FOLDER_OPEN_ROUNDED, icon_color=ft.Colors.WHITE, tooltip="Выбрать папку")
         proxy_btn    = ft.IconButton(icon=ft.Icons.SHIELD_OUTLINED,     icon_color=ft.Colors.WHITE, tooltip="Прокси")
         settings_btn = ft.IconButton(icon=ft.Icons.SETTINGS_ROUNDED,    icon_color=ft.Colors.WHITE, tooltip="Настройки")
@@ -181,8 +184,25 @@ class SaveMediaApp:
             padding=ft.Padding(left=10, right=10)
         )
 
+        def show_history(_):
+            main_screen.layout.visible     = False
+            settings_screen.layout.visible = False
+            history_screen.layout.visible  = True
+            history_screen.refresh()
+            page.appbar = ft.AppBar(
+                title=ft.Text("История загрузок", size=18, weight=ft.FontWeight.W_600),
+                bgcolor=hex_to_flet(svc.state.theme.appbar_color),
+                leading=ft.IconButton(
+                    icon=ft.Icons.ARROW_BACK_IOS_NEW_ROUNDED, icon_color=ft.Colors.WHITE,
+                    icon_size=16, on_click=show_main
+                )
+            )
+            page.bottom_appbar.content = ft.Container(height=0)
+            safe_update()
+
         def show_settings(_):
             main_screen.layout.visible     = False
+            history_screen.layout.visible  = False
             settings_screen.layout.visible = True
             if _pending_restored:
                 settings_screen.on_tools_restored(_pending_restored[-1])
@@ -202,10 +222,11 @@ class SaveMediaApp:
             update_cookies_ui()
             main_screen.layout.visible     = True
             settings_screen.layout.visible = False
+            history_screen.layout.visible  = False
             page.appbar = ft.AppBar(
                 title=ft.Text("SaveMedia [yt-dlp GUI]", size=18, weight=ft.FontWeight.W_600),
                 bgcolor=hex_to_flet(svc.state.theme.appbar_color),
-                actions=[settings_btn, proxy_btn, folder_btn, exit_btn]
+                actions=[settings_btn, history_btn, proxy_btn, folder_btn, exit_btn]
             )
             page.bottom_appbar.content = main_status_container
             safe_update()
@@ -230,6 +251,7 @@ class SaveMediaApp:
         folder_btn.on_click   = open_folder_picker
         proxy_btn.on_click    = toggle_proxy
         settings_btn.on_click = show_settings
+        history_btn.on_click  = show_history
 
         # ── Закрытие окна ─────────────────────────────────────────────────────
 
@@ -249,7 +271,7 @@ class SaveMediaApp:
         page.appbar = ft.AppBar(
             title=ft.Text("SaveMedia [yt-dlp GUI]", size=18, weight=ft.FontWeight.W_600),
             bgcolor="#1c1c1c",
-            actions=[settings_btn, proxy_btn, folder_btn, exit_btn]
+            actions=[settings_btn, history_btn, proxy_btn, folder_btn, exit_btn]
         )
         page.bottom_appbar = ft.BottomAppBar(content=main_status_container, bgcolor="#141414")
 
@@ -257,7 +279,7 @@ class SaveMediaApp:
         update_proxy_button_ui()
         update_cookies_ui()
         apply_theme()
-        page.add(main_screen.layout, settings_screen.layout)
+        page.add(main_screen.layout, settings_screen.layout, history_screen.layout)
 
         if page.platform in [ft.PagePlatform.WINDOWS, ft.PagePlatform.MACOS, ft.PagePlatform.LINUX]:
             page.window.visible = True

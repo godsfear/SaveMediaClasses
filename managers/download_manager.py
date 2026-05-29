@@ -53,7 +53,8 @@ class DownloadTask:
     task_id:   str
     snapshot:  DownloadSnapshot
     provider:  "DownloadProvider"
-    cancelled: bool = False
+    cancelled: bool  = False
+    _last_pct: float = -1.0   # последний эмитированный прогресс; -1 = ещё не было
     _handle:   Optional[asyncio.Task] = field(default=None, repr=False)
 
 
@@ -143,7 +144,8 @@ class DownloadManager:
                 pct = provider.parse_progress(line)
                 if pct is None:
                     self._write_log(line)
-                if pct is not None:
+                if pct is not None and pct - task._last_pct >= 0.01:
+                    task._last_pct = pct
                     status = line.replace("[download]", "").strip()
                     self._bus.emit(DownloadProgressEvent(
                         task_id=task.task_id, pct=pct, status=status[:80],
