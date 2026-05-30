@@ -6,6 +6,9 @@ Pull-модель: данные читаются из БД при открыти
 """
 
 import datetime
+import os
+import subprocess
+import sys
 from typing import Optional
 
 import flet as ft
@@ -193,7 +196,27 @@ class HistoryScreen:
                 alignment=ft.alignment.center,
             )
 
-        # Правая часть карточки — статус, URL, теги, ошибка
+        # Папка загрузки из params
+        folder = rec.params.get("download_path") or ""
+
+        # Кнопки действий
+        btn_folder = ft.IconButton(
+            icon=ft.Icons.FOLDER_OPEN_OUTLINED,
+            icon_color=ft.Colors.GREY_500,
+            icon_size=16,
+            tooltip="Открыть папку",
+            disabled=not bool(folder),
+            on_click=lambda _, f=folder: _open_folder(f),
+        )
+        btn_delete = ft.IconButton(
+            icon=ft.Icons.DELETE_OUTLINE_ROUNDED,
+            icon_color=ft.Colors.GREY_600,
+            icon_size=16,
+            tooltip="Удалить из истории",
+            on_click=lambda _, tid=rec.task_id: self._delete_record(tid),
+        )
+
+        # Правая часть карточки — статус, URL, теги, ошибка, кнопки
         info_column = ft.Column([
             ft.Row([
                 ft.Icon(icon, color=color, size=15),
@@ -202,7 +225,9 @@ class HistoryScreen:
                     f"{started}{duration}", size=11, color=ft.Colors.GREY_500,
                     expand=True, text_align=ft.TextAlign.RIGHT,
                 ),
-            ], vertical_alignment=ft.CrossAxisAlignment.CENTER, spacing=6),
+                btn_folder,
+                btn_delete,
+            ], vertical_alignment=ft.CrossAxisAlignment.CENTER, spacing=2),
             ft.Text(
                 url_short, size=11, color=ft.Colors.GREY_300,
                 no_wrap=True, overflow=ft.TextOverflow.ELLIPSIS,
@@ -232,6 +257,10 @@ class HistoryScreen:
             padding=ft.Padding(left=10, right=10, top=8, bottom=8),
         )
 
+    def _delete_record(self, task_id: str) -> None:
+        self._db.delete(task_id)
+        self.refresh()
+
     def _render_stats(self) -> None:
         s = self._db.get_stats()
         if not s or not s.get("total"):
@@ -246,6 +275,19 @@ class HistoryScreen:
 
 
 # ── Утилиты ───────────────────────────────────────────────────────────────────
+
+def _open_folder(path: str) -> None:
+    """Открыть папку в проводнике."""
+    try:
+        if sys.platform == "win32":
+            os.startfile(path)
+        elif sys.platform == "darwin":
+            subprocess.Popen(["open", path])
+        else:
+            subprocess.Popen(["xdg-open", path])
+    except Exception:
+        pass
+
 
 def _fmt_ts(ts: Optional[float]) -> str:
     if not ts:

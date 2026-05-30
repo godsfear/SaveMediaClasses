@@ -225,6 +225,16 @@ class DownloadRepository:
         except Exception:
             pass
 
+    def delete(self, task_id: str) -> None:
+        """Удалить запись из истории."""
+        try:
+            with self._connect() as conn:
+                conn.execute(
+                    "DELETE FROM downloads WHERE task_id = ?", (task_id,)
+                )
+        except Exception:
+            pass
+
     # ── Приватное ─────────────────────────────────────────────────────────────
 
     def _fetch(self, query: str, params: list) -> List[DownloadRecord]:
