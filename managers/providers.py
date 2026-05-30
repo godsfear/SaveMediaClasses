@@ -182,9 +182,12 @@ class YtDlpProvider:
 
     async def fetch_thumbnail(self, exe: str, url: str) -> tuple:
         """
-        Получить thumbnail как JPEG-байты и полные метаданные из yt-dlp:
-          1. yt-dlp --dump-single-json --no-playlist → весь JSON метаданных
-          2. urllib скачивает байты превью по URL из метаданных
+        Получить thumbnail как JPEG-байты и метаданные из yt-dlp:
+          1. --dump-single-json --flat-playlist → метаданные верхнего уровня.
+             Для плейлиста: _type="playlist", entries — плоский список без деталей.
+             Для видео:     _type="video", thumbnails есть сразу.
+          2. Thumbnail берём из самого объекта (видео) или первого entries (плейлист).
+          3. urllib скачивает байты превью.
         Возвращает (bytes, meta_dict).
         """
         import json as _json
@@ -213,13 +216,16 @@ class YtDlpProvider:
 
             data = _json.loads(stdout.decode("utf-8", errors="replace"))
 
-            # Выбираем лучший thumbnail URL
-            thumb_url = ""
+            # Берём лучший thumbnail URL
             thumbnails = data.get("thumbnails") or []
-            if thumbnails:
-                thumb_url = thumbnails[-1].get("url", "")
+            thumb_url = thumbnails[-1].get("url", "") if thumbnails else ""
             if not thumb_url:
                 thumb_url = data.get("thumbnail", "")
+
+            # Добавляем признак плейлиста по URL — _type из --no-playlist не несёт этой инфы
+            if "list=" in url.lower() or "playlist" in url.lower():
+                data["_is_playlist"] = True
+
             if not thumb_url:
                 return b"", data
 
