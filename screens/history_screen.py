@@ -174,7 +174,7 @@ class HistoryScreen:
         if p.get("audio_only"):      tags.append("MP3")
         if p.get("proxy_enabled"):   tags.append("Прокси")
         if p.get("cookies_enabled"): tags.append("Куки")
-        is_playlist = meta.get("_type") == "playlist" or bool(meta.get("playlist_id"))
+        is_playlist = meta.get("_is_playlist") or meta.get("_type") == "playlist"
         if is_playlist: tags.append("Плейлист")
 
         # Thumbnail — BLOB из БД → base64 data URI для ft.Image
