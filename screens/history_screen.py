@@ -171,17 +171,19 @@ class HistoryScreen:
 
         url_short = rec.url if len(rec.url) <= 58 else rec.url[:55] + "…"
 
-        # Thumbnail — BLOB из БД, отдаём в ft.Image через src_base64
+        # Thumbnail — BLOB из БД → base64 data URI для ft.Image
+        import base64 as _b64
         thumb_data = getattr(rec, "thumbnail", None)
         if thumb_data:
+            b64str = "data:image/jpeg;base64," + _b64.b64encode(thumb_data).decode()
             thumbnail_widget = ft.Container(
                 width=96, height=54,
                 border_radius=4,
                 clip_behavior=ft.ClipBehavior.ANTI_ALIAS,
                 content=ft.Image(
-                    src=thumb_data,
+                    src=b64str,
                     width=96, height=54,
-                    fit="cover",
+                    fit=ft.BoxFit.COVER,
                 ),
             )
         else:
@@ -193,11 +195,17 @@ class HistoryScreen:
                     ft.Icons.PLAY_CIRCLE_OUTLINE_ROUNDED,
                     color=ft.Colors.GREY_800, size=24,
                 ),
-                alignment=ft.alignment.center,
+                alignment=ft.Alignment(0, 0),
             )
 
-        # Папка загрузки из params
-        folder = rec.params.get("download_path") or ""
+        # Папка загрузки: base / extractor_key (если save_to_source)
+        base_folder = rec.params.get("download_path") or ""
+        extractor_key = getattr(rec, "extractor_key", None) or ""
+        save_to_source = rec.params.get("save_to_source", False)
+        if save_to_source and extractor_key and base_folder:
+            folder = os.path.join(base_folder, extractor_key)
+        else:
+            folder = base_folder
 
         # Кнопки действий
         btn_folder = ft.IconButton(
@@ -216,35 +224,52 @@ class HistoryScreen:
             on_click=lambda _, tid=rec.task_id: self._delete_record(tid),
         )
 
-        # Правая часть карточки — статус, URL, теги, ошибка, кнопки
+        # Название видео (из БД) или URL как fallback
+        title = getattr(rec, "title", None) or ""
+        title_short = (title[:60] + "…") if len(title) > 62 else title
+
+        # Правая часть карточки: название, URL, теги, статус+время, кнопки
         info_column = ft.Column([
+            # Строка 1: название + кнопки
             ft.Row([
-                ft.Icon(icon, color=color, size=15),
-                ft.Text(label, size=12, color=color, weight=ft.FontWeight.W_500),
                 ft.Text(
-                    f"{started}{duration}", size=11, color=ft.Colors.GREY_500,
-                    expand=True, text_align=ft.TextAlign.RIGHT,
+                    title_short if title_short else url_short,
+                    size=12, color=ft.Colors.WHITE,
+                    weight=ft.FontWeight.W_500,
+                    expand=True, no_wrap=True,
+                    overflow=ft.TextOverflow.ELLIPSIS,
                 ),
                 btn_folder,
                 btn_delete,
             ], vertical_alignment=ft.CrossAxisAlignment.CENTER, spacing=2),
+            # Строка 2: URL (только если есть title)
             ft.Text(
-                url_short, size=11, color=ft.Colors.GREY_300,
+                url_short, size=11, color=ft.Colors.GREY_500,
                 no_wrap=True, overflow=ft.TextOverflow.ELLIPSIS,
+                visible=bool(title_short),
             ),
-            ft.Row(
-                [ft.Container(
+            # Строка 3: теги + статус + время
+            ft.Row([
+                *([ft.Container(
                     content=ft.Text(t, size=10, color=ft.Colors.GREY_400),
                     bgcolor="#252525", border_radius=4,
                     padding=ft.Padding.symmetric(horizontal=6, vertical=2),
-                ) for t in tags],
-                spacing=4, wrap=True,
-            ) if tags else ft.Container(height=0),
+                ) for t in tags] if tags else []),
+                ft.Row([
+                    ft.Icon(icon, color=color, size=12),
+                    ft.Text(label, size=11, color=color),
+                    ft.Text(
+                        f"{started}{duration}", size=11, color=ft.Colors.GREY_600,
+                    ),
+                ], spacing=4, tight=True),
+            ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+               vertical_alignment=ft.CrossAxisAlignment.CENTER, wrap=True),
+            # Строка 4: ошибка (если есть)
             ft.Text(
                 rec.error_message, size=10, color=ft.Colors.RED_300,
                 visible=bool(rec.error_message),
             ) if rec.error_message else ft.Container(height=0),
-        ], spacing=4, tight=True, expand=True)
+        ], spacing=3, tight=True, expand=True)
 
         return ft.Container(
             content=ft.Row([
