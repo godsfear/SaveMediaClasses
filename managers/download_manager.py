@@ -190,16 +190,7 @@ class DownloadManager:
                 source=type(provider).__name__,
             ))
 
-            # Скачать thumbnail, получить extractor_key и сохранить в БД
-            if success and self._db is not None and hasattr(provider, "fetch_thumbnail"):
-                try:
-                    thumb_data, meta = await provider.fetch_thumbnail(exe, snap.url)
-                    if thumb_data:
-                        self._db.save_thumbnail(task.task_id, thumb_data)
-                    if meta:
-                        self._db.save_meta(task.task_id, meta)
-                except Exception:
-                    pass
+
 
     def _finish(self, task: DownloadTask) -> None:
         self._active.pop(task.task_id, None)
