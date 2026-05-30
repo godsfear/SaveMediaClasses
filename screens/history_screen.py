@@ -161,18 +161,21 @@ class HistoryScreen:
         started  = _fmt_ts(rec.started_at)
         duration = _fmt_duration(rec.started_at, rec.finished_at)
 
-        # Теги: параметры из params, "Плейлист" — из метаданных yt-dlp
-        p    = rec.params
-        meta = rec.meta or {}  # JSON из --dump-single-json (None для старых записей)
-        tags = []
-        if p.get("audio_only"):    tags.append("MP3")
-        if p.get("proxy_enabled"): tags.append("Прокси")
-        if p.get("cookies_enabled"): tags.append("Куки")
-        # Плейлист определяем по факту из метаданных, а не из настройки
-        is_playlist = meta.get("_type") == "playlist" or bool(meta.get("playlist_id"))
-        if is_playlist: tags.append("Плейлист")
+        # Метаданные из yt-dlp
+        meta = rec.meta or {}
+        rec_title     = meta.get("title") or meta.get("fulltitle") or ""
+        rec_extractor = meta.get("extractor_key") or meta.get("extractor") or ""
 
         url_short = rec.url if len(rec.url) <= 58 else rec.url[:55] + "…"
+
+        # Теги: параметры из params, "Плейлист" — из метаданных yt-dlp
+        p    = rec.params
+        tags = []
+        if p.get("audio_only"):      tags.append("MP3")
+        if p.get("proxy_enabled"):   tags.append("Прокси")
+        if p.get("cookies_enabled"): tags.append("Куки")
+        is_playlist = meta.get("_type") == "playlist" or bool(meta.get("playlist_id"))
+        if is_playlist: tags.append("Плейлист")
 
         # Thumbnail — BLOB из БД → base64 data URI для ft.Image
         import base64 as _b64
@@ -200,13 +203,6 @@ class HistoryScreen:
                 ),
                 alignment=ft.Alignment(0, 0),
             )
-
-        # title и extractor_key: из meta если есть, иначе из колонок (старые записи)
-        meta = rec.meta or {}
-        rec_title = (meta.get("title") or meta.get("fulltitle")
-                     or getattr(rec, "title", None) or "")
-        rec_extractor = (meta.get("extractor_key") or meta.get("extractor")
-                         or getattr(rec, "extractor_key", None) or "")
 
         # Папка загрузки: base / extractor_key (если save_to_source)
         base_folder = rec.params.get("download_path") or ""

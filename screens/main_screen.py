@@ -111,6 +111,7 @@ class MainScreen:
         self._state       = svc.state
         self._dm          = svc.dm
         self._bus         = svc.bus
+        self._db          = svc.db
 
         self._cards: Dict[str, DownloadCard] = {}
 
@@ -352,14 +353,25 @@ class MainScreen:
     # ── Утилиты ───────────────────────────────────────────────────────────────
 
     async def _fetch_and_show_thumbnail(self, task_id: str, url: str) -> None:
-        """Фоновая задача: получить thumbnail и показать в карточке пока она ещё жива."""
+        """
+        Фоновая задача: получить thumbnail и метаданные параллельно с загрузкой.
+        Сразу показывает thumbnail в живой карточке и сохраняет в БД —
+        чтобы при переходе в историю данные уже были готовы.
+        """
         try:
             from managers.providers import YtDlpProvider
             provider = YtDlpProvider(self._base_dir, self._tools_dir)
             exe = provider.resolve_exe()
             if not exe:
                 return
-            thumb_data, extractor_key, _title = await provider.fetch_thumbnail(exe, url)
+            thumb_data, meta = await provider.fetch_thumbnail(exe, url)
+            # Сохраняем в БД сразу — не ждём завершения загрузки
+            if self._db is not None:
+                if thumb_data:
+                    self._db.save_thumbnail(task_id, thumb_data)
+                if meta:
+                    self._db.save_meta(task_id, meta)
+            # Обновляем живую карточку
             if thumb_data:
                 card = self._cards.get(task_id)
                 if card:

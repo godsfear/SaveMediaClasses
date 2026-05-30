@@ -12,22 +12,17 @@ DownloadRepository — SQLite-слой истории загрузок.
     finished_at   REAL              — Unix timestamp завершения (NULL пока идёт)
     error_message TEXT              — текст ошибки (NULL если успех)
 
-  Расширяемое поле (не влияет на схему при добавлении новых параметров):
-    params        TEXT              — JSON-снимок всех параметров загрузки
+  Расширяемые поля:
+    params        TEXT              — JSON-снимок параметров загрузки (без url — он в отдельной колонке)
     thumbnail     BLOB              — JPEG-байты превью (NULL если нет)
-    extractor_key TEXT              — yt-dlp extractor_key (Youtube, Vimeo, …)
-    title         TEXT              — название видео из метаданных
     meta          TEXT              — JSON метаданных из yt-dlp --dump-single-json
-
-Добавление нового параметра в DownloadSnapshot → просто появляется в JSON,
-старые записи читаются без ошибок через params.get() с дефолтом.
 """
 
 import json
 import sqlite3
 import time
 from contextlib import contextmanager
-from dataclasses import asdict
+from dataclasses import asdict, fields
 from typing import Any, Dict, Generator, List, Optional
 
 from events import (
@@ -51,22 +46,12 @@ CREATE TABLE IF NOT EXISTS downloads (
     error_message TEXT,
     params        TEXT NOT NULL DEFAULT '{}',
     thumbnail     BLOB,
-    extractor_key TEXT,
-    title         TEXT,
     meta          TEXT
 );
 """
 
 _MIGRATE_THUMBNAIL = """
 ALTER TABLE downloads ADD COLUMN thumbnail BLOB;
-"""
-
-_MIGRATE_EXTRACTOR = """
-ALTER TABLE downloads ADD COLUMN extractor_key TEXT;
-"""
-
-_MIGRATE_TITLE = """
-ALTER TABLE downloads ADD COLUMN title TEXT;
 """
 
 _MIGRATE_META = """
@@ -94,16 +79,8 @@ _UPDATE_THUMBNAIL = """
 UPDATE downloads SET thumbnail = :thumbnail WHERE task_id = :task_id;
 """
 
-_UPDATE_EXTRACTOR = """
-UPDATE downloads SET extractor_key = :extractor_key WHERE task_id = :task_id;
-"""
-
-_UPDATE_TITLE = """
-UPDATE downloads SET title = :title WHERE task_id = :task_id;
-"""
-
 _UPDATE_META = """
-UPDATE downloads SET meta = :meta, extractor_key = :extractor_key, title = :title WHERE task_id = :task_id;
+UPDATE downloads SET meta = :meta WHERE task_id = :task_id;
 """
 
 
@@ -111,27 +88,24 @@ UPDATE downloads SET meta = :meta, extractor_key = :extractor_key, title = :titl
 
 class DownloadRecord:
     """
-    Запись из БД. params десериализуется в dict при создании —
-    обращаться как record.params["audio_only"] или record.params.get("new_field", default).
+    Запись из БД. params и meta десериализуются в dict при создании.
     """
     __slots__ = (
         "task_id", "url", "source", "status",
         "started_at", "finished_at", "error_message",
-        "params", "thumbnail", "extractor_key", "title", "meta",
+        "params", "thumbnail", "meta",
     )
 
-    def __init__(self, params: str = "{}", thumbnail: Optional[bytes] = None, extractor_key: Optional[str] = None, title: Optional[str] = None, meta: Optional[str] = None, **kwargs):
+    def __init__(self, params: str = "{}", thumbnail: Optional[bytes] = None,
+                 meta: Optional[str] = None, **kwargs):
         for k, v in kwargs.items():
-            setattr(self, k, v)
-        # Десериализуем JSON → dict при чтении, не при каждом обращении
+            if k in self.__slots__:
+                setattr(self, k, v)
         try:
             self.params: Dict[str, Any] = json.loads(params) if isinstance(params, str) else params
         except (json.JSONDecodeError, TypeError):
             self.params = {}
         self.thumbnail: Optional[bytes] = thumbnail
-        self.extractor_key: Optional[str] = extractor_key
-        self.title: Optional[str] = title
-        # meta: десериализуем JSON в dict сразу
         try:
             self.meta: Optional[Dict[str, Any]] = json.loads(meta) if isinstance(meta, str) else meta
         except (json.JSONDecodeError, TypeError):
@@ -158,23 +132,11 @@ class DownloadRepository:
             conn.execute(_CREATE_TABLE)
             for idx in _CREATE_INDEXES:
                 conn.execute(idx)
-            # Миграция: добавить колонки если нет
-            try:
-                conn.execute(_MIGRATE_THUMBNAIL)
-            except Exception:
-                pass
-            try:
-                conn.execute(_MIGRATE_EXTRACTOR)
-            except Exception:
-                pass
-            try:
-                conn.execute(_MIGRATE_TITLE)
-            except Exception:
-                pass
-            try:
-                conn.execute(_MIGRATE_META)
-            except Exception:
-                pass
+            for migration in (_MIGRATE_THUMBNAIL, _MIGRATE_META):
+                try:
+                    conn.execute(migration)
+                except Exception:
+                    pass
 
     def _subscribe(self) -> None:
         self._bus.on(DownloadStartedEvent,   self._on_started)
@@ -186,11 +148,14 @@ class DownloadRepository:
     def _on_started(self, e: DownloadStartedEvent) -> None:
         snap = e.snapshot
         try:
-            # Снимок целиком в JSON — схема БД не зависит от состава параметров
-            params_json = json.dumps(asdict(snap), ensure_ascii=False)
+            # url хранится в отдельной колонке — не дублируем в params
+            snap_dict = asdict(snap)
+            snap_dict.pop("url", None)
+            params_json = json.dumps(snap_dict, ensure_ascii=False)
         except TypeError:
-            # На случай если snapshot не dataclass (например, aria2c даст другой тип)
-            params_json = json.dumps(vars(snap) if hasattr(snap, "__dict__") else {})
+            d = vars(snap) if hasattr(snap, "__dict__") else {}
+            d.pop("url", None)
+            params_json = json.dumps(d)
         try:
             with self._connect() as conn:
                 conn.execute(_INSERT, {
@@ -222,11 +187,10 @@ class DownloadRepository:
         except Exception:
             pass
 
-    # ── Публичный API чтения ──────────────────────────────────────────────────
+    # ── Публичный API ─────────────────────────────────────────────────────────
 
     def get_history(self, limit: int = 100,
                     status: Optional[str] = None) -> List[DownloadRecord]:
-        """Последние `limit` записей, опционально отфильтрованных по статусу."""
         query  = "SELECT * FROM downloads"
         params: list = []
         if status:
@@ -237,7 +201,6 @@ class DownloadRepository:
         return self._fetch(query, params)
 
     def get_by_url(self, url: str) -> Optional[DownloadRecord]:
-        """Последняя запись для данного URL — для дедупликации."""
         rows = self._fetch(
             "SELECT * FROM downloads WHERE url = ? ORDER BY started_at DESC LIMIT 1",
             [url]
@@ -245,7 +208,6 @@ class DownloadRepository:
         return rows[0] if rows else None
 
     def get_stats(self) -> dict:
-        """Агрегированная статистика."""
         try:
             with self._connect() as conn:
                 conn.row_factory = sqlite3.Row
@@ -267,22 +229,17 @@ class DownloadRepository:
         """Сохранить JPEG-байты thumbnail в БД."""
         try:
             with self._connect() as conn:
-                conn.execute(_UPDATE_THUMBNAIL, {
-                    "task_id":   task_id,
-                    "thumbnail": data,
-                })
+                conn.execute(_UPDATE_THUMBNAIL, {"task_id": task_id, "thumbnail": data})
         except Exception:
             pass
 
     def save_meta(self, task_id: str, meta: dict) -> None:
-        """Сохранить JSON-метаданные из yt-dlp. Также дублирует key-поля в индексируемые колонки."""
+        """Сохранить JSON-метаданные из yt-dlp."""
         try:
             with self._connect() as conn:
                 conn.execute(_UPDATE_META, {
-                    "task_id":       task_id,
-                    "meta":          json.dumps(meta, ensure_ascii=False),
-                    "extractor_key": meta.get("extractor_key") or meta.get("extractor") or "",
-                    "title":         meta.get("title") or meta.get("fulltitle") or "",
+                    "task_id": task_id,
+                    "meta":    json.dumps(meta, ensure_ascii=False),
                 })
         except Exception:
             pass
@@ -291,9 +248,7 @@ class DownloadRepository:
         """Удалить запись из истории."""
         try:
             with self._connect() as conn:
-                conn.execute(
-                    "DELETE FROM downloads WHERE task_id = ?", (task_id,)
-                )
+                conn.execute("DELETE FROM downloads WHERE task_id = ?", (task_id,))
         except Exception:
             pass
 
