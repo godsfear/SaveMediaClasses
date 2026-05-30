@@ -81,12 +81,30 @@ class DownloadCard:
         self._status.value       = "Отменено"
         self._cancel_btn.visible = False
 
+    def set_thumbnail(self, data: bytes) -> None:
+        """Вставить thumbnail слева от прогресс-бара."""
+        img = ft.Container(
+            width=96, height=54,
+            border_radius=4,
+            clip_behavior=ft.ClipBehavior.ANTI_ALIAS,
+            content=ft.Image(src=data, width=96, height=54, fit="cover"),
+        )
+        # container.content — Column; первый Row — статус+кнопка, второй — бар+процент
+        # Оборачиваем всё в Row с thumbnail слева
+        inner = self.container.content
+        self.container.content = ft.Row(
+            [img, ft.Column(inner.controls, spacing=4, tight=True, expand=True)],
+            spacing=10,
+            vertical_alignment=ft.CrossAxisAlignment.START,
+        )
+
 
 class MainScreen:
 
     def __init__(self, page: ft.Page, svc: Services) -> None:
         self._page        = page
         self._base_dir    = svc.base_dir
+        self._tools_dir   = svc.tools_dir
         self._safe_update = svc.safe_update
         self._state       = svc.state
         self._dm          = svc.dm
@@ -302,6 +320,7 @@ class MainScreen:
         self.url_input.border_color = None
         self._update_download_btn()
         self._safe_update()
+        self._page.run_task(self._fetch_and_show_thumbnail, task_id, url)
 
     # ── Карточки ──────────────────────────────────────────────────────────────
 
@@ -329,6 +348,24 @@ class MainScreen:
             self.download_btn.tooltip  = "Начать загрузку"
 
     # ── Утилиты ───────────────────────────────────────────────────────────────
+
+    async def _fetch_and_show_thumbnail(self, task_id: str, url: str) -> None:
+        """Фоновая задача: получить thumbnail и показать в карточке пока она ещё жива."""
+        try:
+            from managers.providers import YtDlpProvider
+            provider = YtDlpProvider(self._base_dir, self._tools_dir)
+            exe = provider.resolve_exe()
+            if not exe:
+                return
+            data = await provider.fetch_thumbnail(exe, url)
+            if not data:
+                return
+            card = self._cards.get(task_id)
+            if card:
+                card.set_thumbnail(data)
+                self._safe_update()
+        except Exception:
+            pass
 
     def _show_status(self, message: str, color) -> None:
         """Отобразить сообщение в статус-баре через шину."""
