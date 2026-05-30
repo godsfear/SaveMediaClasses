@@ -17,6 +17,7 @@ DownloadRepository — SQLite-слой истории загрузок.
     thumbnail     BLOB              — JPEG-байты превью (NULL если нет)
     extractor_key TEXT              — yt-dlp extractor_key (Youtube, Vimeo, …)
     title         TEXT              — название видео из метаданных
+    meta          TEXT              — JSON метаданных из yt-dlp --dump-single-json
 
 Добавление нового параметра в DownloadSnapshot → просто появляется в JSON,
 старые записи читаются без ошибок через params.get() с дефолтом.
@@ -51,7 +52,8 @@ CREATE TABLE IF NOT EXISTS downloads (
     params        TEXT NOT NULL DEFAULT '{}',
     thumbnail     BLOB,
     extractor_key TEXT,
-    title         TEXT
+    title         TEXT,
+    meta          TEXT
 );
 """
 
@@ -65,6 +67,10 @@ ALTER TABLE downloads ADD COLUMN extractor_key TEXT;
 
 _MIGRATE_TITLE = """
 ALTER TABLE downloads ADD COLUMN title TEXT;
+"""
+
+_MIGRATE_META = """
+ALTER TABLE downloads ADD COLUMN meta TEXT;
 """
 
 _CREATE_INDEXES = [
@@ -96,6 +102,10 @@ _UPDATE_TITLE = """
 UPDATE downloads SET title = :title WHERE task_id = :task_id;
 """
 
+_UPDATE_META = """
+UPDATE downloads SET meta = :meta, extractor_key = :extractor_key, title = :title WHERE task_id = :task_id;
+"""
+
 
 # ── Модель записи ─────────────────────────────────────────────────────────────
 
@@ -107,10 +117,10 @@ class DownloadRecord:
     __slots__ = (
         "task_id", "url", "source", "status",
         "started_at", "finished_at", "error_message",
-        "params", "thumbnail", "extractor_key", "title",
+        "params", "thumbnail", "extractor_key", "title", "meta",
     )
 
-    def __init__(self, params: str = "{}", thumbnail: Optional[bytes] = None, extractor_key: Optional[str] = None, title: Optional[str] = None, **kwargs):
+    def __init__(self, params: str = "{}", thumbnail: Optional[bytes] = None, extractor_key: Optional[str] = None, title: Optional[str] = None, meta: Optional[str] = None, **kwargs):
         for k, v in kwargs.items():
             setattr(self, k, v)
         # Десериализуем JSON → dict при чтении, не при каждом обращении
@@ -121,6 +131,11 @@ class DownloadRecord:
         self.thumbnail: Optional[bytes] = thumbnail
         self.extractor_key: Optional[str] = extractor_key
         self.title: Optional[str] = title
+        # meta: десериализуем JSON в dict сразу
+        try:
+            self.meta: Optional[Dict[str, Any]] = json.loads(meta) if isinstance(meta, str) else meta
+        except (json.JSONDecodeError, TypeError):
+            self.meta = None
 
     def __repr__(self) -> str:
         return f"<DownloadRecord {self.task_id[:8]}… {self.status} {self.url[:40]}>"
@@ -154,6 +169,10 @@ class DownloadRepository:
                 pass
             try:
                 conn.execute(_MIGRATE_TITLE)
+            except Exception:
+                pass
+            try:
+                conn.execute(_MIGRATE_META)
             except Exception:
                 pass
 
@@ -255,24 +274,15 @@ class DownloadRepository:
         except Exception:
             pass
 
-    def save_extractor_key(self, task_id: str, extractor_key: str) -> None:
-        """Сохранить extractor_key (Youtube, Vimeo, …) в БД."""
+    def save_meta(self, task_id: str, meta: dict) -> None:
+        """Сохранить JSON-метаданные из yt-dlp. Также дублирует key-поля в индексируемые колонки."""
         try:
             with self._connect() as conn:
-                conn.execute(_UPDATE_EXTRACTOR, {
+                conn.execute(_UPDATE_META, {
                     "task_id":       task_id,
-                    "extractor_key": extractor_key,
-                })
-        except Exception:
-            pass
-
-    def save_title(self, task_id: str, title: str) -> None:
-        """Сохранить название видео в БД."""
-        try:
-            with self._connect() as conn:
-                conn.execute(_UPDATE_TITLE, {
-                    "task_id": task_id,
-                    "title":   title,
+                    "meta":          json.dumps(meta, ensure_ascii=False),
+                    "extractor_key": meta.get("extractor_key") or meta.get("extractor") or "",
+                    "title":         meta.get("title") or meta.get("fulltitle") or "",
                 })
         except Exception:
             pass

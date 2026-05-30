@@ -182,10 +182,10 @@ class YtDlpProvider:
 
     async def fetch_thumbnail(self, exe: str, url: str) -> tuple:
         """
-        Получить thumbnail как JPEG-байты, extractor_key и title видео:
-          1. yt-dlp --dump-single-json → превью URL, extractor_key, title
-          2. urllib скачивает байты превью
-        Возвращает (bytes, extractor_key, title).
+        Получить thumbnail как JPEG-байты и полные метаданные из yt-dlp:
+          1. yt-dlp --dump-single-json --no-playlist → весь JSON метаданных
+          2. urllib скачивает байты превью по URL из метаданных
+        Возвращает (bytes, meta_dict).
         """
         import json as _json
         import urllib.request
@@ -206,16 +206,12 @@ class YtDlpProvider:
                 stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=20)
             except asyncio.TimeoutError:
                 proc.kill()
-                return b"", "", ""
+                return b"", {}
 
             if proc.returncode != 0:
-                return b"", "", ""
+                return b"", {}
 
             data = _json.loads(stdout.decode("utf-8", errors="replace"))
-
-            # Extractor key и название видео
-            extractor_key = data.get("extractor_key") or data.get("extractor") or ""
-            title = data.get("title") or data.get("fulltitle") or ""
 
             # Выбираем лучший thumbnail URL
             thumb_url = ""
@@ -225,7 +221,7 @@ class YtDlpProvider:
             if not thumb_url:
                 thumb_url = data.get("thumbnail", "")
             if not thumb_url:
-                return b"", extractor_key, title
+                return b"", data
 
             # Скачиваем байты синхронно в executor чтобы не блокировать event loop
             loop = asyncio.get_event_loop()
@@ -241,7 +237,7 @@ class YtDlpProvider:
                 loop.run_in_executor(None, _download),
                 timeout=15,
             )
-            return (raw if raw else b""), extractor_key, title
+            return (raw if raw else b""), data
 
         except Exception:
-            return b"", "", ""
+            return b"", {}
