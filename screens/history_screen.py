@@ -251,6 +251,10 @@ def _fmt_ts(ts: Optional[float]) -> str:
     if not ts:
         return "—"
     try:
+        # %d - день месяца (01-31)
+        # %b - сокращенное название месяца в текущей локали
+        # %Y - год (4 цифры)
+        # %H:%M - часы и минуты
         return datetime.datetime.fromtimestamp(ts).strftime("%d %b %Y  %H:%M")
     except Exception:
         return "—"
