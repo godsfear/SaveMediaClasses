@@ -84,14 +84,15 @@ class Services:
         bus        = EventBus()
         config_mgr = ConfigManager(os.path.join(base_dir, "config.json"))
         tools      = ToolsManager(base_dir, tools_dir)
+        state = config_mgr.load()
+        db_path = os.path.join(base_dir, "savemedia.db")
+        db      = DownloadRepository(db_path=db_path, bus=bus)
         dm         = DownloadManager(
             provider_factory=lambda: YtDlpProvider(base_dir, tools_dir),
             log_path=os.path.join(base_dir, "savemedia.log"),
             bus=bus,
+            db=db,
         )
-        state = config_mgr.load()
-        db_path = os.path.join(base_dir, "savemedia.db")
-        db      = DownloadRepository(db_path=db_path, bus=bus)
 
         return Services(
             base_dir=base_dir,

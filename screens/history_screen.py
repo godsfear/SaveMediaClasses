@@ -168,33 +168,64 @@ class HistoryScreen:
 
         url_short = rec.url if len(rec.url) <= 58 else rec.url[:55] + "…"
 
-        return ft.Container(
-            content=ft.Column([
-                ft.Row([
-                    ft.Icon(icon, color=color, size=15),
-                    ft.Text(label, size=12, color=color, weight=ft.FontWeight.W_500),
-                    ft.Text(
-                        f"{started}{duration}", size=11, color=ft.Colors.GREY_500,
-                        expand=True, text_align=ft.TextAlign.RIGHT,
-                    ),
-                ], vertical_alignment=ft.CrossAxisAlignment.CENTER, spacing=6),
-                ft.Text(
-                    url_short, size=11, color=ft.Colors.GREY_300,
-                    no_wrap=True, overflow=ft.TextOverflow.ELLIPSIS,
+        # Thumbnail — BLOB из БД, отдаём в ft.Image через src_base64
+        thumb_data = getattr(rec, "thumbnail", None)
+        if thumb_data:
+            thumbnail_widget = ft.Container(
+                width=96, height=54,
+                border_radius=4,
+                clip_behavior=ft.ClipBehavior.ANTI_ALIAS,
+                content=ft.Image(
+                    src=thumb_data,
+                    width=96, height=54,
+                    fit="cover",
                 ),
-                ft.Row(
-                    [ft.Container(
-                        content=ft.Text(t, size=10, color=ft.Colors.GREY_400),
-                        bgcolor="#252525", border_radius=4,
-                        padding=ft.Padding.symmetric(horizontal=6, vertical=2),
-                    ) for t in tags],
-                    spacing=4, wrap=True,
-                ) if tags else ft.Container(height=0),
+            )
+        else:
+            thumbnail_widget = ft.Container(
+                width=96, height=54,
+                bgcolor="#252525",
+                border_radius=4,
+                content=ft.Icon(
+                    ft.Icons.PLAY_CIRCLE_OUTLINE_ROUNDED,
+                    color=ft.Colors.GREY_800, size=24,
+                ),
+                alignment=ft.alignment.center,
+            )
+
+        # Правая часть карточки — статус, URL, теги, ошибка
+        info_column = ft.Column([
+            ft.Row([
+                ft.Icon(icon, color=color, size=15),
+                ft.Text(label, size=12, color=color, weight=ft.FontWeight.W_500),
                 ft.Text(
-                    rec.error_message, size=10, color=ft.Colors.RED_300,
-                    visible=bool(rec.error_message),
-                ) if rec.error_message else ft.Container(height=0),
-            ], spacing=4, tight=True),
+                    f"{started}{duration}", size=11, color=ft.Colors.GREY_500,
+                    expand=True, text_align=ft.TextAlign.RIGHT,
+                ),
+            ], vertical_alignment=ft.CrossAxisAlignment.CENTER, spacing=6),
+            ft.Text(
+                url_short, size=11, color=ft.Colors.GREY_300,
+                no_wrap=True, overflow=ft.TextOverflow.ELLIPSIS,
+            ),
+            ft.Row(
+                [ft.Container(
+                    content=ft.Text(t, size=10, color=ft.Colors.GREY_400),
+                    bgcolor="#252525", border_radius=4,
+                    padding=ft.Padding.symmetric(horizontal=6, vertical=2),
+                ) for t in tags],
+                spacing=4, wrap=True,
+            ) if tags else ft.Container(height=0),
+            ft.Text(
+                rec.error_message, size=10, color=ft.Colors.RED_300,
+                visible=bool(rec.error_message),
+            ) if rec.error_message else ft.Container(height=0),
+        ], spacing=4, tight=True, expand=True)
+
+        return ft.Container(
+            content=ft.Row([
+                thumbnail_widget,
+                info_column,
+            ], spacing=10, vertical_alignment=ft.CrossAxisAlignment.START),
             bgcolor="#1a1a1a",
             border=ft.Border.all(1, "#2a2a2a"),
             border_radius=6,
@@ -220,10 +251,6 @@ def _fmt_ts(ts: Optional[float]) -> str:
     if not ts:
         return "—"
     try:
-        # %d - день месяца (01-31)
-        # %b - сокращенное название месяца в текущей локали
-        # %Y - год (4 цифры)
-        # %H:%M - часы и минуты
         return datetime.datetime.fromtimestamp(ts).strftime("%d %b %Y  %H:%M")
     except Exception:
         return "—"

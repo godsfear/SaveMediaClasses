@@ -14,6 +14,7 @@ DownloadRepository — SQLite-слой истории загрузок.
 
   Расширяемое поле (не влияет на схему при добавлении новых параметров):
     params        TEXT              — JSON-снимок всех параметров загрузки
+    thumbnail     BLOB              — JPEG-байты превью (NULL если нет)
 
 Добавление нового параметра в DownloadSnapshot → просто появляется в JSON,
 старые записи читаются без ошибок через params.get() с дефолтом.
@@ -45,8 +46,13 @@ CREATE TABLE IF NOT EXISTS downloads (
     started_at    REAL NOT NULL,
     finished_at   REAL,
     error_message TEXT,
-    params        TEXT NOT NULL DEFAULT '{}'
+    params        TEXT NOT NULL DEFAULT '{}',
+    thumbnail     BLOB
 );
+"""
+
+_MIGRATE_THUMBNAIL = """
+ALTER TABLE downloads ADD COLUMN thumbnail BLOB;
 """
 
 _CREATE_INDEXES = [
@@ -66,6 +72,10 @@ SET status = :status, finished_at = :finished_at, error_message = :error_message
 WHERE task_id = :task_id;
 """
 
+_UPDATE_THUMBNAIL = """
+UPDATE downloads SET thumbnail = :thumbnail WHERE task_id = :task_id;
+"""
+
 
 # ── Модель записи ─────────────────────────────────────────────────────────────
 
@@ -77,10 +87,10 @@ class DownloadRecord:
     __slots__ = (
         "task_id", "url", "source", "status",
         "started_at", "finished_at", "error_message",
-        "params",
+        "params", "thumbnail",
     )
 
-    def __init__(self, params: str = "{}", **kwargs):
+    def __init__(self, params: str = "{}", thumbnail: Optional[bytes] = None, **kwargs):
         for k, v in kwargs.items():
             setattr(self, k, v)
         # Десериализуем JSON → dict при чтении, не при каждом обращении
@@ -88,6 +98,7 @@ class DownloadRecord:
             self.params: Dict[str, Any] = json.loads(params) if isinstance(params, str) else params
         except (json.JSONDecodeError, TypeError):
             self.params = {}
+        self.thumbnail: Optional[bytes] = thumbnail
 
     def __repr__(self) -> str:
         return f"<DownloadRecord {self.task_id[:8]}… {self.status} {self.url[:40]}>"
@@ -110,6 +121,11 @@ class DownloadRepository:
             conn.execute(_CREATE_TABLE)
             for idx in _CREATE_INDEXES:
                 conn.execute(idx)
+            # Миграция: добавить колонку thumbnail если её нет
+            try:
+                conn.execute(_MIGRATE_THUMBNAIL)
+            except Exception:
+                pass  # Колонка уже существует — это норма
 
     def _subscribe(self) -> None:
         self._bus.on(DownloadStartedEvent,   self._on_started)
@@ -197,6 +213,17 @@ class DownloadRepository:
                 return dict(row) if row else {}
         except Exception:
             return {}
+
+    def save_thumbnail(self, task_id: str, data: bytes) -> None:
+        """Сохранить JPEG-байты thumbnail в БД."""
+        try:
+            with self._connect() as conn:
+                conn.execute(_UPDATE_THUMBNAIL, {
+                    "task_id":   task_id,
+                    "thumbnail": data,
+                })
+        except Exception:
+            pass
 
     # ── Приватное ─────────────────────────────────────────────────────────────
 
