@@ -161,13 +161,16 @@ class HistoryScreen:
         started  = _fmt_ts(rec.started_at)
         duration = _fmt_duration(rec.started_at, rec.finished_at)
 
-        # Теги из JSON-params — совместимы со старыми записями через .get()
+        # Теги: параметры из params, "Плейлист" — из метаданных yt-dlp
         p    = rec.params
+        meta = rec.meta or {}  # JSON из --dump-single-json (None для старых записей)
         tags = []
-        if p.get("audio_only"):        tags.append("MP3")
-        if p.get("proxy_enabled"):     tags.append("Прокси")
-        if p.get("playlist_enabled"):  tags.append("Плейлист")
-        if p.get("cookies_enabled"):   tags.append("Куки")
+        if p.get("audio_only"):    tags.append("MP3")
+        if p.get("proxy_enabled"): tags.append("Прокси")
+        if p.get("cookies_enabled"): tags.append("Куки")
+        # Плейлист определяем по факту из метаданных, а не из настройки
+        is_playlist = meta.get("_type") == "playlist" or bool(meta.get("playlist_id"))
+        if is_playlist: tags.append("Плейлист")
 
         url_short = rec.url if len(rec.url) <= 58 else rec.url[:55] + "…"
 
@@ -198,9 +201,16 @@ class HistoryScreen:
                 alignment=ft.Alignment(0, 0),
             )
 
+        # title и extractor_key: из meta если есть, иначе из колонок (старые записи)
+        meta = rec.meta or {}
+        rec_title = (meta.get("title") or meta.get("fulltitle")
+                     or getattr(rec, "title", None) or "")
+        rec_extractor = (meta.get("extractor_key") or meta.get("extractor")
+                         or getattr(rec, "extractor_key", None) or "")
+
         # Папка загрузки: base / extractor_key (если save_to_source)
         base_folder = rec.params.get("download_path") or ""
-        extractor_key = getattr(rec, "extractor_key", None) or ""
+        extractor_key = rec_extractor
         save_to_source = rec.params.get("save_to_source", False)
         if save_to_source and extractor_key and base_folder:
             folder = os.path.join(base_folder, extractor_key)
@@ -224,16 +234,15 @@ class HistoryScreen:
             on_click=lambda _, tid=rec.task_id: self._delete_record(tid),
         )
 
-        # Название видео (из БД) или URL как fallback
-        title = getattr(rec, "title", None) or ""
-        title_short = (title[:60] + "…") if len(title) > 62 else title
+        # Название видео
+        title_short = (rec_title[:60] + "…") if len(rec_title) > 62 else rec_title
 
         # Правая часть карточки: название, URL, теги, статус+время, кнопки
         info_column = ft.Column([
             # Строка 1: название + кнопки
             ft.Row([
                 ft.Text(
-                    title_short if title_short else url_short,
+                    title_short or url_short,
                     size=12, color=ft.Colors.WHITE,
                     weight=ft.FontWeight.W_500,
                     expand=True, no_wrap=True,
@@ -318,6 +327,10 @@ def _fmt_ts(ts: Optional[float]) -> str:
     if not ts:
         return "—"
     try:
+        # %d - день месяца (01-31)
+        # %b - сокращенное название месяца в текущей локали
+        # %Y - год (4 цифры)
+        # %H:%M - часы и минуты
         return datetime.datetime.fromtimestamp(ts).strftime("%d %b %Y  %H:%M")
     except Exception:
         return "—"
