@@ -73,3 +73,178 @@ Deleting original file d:\Downloads\Youtube\Excellent Use of Free Will.f251.webm
 [Metadata] Adding metadata to "d:\Downloads\Youtube\Excellent Use of Free Will.mp4"
 [ThumbnailsConvertor] Converting thumbnail "d:\Downloads\Youtube\Excellent Use of Free Will.webp" to png
 [EmbedThumbnail] mutagen: Adding thumbnail to "d:\Downloads\Youtube\Excellent Use of Free Will.mp4"
+[youtube] Extracting URL: https://www.youtube.com/watch?v=LAqC3SJwzT4
+[youtube] LAqC3SJwzT4: Downloading webpage
+WARNING: [youtube] No supported JavaScript runtime could be found. Only deno is enabled by default; to use another runtime add  --js-runtimes RUNTIME[:PATH]  to your command/config. YouTube extraction without a JS runtime has been deprecated, and some formats may be missing. See  https://github.com/yt-dlp/yt-dlp/wiki/EJS  for details on installing one
+[youtube] LAqC3SJwzT4: Downloading android vr player API JSON
+[info] LAqC3SJwzT4: Downloading 1 format(s): 399+251
+[info] Downloading video thumbnail 41 ...
+[info] Writing video thumbnail 41 to: d:\Downloads\Youtube\Excellent Use of Free Will.webp
+[download] d:\Downloads\Youtube\Excellent Use of Free Will.mp4 has already been downloaded
+[Metadata] Adding metadata to "d:\Downloads\Youtube\Excellent Use of Free Will.mp4"
+[ThumbnailsConvertor] Converting thumbnail "d:\Downloads\Youtube\Excellent Use of Free Will.webp" to png
+[EmbedThumbnail] mutagen: Adding thumbnail to "d:\Downloads\Youtube\Excellent Use of Free Will.mp4"
+[youtube] Extracting URL: https://www.youtube.com/watch?v=LAqC3SJwzT4
+[youtube] LAqC3SJwzT4: Downloading webpage
+WARNING: [youtube] No supported JavaScript runtime could be found. Only deno is enabled by default; to use another runtime add  --js-runtimes RUNTIME[:PATH]  to your command/config. YouTube extraction without a JS runtime has been deprecated, and some formats may be missing. See  https://github.com/yt-dlp/yt-dlp/wiki/EJS  for details on installing one
+[youtube] LAqC3SJwzT4: Downloading android vr player API JSON
+[info] LAqC3SJwzT4: Downloading 1 format(s): 399+251
+[info] Downloading video thumbnail 41 ...
+[info] Writing video thumbnail 41 to: d:\Downloads\Youtube\Excellent Use of Free Will.webp
+[download] Destination: d:\Downloads\Youtube\Excellent Use of Free Will.f399.mp4
+[download] Destination: d:\Downloads\Youtube\Excellent Use of Free Will.f251.webm
+[Merger] Merging formats into "d:\Downloads\Youtube\Excellent Use of Free Will.mp4"
+Deleting original file d:\Downloads\Youtube\Excellent Use of Free Will.f251.webm (pass -k to keep)
+Deleting original file d:\Downloads\Youtube\Excellent Use of Free Will.f399.mp4 (pass -k to keep)
+[Metadata] Adding metadata to "d:\Downloads\Youtube\Excellent Use of Free Will.mp4"
+[ThumbnailsConvertor] Converting thumbnail "d:\Downloads\Youtube\Excellent Use of Free Will.webp" to png
+[EmbedThumbnail] mutagen: Adding thumbnail to "d:\Downloads\Youtube\Excellent Use of Free Will.mp4"
+[youtube] Extracting URL: https://www.youtube.com/watch?v=9zcuxqn3WYE
+[youtube] 9zcuxqn3WYE: Downloading webpage
+WARNING: [youtube] No supported JavaScript runtime could be found. Only deno is enabled by default; to use another runtime add  --js-runtimes RUNTIME[:PATH]  to your command/config. YouTube extraction without a JS runtime has been deprecated, and some formats may be missing. See  https://github.com/yt-dlp/yt-dlp/wiki/EJS  for details on installing one
+[youtube] 9zcuxqn3WYE: Downloading android vr player API JSON
+[info] 9zcuxqn3WYE: Downloading 1 format(s): 399+251
+[info] Downloading video thumbnail 41 ...
+[info] Writing video thumbnail 41 to: d:\Downloads\Youtube\Левое движение десятых： борьба с либералами и поиск места России ⧸ Котомодерн.webp
+[download] Destination: d:\Downloads\Youtube\Левое движение десятых： борьба с либералами и поиск места России ⧸ Котомодерн.f399.mp4
+[download] Destination: d:\Downloads\Youtube\Левое движение десятых： борьба с либералами и поиск места России ⧸ Котомодерн.f251.webm
+[Merger] Merging formats into "d:\Downloads\Youtube\Левое движение десятых： борьба с либералами и поиск места России ⧸ Котомодерн.mp4"
+Deleting original file d:\Downloads\Youtube\Левое движение десятых： борьба с либералами и поиск места России ⧸ Котомодерн.f399.mp4 (pass -k to keep)
+Deleting original file d:\Downloads\Youtube\Левое движение десятых： борьба с либералами и поиск места России ⧸ Котомодерн.f251.webm (pass -k to keep)
+[Metadata] Adding metadata to "d:\Downloads\Youtube\Левое движение десятых： борьба с либералами и поиск места России ⧸ Котомодерн.mp4"
+[ThumbnailsConvertor] Converting thumbnail "d:\Downloads\Youtube\Левое движение десятых： борьба с либералами и поиск места России ⧸ Котомодерн.webp" to png
+[EmbedThumbnail] mutagen: Adding thumbnail to "d:\Downloads\Youtube\Левое движение десятых： борьба с либералами и поиск места России ⧸ Котомодерн.mp4"
+[youtube] Extracting URL: https://www.youtube.com/watch?v=9zcuxqn3WYE
+[youtube] 9zcuxqn3WYE: Downloading webpage
+WARNING: [youtube] No supported JavaScript runtime could be found. Only deno is enabled by default; to use another runtime add  --js-runtimes RUNTIME[:PATH]  to your command/config. YouTube extraction without a JS runtime has been deprecated, and some formats may be missing. See  https://github.com/yt-dlp/yt-dlp/wiki/EJS  for details on installing one
+[youtube] 9zcuxqn3WYE: Downloading android vr player API JSON
+[info] 9zcuxqn3WYE: Downloading 1 format(s): 399+251
+[info] Downloading video thumbnail 41 ...
+[info] Writing video thumbnail 41 to: d:\Downloads\Youtube\Левое движение десятых： борьба с либералами и поиск места России ⧸ Котомодерн.webp
+[download] Destination: d:\Downloads\Youtube\Левое движение десятых： борьба с либералами и поиск места России ⧸ Котомодерн.f399.mp4
+[download] Destination: d:\Downloads\Youtube\Левое движение десятых： борьба с либералами и поиск места России ⧸ Котомодерн.f251.webm
+[Merger] Merging formats into "d:\Downloads\Youtube\Левое движение десятых： борьба с либералами и поиск места России ⧸ Котомодерн.mp4"
+Deleting original file d:\Downloads\Youtube\Левое движение десятых： борьба с либералами и поиск места России ⧸ Котомодерн.f399.mp4 (pass -k to keep)
+Deleting original file d:\Downloads\Youtube\Левое движение десятых： борьба с либералами и поиск места России ⧸ Котомодерн.f251.webm (pass -k to keep)
+[Metadata] Adding metadata to "d:\Downloads\Youtube\Левое движение десятых： борьба с либералами и поиск места России ⧸ Котомодерн.mp4"
+[ThumbnailsConvertor] Converting thumbnail "d:\Downloads\Youtube\Левое движение десятых： борьба с либералами и поиск места России ⧸ Котомодерн.webp" to png
+[EmbedThumbnail] mutagen: Adding thumbnail to "d:\Downloads\Youtube\Левое движение десятых： борьба с либералами и поиск места России ⧸ Котомодерн.mp4"
+[youtube] Extracting URL: https://www.youtube.com/watch?v=LAqC3SJwzT4
+[youtube] LAqC3SJwzT4: Downloading webpage
+WARNING: [youtube] No supported JavaScript runtime could be found. Only deno is enabled by default; to use another runtime add  --js-runtimes RUNTIME[:PATH]  to your command/config. YouTube extraction without a JS runtime has been deprecated, and some formats may be missing. See  https://github.com/yt-dlp/yt-dlp/wiki/EJS  for details on installing one
+[youtube] LAqC3SJwzT4: Downloading android vr player API JSON
+[info] LAqC3SJwzT4: Downloading 1 format(s): 399+251
+[info] Downloading video thumbnail 41 ...
+[info] Writing video thumbnail 41 to: d:\Downloads\Youtube\Excellent Use of Free Will.webp
+[download] Destination: d:\Downloads\Youtube\Excellent Use of Free Will.f399.mp4
+[download] Destination: d:\Downloads\Youtube\Excellent Use of Free Will.f251.webm
+[Merger] Merging formats into "d:\Downloads\Youtube\Excellent Use of Free Will.mp4"
+Deleting original file d:\Downloads\Youtube\Excellent Use of Free Will.f399.mp4 (pass -k to keep)
+Deleting original file d:\Downloads\Youtube\Excellent Use of Free Will.f251.webm (pass -k to keep)
+[Metadata] Adding metadata to "d:\Downloads\Youtube\Excellent Use of Free Will.mp4"
+[ThumbnailsConvertor] Converting thumbnail "d:\Downloads\Youtube\Excellent Use of Free Will.webp" to png
+[EmbedThumbnail] mutagen: Adding thumbnail to "d:\Downloads\Youtube\Excellent Use of Free Will.mp4"
+[youtube] Extracting URL: https://www.youtube.com/watch?v=9zcuxqn3WYE
+[youtube] 9zcuxqn3WYE: Downloading webpage
+WARNING: [youtube] No supported JavaScript runtime could be found. Only deno is enabled by default; to use another runtime add  --js-runtimes RUNTIME[:PATH]  to your command/config. YouTube extraction without a JS runtime has been deprecated, and some formats may be missing. See  https://github.com/yt-dlp/yt-dlp/wiki/EJS  for details on installing one
+[youtube] 9zcuxqn3WYE: Downloading android vr player API JSON
+[info] 9zcuxqn3WYE: Downloading 1 format(s): 399+251
+[info] Downloading video thumbnail 41 ...
+[info] Writing video thumbnail 41 to: d:\Downloads\Youtube\Левое движение десятых： борьба с либералами и поиск места России ⧸ Котомодерн.webp
+[download] Destination: d:\Downloads\Youtube\Левое движение десятых： борьба с либералами и поиск места России ⧸ Котомодерн.f399.mp4
+[download] Destination: d:\Downloads\Youtube\Левое движение десятых： борьба с либералами и поиск места России ⧸ Котомодерн.f251.webm
+[Merger] Merging formats into "d:\Downloads\Youtube\Левое движение десятых： борьба с либералами и поиск места России ⧸ Котомодерн.mp4"
+Deleting original file d:\Downloads\Youtube\Левое движение десятых： борьба с либералами и поиск места России ⧸ Котомодерн.f251.webm (pass -k to keep)
+Deleting original file d:\Downloads\Youtube\Левое движение десятых： борьба с либералами и поиск места России ⧸ Котомодерн.f399.mp4 (pass -k to keep)
+[Metadata] Adding metadata to "d:\Downloads\Youtube\Левое движение десятых： борьба с либералами и поиск места России ⧸ Котомодерн.mp4"
+[ThumbnailsConvertor] Converting thumbnail "d:\Downloads\Youtube\Левое движение десятых： борьба с либералами и поиск места России ⧸ Котомодерн.webp" to png
+[EmbedThumbnail] mutagen: Adding thumbnail to "d:\Downloads\Youtube\Левое движение десятых： борьба с либералами и поиск места России ⧸ Котомодерн.mp4"
+[youtube] Extracting URL: https://www.youtube.com/watch?v=LAqC3SJwzT4
+[youtube] LAqC3SJwzT4: Downloading webpage
+WARNING: [youtube] No supported JavaScript runtime could be found. Only deno is enabled by default; to use another runtime add  --js-runtimes RUNTIME[:PATH]  to your command/config. YouTube extraction without a JS runtime has been deprecated, and some formats may be missing. See  https://github.com/yt-dlp/yt-dlp/wiki/EJS  for details on installing one
+[youtube] LAqC3SJwzT4: Downloading android vr player API JSON
+[info] LAqC3SJwzT4: Downloading 1 format(s): 399+251
+[info] Downloading video thumbnail 41 ...
+[info] Writing video thumbnail 41 to: d:\Downloads\Youtube\Excellent Use of Free Will.webp
+[download] Destination: d:\Downloads\Youtube\Excellent Use of Free Will.f399.mp4
+[download] Destination: d:\Downloads\Youtube\Excellent Use of Free Will.f251.webm
+[Merger] Merging formats into "d:\Downloads\Youtube\Excellent Use of Free Will.mp4"
+Deleting original file d:\Downloads\Youtube\Excellent Use of Free Will.f399.mp4 (pass -k to keep)
+Deleting original file d:\Downloads\Youtube\Excellent Use of Free Will.f251.webm (pass -k to keep)
+[Metadata] Adding metadata to "d:\Downloads\Youtube\Excellent Use of Free Will.mp4"
+[ThumbnailsConvertor] Converting thumbnail "d:\Downloads\Youtube\Excellent Use of Free Will.webp" to png
+[EmbedThumbnail] mutagen: Adding thumbnail to "d:\Downloads\Youtube\Excellent Use of Free Will.mp4"
+[youtube:tab] Extracting URL: https://www.youtube.com/watch?v=MydxwLdJ7Ik&list=PLzbnzrEOs605B5ThQRXa3fBT-NxzziJvn
+[youtube:tab] Downloading playlist PLzbnzrEOs605B5ThQRXa3fBT-NxzziJvn - add --no-playlist to download just the video MydxwLdJ7Ik
+[youtube:tab] PLzbnzrEOs605B5ThQRXa3fBT-NxzziJvn: Downloading webpage
+[youtube:tab] Extracting URL: https://www.youtube.com/playlist?list=PLzbnzrEOs605B5ThQRXa3fBT-NxzziJvn
+[youtube:tab] PLzbnzrEOs605B5ThQRXa3fBT-NxzziJvn: Downloading webpage
+[youtube:tab] PLzbnzrEOs605B5ThQRXa3fBT-NxzziJvn: Redownloading playlist API JSON with unavailable videos
+[download] Downloading playlist: Гэги с наших игр по ДнД
+[youtube:tab] PLzbnzrEOs605B5ThQRXa3fBT-NxzziJvn page 1: Downloading API JSON
+[youtube:tab] Playlist Гэги с наших игр по ДнД: Downloading 4 items of 4
+[download] Downloading item 1 of 4
+[youtube] Extracting URL: https://www.youtube.com/watch?v=MydxwLdJ7Ik
+[youtube] MydxwLdJ7Ik: Downloading webpage
+WARNING: [youtube] No supported JavaScript runtime could be found. Only deno is enabled by default; to use another runtime add  --js-runtimes RUNTIME[:PATH]  to your command/config. YouTube extraction without a JS runtime has been deprecated, and some formats may be missing. See  https://github.com/yt-dlp/yt-dlp/wiki/EJS  for details on installing one
+[youtube] MydxwLdJ7Ik: Downloading android vr player API JSON
+[info] MydxwLdJ7Ik: Downloading 1 format(s): 298+251
+[info] Downloading video thumbnail 41 ...
+[info] Writing video thumbnail 41 to: d:\Downloads\Youtube\Гэги с наших игр по ДнД\1 - Смешные моменты из 1-й сессии по ДнД для меня в качестве мастера.webp
+[download] Destination: d:\Downloads\Youtube\Гэги с наших игр по ДнД\1 - Смешные моменты из 1-й сессии по ДнД для меня в качестве мастера.f298.mp4
+[download] Destination: d:\Downloads\Youtube\Гэги с наших игр по ДнД\1 - Смешные моменты из 1-й сессии по ДнД для меня в качестве мастера.f251.webm
+[Merger] Merging formats into "d:\Downloads\Youtube\Гэги с наших игр по ДнД\1 - Смешные моменты из 1-й сессии по ДнД для меня в качестве мастера.mp4"
+Deleting original file d:\Downloads\Youtube\Гэги с наших игр по ДнД\1 - Смешные моменты из 1-й сессии по ДнД для меня в качестве мастера.f251.webm (pass -k to keep)
+Deleting original file d:\Downloads\Youtube\Гэги с наших игр по ДнД\1 - Смешные моменты из 1-й сессии по ДнД для меня в качестве мастера.f298.mp4 (pass -k to keep)
+[Metadata] Adding metadata to "d:\Downloads\Youtube\Гэги с наших игр по ДнД\1 - Смешные моменты из 1-й сессии по ДнД для меня в качестве мастера.mp4"
+[ThumbnailsConvertor] Converting thumbnail "d:\Downloads\Youtube\Гэги с наших игр по ДнД\1 - Смешные моменты из 1-й сессии по ДнД для меня в качестве мастера.webp" to png
+[EmbedThumbnail] mutagen: Adding thumbnail to "d:\Downloads\Youtube\Гэги с наших игр по ДнД\1 - Смешные моменты из 1-й сессии по ДнД для меня в качестве мастера.mp4"
+[download] Downloading item 2 of 4
+[youtube] Extracting URL: https://www.youtube.com/watch?v=v19GHHBmzVA
+[youtube] v19GHHBmzVA: Downloading webpage
+WARNING: [youtube] No supported JavaScript runtime could be found. Only deno is enabled by default; to use another runtime add  --js-runtimes RUNTIME[:PATH]  to your command/config. YouTube extraction without a JS runtime has been deprecated, and some formats may be missing. See  https://github.com/yt-dlp/yt-dlp/wiki/EJS  for details on installing one
+[youtube] v19GHHBmzVA: Downloading android vr player API JSON
+[info] v19GHHBmzVA: Downloading 1 format(s): 298+251
+[info] Downloading video thumbnail 41 ...
+[info] Writing video thumbnail 41 to: d:\Downloads\Youtube\Гэги с наших игр по ДнД\2 - Смешные моменты 2-й игры. Розовый молот и волчьи шкуры..webp
+[download] Destination: d:\Downloads\Youtube\Гэги с наших игр по ДнД\2 - Смешные моменты 2-й игры. Розовый молот и волчьи шкуры..f298.mp4
+[download] Destination: d:\Downloads\Youtube\Гэги с наших игр по ДнД\2 - Смешные моменты 2-й игры. Розовый молот и волчьи шкуры..f251.webm
+[Merger] Merging formats into "d:\Downloads\Youtube\Гэги с наших игр по ДнД\2 - Смешные моменты 2-й игры. Розовый молот и волчьи шкуры..mp4"
+Deleting original file d:\Downloads\Youtube\Гэги с наших игр по ДнД\2 - Смешные моменты 2-й игры. Розовый молот и волчьи шкуры..f251.webm (pass -k to keep)
+Deleting original file d:\Downloads\Youtube\Гэги с наших игр по ДнД\2 - Смешные моменты 2-й игры. Розовый молот и волчьи шкуры..f298.mp4 (pass -k to keep)
+[Metadata] Adding metadata to "d:\Downloads\Youtube\Гэги с наших игр по ДнД\2 - Смешные моменты 2-й игры. Розовый молот и волчьи шкуры..mp4"
+[ThumbnailsConvertor] Converting thumbnail "d:\Downloads\Youtube\Гэги с наших игр по ДнД\2 - Смешные моменты 2-й игры. Розовый молот и волчьи шкуры..webp" to png
+[EmbedThumbnail] mutagen: Adding thumbnail to "d:\Downloads\Youtube\Гэги с наших игр по ДнД\2 - Смешные моменты 2-й игры. Розовый молот и волчьи шкуры..mp4"
+[download] Downloading item 3 of 4
+[youtube] Extracting URL: https://www.youtube.com/watch?v=hRL065g0qwM
+[youtube] hRL065g0qwM: Downloading webpage
+WARNING: [youtube] No supported JavaScript runtime could be found. Only deno is enabled by default; to use another runtime add  --js-runtimes RUNTIME[:PATH]  to your command/config. YouTube extraction without a JS runtime has been deprecated, and some formats may be missing. See  https://github.com/yt-dlp/yt-dlp/wiki/EJS  for details on installing one
+[youtube] hRL065g0qwM: Downloading android vr player API JSON
+[info] hRL065g0qwM: Downloading 1 format(s): 298+251
+[info] Downloading video thumbnail 41 ...
+[info] Writing video thumbnail 41 to: d:\Downloads\Youtube\Гэги с наших игр по ДнД\3 - Смешные моменты 3-й игры. Дураки и молния..webp
+[download] Destination: d:\Downloads\Youtube\Гэги с наших игр по ДнД\3 - Смешные моменты 3-й игры. Дураки и молния..f298.mp4
+[download] Destination: d:\Downloads\Youtube\Гэги с наших игр по ДнД\3 - Смешные моменты 3-й игры. Дураки и молния..f251.webm
+[Merger] Merging formats into "d:\Downloads\Youtube\Гэги с наших игр по ДнД\3 - Смешные моменты 3-й игры. Дураки и молния..mp4"
+Deleting original file d:\Downloads\Youtube\Гэги с наших игр по ДнД\3 - Смешные моменты 3-й игры. Дураки и молния..f251.webm (pass -k to keep)
+Deleting original file d:\Downloads\Youtube\Гэги с наших игр по ДнД\3 - Смешные моменты 3-й игры. Дураки и молния..f298.mp4 (pass -k to keep)
+[Metadata] Adding metadata to "d:\Downloads\Youtube\Гэги с наших игр по ДнД\3 - Смешные моменты 3-й игры. Дураки и молния..mp4"
+[ThumbnailsConvertor] Converting thumbnail "d:\Downloads\Youtube\Гэги с наших игр по ДнД\3 - Смешные моменты 3-й игры. Дураки и молния..webp" to png
+[EmbedThumbnail] mutagen: Adding thumbnail to "d:\Downloads\Youtube\Гэги с наших игр по ДнД\3 - Смешные моменты 3-й игры. Дураки и молния..mp4"
+[download] Downloading item 4 of 4
+[youtube] Extracting URL: https://www.youtube.com/watch?v=IuzWDbOgkCo
+[youtube] IuzWDbOgkCo: Downloading webpage
+WARNING: [youtube] No supported JavaScript runtime could be found. Only deno is enabled by default; to use another runtime add  --js-runtimes RUNTIME[:PATH]  to your command/config. YouTube extraction without a JS runtime has been deprecated, and some formats may be missing. See  https://github.com/yt-dlp/yt-dlp/wiki/EJS  for details on installing one
+[youtube] IuzWDbOgkCo: Downloading android vr player API JSON
+[info] IuzWDbOgkCo: Downloading 1 format(s): 137+251
+[info] Downloading video thumbnail 41 ...
+[info] Writing video thumbnail 41 to: d:\Downloads\Youtube\Гэги с наших игр по ДнД\4 - Смешные моменты 4-й игры. Лоренцо и его малыш..webp
+[download] Destination: d:\Downloads\Youtube\Гэги с наших игр по ДнД\4 - Смешные моменты 4-й игры. Лоренцо и его малыш..f137.mp4
+[download] Destination: d:\Downloads\Youtube\Гэги с наших игр по ДнД\4 - Смешные моменты 4-й игры. Лоренцо и его малыш..f251.webm
+[Merger] Merging formats into "d:\Downloads\Youtube\Гэги с наших игр по ДнД\4 - Смешные моменты 4-й игры. Лоренцо и его малыш..mp4"
+Deleting original file d:\Downloads\Youtube\Гэги с наших игр по ДнД\4 - Смешные моменты 4-й игры. Лоренцо и его малыш..f137.mp4 (pass -k to keep)
+Deleting original file d:\Downloads\Youtube\Гэги с наших игр по ДнД\4 - Смешные моменты 4-й игры. Лоренцо и его малыш..f251.webm (pass -k to keep)
+[Metadata] Adding metadata to "d:\Downloads\Youtube\Гэги с наших игр по ДнД\4 - Смешные моменты 4-й игры. Лоренцо и его малыш..mp4"
+[ThumbnailsConvertor] Converting thumbnail "d:\Downloads\Youtube\Гэги с наших игр по ДнД\4 - Смешные моменты 4-й игры. Лоренцо и его малыш..webp" to png
+[EmbedThumbnail] mutagen: Adding thumbnail to "d:\Downloads\Youtube\Гэги с наших игр по ДнД\4 - Смешные моменты 4-й игры. Лоренцо и его малыш..mp4"
+[download] Finished downloading playlist: Гэги с наших игр по ДнД

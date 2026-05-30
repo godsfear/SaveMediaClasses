@@ -15,6 +15,8 @@ DownloadRepository — SQLite-слой истории загрузок.
   Расширяемое поле (не влияет на схему при добавлении новых параметров):
     params        TEXT              — JSON-снимок всех параметров загрузки
     thumbnail     BLOB              — JPEG-байты превью (NULL если нет)
+    extractor_key TEXT              — yt-dlp extractor_key (Youtube, Vimeo, …)
+    title         TEXT              — название видео из метаданных
 
 Добавление нового параметра в DownloadSnapshot → просто появляется в JSON,
 старые записи читаются без ошибок через params.get() с дефолтом.
@@ -47,12 +49,22 @@ CREATE TABLE IF NOT EXISTS downloads (
     finished_at   REAL,
     error_message TEXT,
     params        TEXT NOT NULL DEFAULT '{}',
-    thumbnail     BLOB
+    thumbnail     BLOB,
+    extractor_key TEXT,
+    title         TEXT
 );
 """
 
 _MIGRATE_THUMBNAIL = """
 ALTER TABLE downloads ADD COLUMN thumbnail BLOB;
+"""
+
+_MIGRATE_EXTRACTOR = """
+ALTER TABLE downloads ADD COLUMN extractor_key TEXT;
+"""
+
+_MIGRATE_TITLE = """
+ALTER TABLE downloads ADD COLUMN title TEXT;
 """
 
 _CREATE_INDEXES = [
@@ -76,6 +88,14 @@ _UPDATE_THUMBNAIL = """
 UPDATE downloads SET thumbnail = :thumbnail WHERE task_id = :task_id;
 """
 
+_UPDATE_EXTRACTOR = """
+UPDATE downloads SET extractor_key = :extractor_key WHERE task_id = :task_id;
+"""
+
+_UPDATE_TITLE = """
+UPDATE downloads SET title = :title WHERE task_id = :task_id;
+"""
+
 
 # ── Модель записи ─────────────────────────────────────────────────────────────
 
@@ -87,10 +107,10 @@ class DownloadRecord:
     __slots__ = (
         "task_id", "url", "source", "status",
         "started_at", "finished_at", "error_message",
-        "params", "thumbnail",
+        "params", "thumbnail", "extractor_key", "title",
     )
 
-    def __init__(self, params: str = "{}", thumbnail: Optional[bytes] = None, **kwargs):
+    def __init__(self, params: str = "{}", thumbnail: Optional[bytes] = None, extractor_key: Optional[str] = None, title: Optional[str] = None, **kwargs):
         for k, v in kwargs.items():
             setattr(self, k, v)
         # Десериализуем JSON → dict при чтении, не при каждом обращении
@@ -99,6 +119,8 @@ class DownloadRecord:
         except (json.JSONDecodeError, TypeError):
             self.params = {}
         self.thumbnail: Optional[bytes] = thumbnail
+        self.extractor_key: Optional[str] = extractor_key
+        self.title: Optional[str] = title
 
     def __repr__(self) -> str:
         return f"<DownloadRecord {self.task_id[:8]}… {self.status} {self.url[:40]}>"
@@ -121,11 +143,19 @@ class DownloadRepository:
             conn.execute(_CREATE_TABLE)
             for idx in _CREATE_INDEXES:
                 conn.execute(idx)
-            # Миграция: добавить колонку thumbnail если её нет
+            # Миграция: добавить колонки если нет
             try:
                 conn.execute(_MIGRATE_THUMBNAIL)
             except Exception:
-                pass  # Колонка уже существует — это норма
+                pass
+            try:
+                conn.execute(_MIGRATE_EXTRACTOR)
+            except Exception:
+                pass
+            try:
+                conn.execute(_MIGRATE_TITLE)
+            except Exception:
+                pass
 
     def _subscribe(self) -> None:
         self._bus.on(DownloadStartedEvent,   self._on_started)
@@ -221,6 +251,28 @@ class DownloadRepository:
                 conn.execute(_UPDATE_THUMBNAIL, {
                     "task_id":   task_id,
                     "thumbnail": data,
+                })
+        except Exception:
+            pass
+
+    def save_extractor_key(self, task_id: str, extractor_key: str) -> None:
+        """Сохранить extractor_key (Youtube, Vimeo, …) в БД."""
+        try:
+            with self._connect() as conn:
+                conn.execute(_UPDATE_EXTRACTOR, {
+                    "task_id":       task_id,
+                    "extractor_key": extractor_key,
+                })
+        except Exception:
+            pass
+
+    def save_title(self, task_id: str, title: str) -> None:
+        """Сохранить название видео в БД."""
+        try:
+            with self._connect() as conn:
+                conn.execute(_UPDATE_TITLE, {
+                    "task_id": task_id,
+                    "title":   title,
                 })
         except Exception:
             pass

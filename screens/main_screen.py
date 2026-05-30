@@ -83,11 +83,13 @@ class DownloadCard:
 
     def set_thumbnail(self, data: bytes) -> None:
         """Вставить thumbnail слева от прогресс-бара."""
+        import base64 as _b64
+        b64str = "data:image/jpeg;base64," + _b64.b64encode(data).decode()
         img = ft.Container(
             width=96, height=54,
             border_radius=4,
             clip_behavior=ft.ClipBehavior.ANTI_ALIAS,
-            content=ft.Image(src=data, width=96, height=54, fit="cover"),
+            content=ft.Image(src=b64str, width=96, height=54, fit=ft.BoxFit.COVER),
         )
         # container.content — Column; первый Row — статус+кнопка, второй — бар+процент
         # Оборачиваем всё в Row с thumbnail слева
@@ -357,13 +359,12 @@ class MainScreen:
             exe = provider.resolve_exe()
             if not exe:
                 return
-            data = await provider.fetch_thumbnail(exe, url)
-            if not data:
-                return
-            card = self._cards.get(task_id)
-            if card:
-                card.set_thumbnail(data)
-                self._safe_update()
+            thumb_data, extractor_key, _title = await provider.fetch_thumbnail(exe, url)
+            if thumb_data:
+                card = self._cards.get(task_id)
+                if card:
+                    card.set_thumbnail(thumb_data)
+                    self._safe_update()
         except Exception:
             pass
 
