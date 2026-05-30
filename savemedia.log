@@ -28,3 +28,33 @@ Deleting original file d:\Downloads\Youtube\Левое движение деся
 [Metadata] Adding metadata to "d:\Downloads\Youtube\Левое движение десятых： борьба с либералами и поиск места России ⧸ Котомодерн.mp4"
 [ThumbnailsConvertor] Converting thumbnail "d:\Downloads\Youtube\Левое движение десятых： борьба с либералами и поиск места России ⧸ Котомодерн.webp" to png
 [EmbedThumbnail] mutagen: Adding thumbnail to "d:\Downloads\Youtube\Левое движение десятых： борьба с либералами и поиск места России ⧸ Котомодерн.mp4"
+[youtube] Extracting URL: https://www.youtube.com/watch?v=9zcuxqn3WYE
+[youtube] 9zcuxqn3WYE: Downloading webpage
+WARNING: [youtube] No supported JavaScript runtime could be found. Only deno is enabled by default; to use another runtime add  --js-runtimes RUNTIME[:PATH]  to your command/config. YouTube extraction without a JS runtime has been deprecated, and some formats may be missing. See  https://github.com/yt-dlp/yt-dlp/wiki/EJS  for details on installing one
+[youtube] 9zcuxqn3WYE: Downloading android vr player API JSON
+[info] 9zcuxqn3WYE: Downloading 1 format(s): 399+251
+[info] Downloading video thumbnail 41 ...
+[info] Writing video thumbnail 41 to: d:\Downloads\Youtube\Левое движение десятых： борьба с либералами и поиск места России ⧸ Котомодерн.webp
+[download] Destination: d:\Downloads\Youtube\Левое движение десятых： борьба с либералами и поиск места России ⧸ Котомодерн.f399.mp4
+[download] Destination: d:\Downloads\Youtube\Левое движение десятых： борьба с либералами и поиск места России ⧸ Котомодерн.f251.webm
+[Merger] Merging formats into "d:\Downloads\Youtube\Левое движение десятых： борьба с либералами и поиск места России ⧸ Котомодерн.mp4"
+Deleting original file d:\Downloads\Youtube\Левое движение десятых： борьба с либералами и поиск места России ⧸ Котомодерн.f399.mp4 (pass -k to keep)
+Deleting original file d:\Downloads\Youtube\Левое движение десятых： борьба с либералами и поиск места России ⧸ Котомодерн.f251.webm (pass -k to keep)
+[Metadata] Adding metadata to "d:\Downloads\Youtube\Левое движение десятых： борьба с либералами и поиск места России ⧸ Котомодерн.mp4"
+[ThumbnailsConvertor] Converting thumbnail "d:\Downloads\Youtube\Левое движение десятых： борьба с либералами и поиск места России ⧸ Котомодерн.webp" to png
+[EmbedThumbnail] mutagen: Adding thumbnail to "d:\Downloads\Youtube\Левое движение десятых： борьба с либералами и поиск места России ⧸ Котомодерн.mp4"
+[youtube] Extracting URL: https://www.youtube.com/watch?v=9zcuxqn3WYE
+[youtube] 9zcuxqn3WYE: Downloading webpage
+WARNING: [youtube] No supported JavaScript runtime could be found. Only deno is enabled by default; to use another runtime add  --js-runtimes RUNTIME[:PATH]  to your command/config. YouTube extraction without a JS runtime has been deprecated, and some formats may be missing. See  https://github.com/yt-dlp/yt-dlp/wiki/EJS  for details on installing one
+[youtube] 9zcuxqn3WYE: Downloading android vr player API JSON
+[info] 9zcuxqn3WYE: Downloading 1 format(s): 399+251
+[info] Downloading video thumbnail 41 ...
+[info] Writing video thumbnail 41 to: d:\Downloads\Youtube\Левое движение десятых： борьба с либералами и поиск места России ⧸ Котомодерн.webp
+[download] Destination: d:\Downloads\Youtube\Левое движение десятых： борьба с либералами и поиск места России ⧸ Котомодерн.f399.mp4
+[download] Destination: d:\Downloads\Youtube\Левое движение десятых： борьба с либералами и поиск места России ⧸ Котомодерн.f251.webm
+[Merger] Merging formats into "d:\Downloads\Youtube\Левое движение десятых： борьба с либералами и поиск места России ⧸ Котомодерн.mp4"
+Deleting original file d:\Downloads\Youtube\Левое движение десятых： борьба с либералами и поиск места России ⧸ Котомодерн.f399.mp4 (pass -k to keep)
+Deleting original file d:\Downloads\Youtube\Левое движение десятых： борьба с либералами и поиск места России ⧸ Котомодерн.f251.webm (pass -k to keep)
+[Metadata] Adding metadata to "d:\Downloads\Youtube\Левое движение десятых： борьба с либералами и поиск места России ⧸ Котомодерн.mp4"
+[ThumbnailsConvertor] Converting thumbnail "d:\Downloads\Youtube\Левое движение десятых： борьба с либералами и поиск места России ⧸ Котомодерн.webp" to png
+[EmbedThumbnail] mutagen: Adding thumbnail to "d:\Downloads\Youtube\Левое движение десятых： борьба с либералами и поиск места России ⧸ Котомодерн.mp4"

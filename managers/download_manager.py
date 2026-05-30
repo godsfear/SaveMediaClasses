@@ -65,14 +65,17 @@ class DownloadManager:
     def __init__(self,
                  provider_factory: Callable[[], "DownloadProvider"],
                  log_path: str,
-                 bus: EventBus) -> None:
+                 bus: EventBus,
+                 db=None) -> None:
         """
         provider_factory — callable без аргументов, возвращает новый DownloadProvider.
         Пример: lambda: YtDlpProvider(base_dir, tools_dir)
+        db — DownloadRepository для сохранения thumbnail после загрузки (опционально).
         """
         self._provider_factory = provider_factory
         self._log_path         = log_path
         self._bus              = bus
+        self._db               = db
 
         self._semaphore = asyncio.Semaphore(MAX_PARALLEL)
         self._active: Dict[str, DownloadTask] = {}
@@ -186,6 +189,15 @@ class DownloadManager:
                 task_id=task.task_id, success=success, message=message,
                 source=type(provider).__name__,
             ))
+
+            # Скачать thumbnail и сохранить BLOB в БД (только при успехе)
+            if success and self._db is not None and hasattr(provider, "fetch_thumbnail"):
+                try:
+                    thumb_data = await provider.fetch_thumbnail(exe, snap.url)
+                    if thumb_data:
+                        self._db.save_thumbnail(task.task_id, thumb_data)
+                except Exception:
+                    pass
 
     def _finish(self, task: DownloadTask) -> None:
         self._active.pop(task.task_id, None)

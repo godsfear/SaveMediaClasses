@@ -179,3 +179,65 @@ class YtDlpProvider:
     @classmethod
     def post_processing_tags(cls) -> list[str]:
         return cls._POST_TAGS
+
+    async def fetch_thumbnail(self, exe: str, url: str) -> bytes:
+        """
+        Получить thumbnail как JPEG-байты:
+          1. yt-dlp --dump-single-json → берём URL превью
+          2. urllib скачивает байты → возвращаем
+        Возвращает пустые bytes если что-то пошло не так.
+        """
+        import json as _json
+        import urllib.request
+
+        try:
+            startup = None
+            if os.name == "nt":
+                startup = subprocess.STARTUPINFO()
+                startup.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+
+            proc = await asyncio.create_subprocess_exec(
+                exe, "--dump-single-json", "--no-playlist", url,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.DEVNULL,
+                startupinfo=startup,
+            )
+            try:
+                stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=20)
+            except asyncio.TimeoutError:
+                proc.kill()
+                return b""
+
+            if proc.returncode != 0:
+                return b""
+
+            data = _json.loads(stdout.decode("utf-8", errors="replace"))
+
+            # Выбираем лучший thumbnail URL
+            thumb_url = ""
+            thumbnails = data.get("thumbnails") or []
+            if thumbnails:
+                thumb_url = thumbnails[-1].get("url", "")
+            if not thumb_url:
+                thumb_url = data.get("thumbnail", "")
+            if not thumb_url:
+                return b""
+
+            # Скачиваем байты синхронно в executor чтобы не блокировать event loop
+            loop = asyncio.get_event_loop()
+            def _download() -> bytes:
+                req = urllib.request.Request(
+                    thumb_url,
+                    headers={"User-Agent": "Mozilla/5.0"},
+                )
+                with urllib.request.urlopen(req, timeout=10) as resp:
+                    return resp.read()
+
+            raw = await asyncio.wait_for(
+                loop.run_in_executor(None, _download),
+                timeout=15,
+            )
+            return raw if raw else b""
+
+        except Exception:
+            return b""
