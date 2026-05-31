@@ -60,8 +60,9 @@ class ConfigManager:
                 k: tuple(v) for k, v in cfg.get("tool_versions", {}).items()
                 if isinstance(v, (list, tuple)) and len(v) == 3
             },
-            theme  = ThemeConfig.from_dict(raw.get("theme", {})),
-            window = WindowConfig.from_dict(raw.get("window", {})),
+            theme    = ThemeConfig.from_dict(raw.get("theme", {})),
+            window   = WindowConfig.from_dict(raw.get("window", {})),
+            language = str(raw.get("language", "ru")) or "ru",
         )
 
     def load_window_geometry(self) -> WindowConfig:
@@ -98,8 +99,9 @@ class ConfigManager:
                     "ffmpeg_download": state.url_ffmpeg_download,
                 },
             },
-            "window": state.window.to_dict(),
-            "theme":  state.theme.to_dict(),
+            "window":   state.window.to_dict(),
+            "theme":    state.theme.to_dict(),
+            "language": state.language,
         }
         try:
             with open(self.config_file, "w", encoding="utf-8") as f:

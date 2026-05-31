@@ -47,5 +47,6 @@ class AppState:
     tool_versions: Dict[str, tuple] = field(default_factory=dict)
 
     # ── Тема и геометрия — типизированные dataclass вместо Dict ──────────────
-    theme:  ThemeConfig  = field(default_factory=ThemeConfig)
-    window: WindowConfig = field(default_factory=WindowConfig)
+    theme:    ThemeConfig  = field(default_factory=ThemeConfig)
+    window:   WindowConfig = field(default_factory=WindowConfig)
+    language: str          = "ru"
