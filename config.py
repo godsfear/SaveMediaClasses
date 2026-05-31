@@ -84,15 +84,23 @@ class WindowConfig:
 
 # ── UI-метаданные темы (порядок полей для Settings) ──────────────────────────
 
+# THEME_FIELDS: список (field_key, i18n_key)
+# THEME_GROUPS: список (group_i18n_key, [field_key, ...])
 THEME_FIELDS = [
-    ("accent_color",   "Акцент (обводка полей, фокус)"),
-    ("header_color",   "Заголовки секций"),
-    ("switch_color",   "Цвет переключателей"),
-    ("text_color",     "Основной текст / путь к папке"),
-    ("progress_color", "Прогресс-бар и статус"),
-    ("button_color",   "Кнопка «Скачать»"),
-    ("appbar_color",   "Фон шапки AppBar"),
-    ("card_color",     "Фон карточек"),
+    ("accent_color",   "color_accent"),
+    ("header_color",   "color_header"),
+    ("switch_color",   "color_switch"),
+    ("text_color",     "color_text"),
+    ("progress_color", "color_progress"),
+    ("button_color",   "color_button"),
+    ("appbar_color",   "color_appbar"),
+    ("card_color",     "color_card"),
+]
+
+THEME_GROUPS = [
+    ("theme_group_controls", ["accent_color", "header_color", "switch_color",
+                               "text_color", "progress_color", "button_color"]),
+    ("theme_group_surfaces", ["appbar_color", "card_color"]),
 ]
 
 PALETTE = [

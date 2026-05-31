@@ -16,6 +16,7 @@ from events import (
     ToolsCheckedEvent,
     ToolsStatusMessageEvent,
 )
+from locale import Locale, Strings
 from managers.download_manager import DownloadManager, DownloadSnapshot, MAX_PARALLEL
 from services import Services
 from managers.providers import YtDlpProvider as _DefaultProvider
@@ -25,8 +26,9 @@ from state import AppState
 class DownloadCard:
     """Карточка одной загрузки. Только отрисовка — никакой логики."""
 
-    def __init__(self, task_id: str, url: str, on_cancel) -> None:
+    def __init__(self, task_id: str, url: str, on_cancel, s: Strings) -> None:
         self.task_id   = task_id
+        self._s        = s
         self._pct_text = ft.Text("0%", size=11, color=ft.Colors.GREY_400, width=36,
                                  text_align=ft.TextAlign.RIGHT)
         self._bar      = ft.ProgressBar(value=0.0, color=ft.Colors.GREEN,
@@ -35,7 +37,7 @@ class DownloadCard:
                                  expand=True, no_wrap=True, overflow=ft.TextOverflow.ELLIPSIS)
         self._cancel_btn = ft.IconButton(
             icon=ft.Icons.CLOSE_ROUNDED, icon_color=ft.Colors.RED_300,
-            icon_size=16, tooltip="Отменить", on_click=on_cancel
+            icon_size=16, tooltip=s.btn_clear, on_click=on_cancel
         )
         self.container = ft.Container(
             content=ft.Column([
@@ -65,7 +67,7 @@ class DownloadCard:
         self._bar.value      = None
         self._bar.color      = ft.Colors.BLUE_400
         self._pct_text.value = "..."
-        self._status.value   = "Постобработка..."
+        self._status.value   = self._s.status_postprocessing
 
     def set_done(self, success: bool, message: str) -> None:
         self._bar.value          = 1.0 if success else 0.0
@@ -78,26 +80,21 @@ class DownloadCard:
         self._bar.value          = 0.0
         self._bar.color          = ft.Colors.ORANGE
         self._pct_text.value     = "—"
-        self._status.value       = "Отменено"
+        self._status.value       = self._s.status_cancelled
         self._cancel_btn.visible = False
 
     def set_thumbnail(self, data: bytes) -> None:
-        """Вставить thumbnail слева от прогресс-бара."""
         import base64 as _b64
         b64str = "data:image/jpeg;base64," + _b64.b64encode(data).decode()
         img = ft.Container(
-            width=96, height=54,
-            border_radius=4,
+            width=96, height=54, border_radius=4,
             clip_behavior=ft.ClipBehavior.ANTI_ALIAS,
             content=ft.Image(src=b64str, width=96, height=54, fit=ft.BoxFit.COVER),
         )
-        # container.content — Column; первый Row — статус+кнопка, второй — бар+процент
-        # Оборачиваем всё в Row с thumbnail слева
         inner = self.container.content
         self.container.content = ft.Row(
             [img, ft.Column(inner.controls, spacing=4, tight=True, expand=True)],
-            spacing=10,
-            vertical_alignment=ft.CrossAxisAlignment.START,
+            spacing=10, vertical_alignment=ft.CrossAxisAlignment.START,
         )
 
 
@@ -118,6 +115,9 @@ class MainScreen:
         self._subscribe()
         self._build_widgets()
         self._build_layout()
+
+    def _s(self) -> Strings:
+        return Locale.load(self._state.language)
 
     # ── Подписка на шину ──────────────────────────────────────────────────────
 
@@ -158,13 +158,11 @@ class MainScreen:
             self._page.run_task(self._remove_card_after_delay, e.task_id)
 
     def _on_tools_checked(self, e: ToolsCheckedEvent) -> None:
+        s = self._s()
         if e.needs_update:
-            self._show_status(
-                "Доступны обновления скриптов — перейдите в настройки и нажмите «Обновить скрипты»",
-                ft.Colors.ORANGE
-            )
+            self._show_status(s.status_tools_update, ft.Colors.ORANGE)
         else:
-            self._show_status("Все компоненты актуальны", ft.Colors.GREEN_400)
+            self._show_status(s.status_tools_ok, ft.Colors.GREEN_400)
 
     def _on_tools_status_message(self, e: ToolsStatusMessageEvent) -> None:
         self._show_status(e.message, e.color)
@@ -176,20 +174,21 @@ class MainScreen:
     # ── Виджеты ───────────────────────────────────────────────────────────────
 
     def _build_widgets(self) -> None:
+        s = self._s()
         self.folder_label = ft.Text(
-            "Папка не выбрана", color=ft.Colors.GREY_400, size=12,
+            s.folder_not_selected, color=ft.Colors.GREY_400, size=12,
             weight=ft.FontWeight.W_500, expand=True,
             no_wrap=True, overflow=ft.TextOverflow.ELLIPSIS
         )
         self.url_input = ft.TextField(
-            label="URL медиафайла или плейлиста",
-            hint_text="Вставьте ссылку для скачивания...",
+            label=s.url_label,
+            hint_text=s.url_hint,
             expand=True, border_radius=8,
             focused_border_color=ft.Colors.BLUE,
             on_change=self._on_url_change,
             suffix=ft.IconButton(
                 icon=ft.Icons.CANCEL_ROUNDED, icon_color=ft.Colors.GREY_500,
-                icon_size=18, tooltip="Очистить",
+                icon_size=18, tooltip=s.btn_clear,
                 on_click=lambda _: [
                     setattr(self.url_input, "value", ""),
                     self._on_url_change(None),
@@ -197,25 +196,25 @@ class MainScreen:
                 ]
             )
         )
-        self.audio_only_switch      = ft.Switch(label="Только аудио (MP3)", active_color=ft.Colors.GREEN)
-        self.cookies_enabled_switch = ft.Switch(label="Использовать куки",  active_color=ft.Colors.GREEN, value=False)
+        self.audio_only_switch      = ft.Switch(label=s.switch_audio_only, active_color=ft.Colors.GREEN)
+        self.cookies_enabled_switch = ft.Switch(label=s.switch_cookies,    active_color=ft.Colors.GREEN, value=False)
 
         self._btn_icon = ft.Icon(ft.Icons.DOWNLOAD_ROUNDED, color=ft.Colors.WHITE)
-        self._btn_text = ft.Text("Скачать", color=ft.Colors.WHITE, weight=ft.FontWeight.BOLD)
+        self._btn_text = ft.Text(s.btn_download, color=ft.Colors.WHITE, weight=ft.FontWeight.BOLD)
         self.download_btn = ft.Button(
             content=ft.Row([self._btn_icon, self._btn_text], tight=True, spacing=8),
-            bgcolor=ft.Colors.GREEN, tooltip="Начать загрузку",
+            bgcolor=ft.Colors.GREEN, tooltip=s.btn_download_tooltip,
             style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=8), elevation=0),
             on_click=self._on_download_click
         )
 
         self._cards_column = ft.Column(spacing=6)
-        self.header_folder = ft.Text("Папка назначения",     size=14, weight=ft.FontWeight.BOLD, color=ft.Colors.CYAN_400)
-        self.header_main   = ft.Text("Управление загрузкой", size=14, weight=ft.FontWeight.BOLD, color=ft.Colors.CYAN_400)
-        self.header_queue  = ft.Text("Очередь загрузок",     size=14, weight=ft.FontWeight.BOLD, color=ft.Colors.CYAN_400)
+        self.header_folder = ft.Text(s.header_folder,   size=14, weight=ft.FontWeight.BOLD, color=ft.Colors.CYAN_400)
+        self.header_main   = ft.Text(s.header_download, size=14, weight=ft.FontWeight.BOLD, color=ft.Colors.CYAN_400)
+        self.header_queue  = ft.Text(s.header_queue,    size=14, weight=ft.FontWeight.BOLD, color=ft.Colors.CYAN_400)
         self._log_btn = ft.IconButton(
             icon=ft.Icons.RECEIPT_LONG_ROUNDED, icon_color=ft.Colors.GREY_500,
-            icon_size=18, tooltip="Открыть лог",
+            icon_size=18, tooltip=s.btn_open_log,
             on_click=lambda _: self._open_log(os.path.join(self._base_dir, "savemedia.log"))
         )
 
@@ -265,6 +264,24 @@ class MainScreen:
         self._state.audio_only      = bool(self.audio_only_switch.value)
         self._state.cookies_enabled = bool(self.cookies_enabled_switch.value)
 
+    # ── Смена языка ───────────────────────────────────────────────────────────
+
+    def rebuild_for_language(self) -> None:
+        s = self._s()
+        self.header_folder.value  = s.header_folder;   self.header_folder.update()
+        self.header_main.value    = s.header_download; self.header_main.update()
+        self.header_queue.value   = s.header_queue;    self.header_queue.update()
+        self.url_input.label      = s.url_label;       self.url_input.update()
+        self.url_input.hint_text  = s.url_hint
+        self.audio_only_switch.label      = s.switch_audio_only; self.audio_only_switch.update()
+        self.cookies_enabled_switch.label = s.switch_cookies;    self.cookies_enabled_switch.update()
+        self._btn_text.value      = s.btn_download;    self._btn_text.update()
+        self.download_btn.tooltip = s.btn_download_tooltip
+        if self.folder_label.value == self.folder_label.value:  # всегда обновляем если нет пути
+            if not self._state.download_path:
+                self.folder_label.value = s.folder_not_selected
+                self.folder_label.update()
+
     # ── Валидация URL ─────────────────────────────────────────────────────────
 
     def _on_url_change(self, _) -> None:
@@ -280,18 +297,19 @@ class MainScreen:
     # ── Нажатие «Скачать» ────────────────────────────────────────────────────
 
     def _on_download_click(self, _) -> None:
+        s   = self._s()
         url = safe_str(self.url_input.value).strip()
 
         if not url:
-            self._show_status("Ошибка: Ссылка для загрузки пуста!", ft.Colors.RED)
+            self._show_status(s.err_url_empty, ft.Colors.RED)
             return
         if not _DefaultProvider.is_valid_url(url):
-            self._show_status("Ошибка: Ссылка должна начинаться с http:// или https://", ft.Colors.RED)
+            self._show_status(s.err_url_invalid, ft.Colors.RED)
             self.url_input.border_color = ft.Colors.RED_400
             self._safe_update()
             return
         if self._dm.at_capacity:
-            self._show_status(f"Максимум {MAX_PARALLEL} загрузок одновременно", ft.Colors.ORANGE)
+            self._show_status(s.fmt("err_max_parallel", n=MAX_PARALLEL), ft.Colors.ORANGE)
             return
 
         self.sync_to_state()
@@ -312,10 +330,7 @@ class MainScreen:
 
         task_id = self._dm.add(self._page, snapshot)
         if task_id is None:
-            self._show_status(
-                "yt-dlp не найден — перейдите в настройки и нажмите «Обновить скрипты»",
-                ft.Colors.ORANGE
-            )
+            self._show_status(s.status_ytdlp_missing, ft.Colors.ORANGE)
             return
 
         self._add_card(task_id, url)
@@ -330,7 +345,8 @@ class MainScreen:
     def _add_card(self, task_id: str, url: str) -> None:
         card = DownloadCard(
             task_id=task_id, url=url,
-            on_cancel=lambda _: self._dm.cancel(task_id)
+            on_cancel=lambda _: self._dm.cancel(task_id),
+            s=self._s(),
         )
         self._cards[task_id] = card
         self._cards_column.controls.append(card.container)
@@ -343,21 +359,17 @@ class MainScreen:
         self._safe_update()
 
     def _update_download_btn(self) -> None:
+        s = self._s()
         if self._dm.at_capacity:
             self.download_btn.disabled = True
-            self.download_btn.tooltip  = f"Максимум {MAX_PARALLEL} загрузок одновременно"
+            self.download_btn.tooltip  = s.fmt("err_max_parallel", n=MAX_PARALLEL)
         else:
             self.download_btn.disabled = False
-            self.download_btn.tooltip  = "Начать загрузку"
+            self.download_btn.tooltip  = s.btn_download_tooltip
 
     # ── Утилиты ───────────────────────────────────────────────────────────────
 
     async def _fetch_and_show_thumbnail(self, task_id: str, url: str) -> None:
-        """
-        Фоновая задача: получить thumbnail и метаданные параллельно с загрузкой.
-        Сразу показывает thumbnail в живой карточке и сохраняет в БД —
-        чтобы при переходе в историю данные уже были готовы.
-        """
         try:
             from managers.providers import YtDlpProvider
             provider = YtDlpProvider(self._base_dir, self._tools_dir)
@@ -365,13 +377,11 @@ class MainScreen:
             if not exe:
                 return
             thumb_data, meta = await provider.fetch_thumbnail(exe, url)
-            # Сохраняем в БД сразу — не ждём завершения загрузки
             if self._db is not None:
                 if thumb_data:
                     self._db.save_thumbnail(task_id, thumb_data)
                 if meta:
                     self._db.save_meta(task_id, meta)
-            # Обновляем живую карточку
             if thumb_data:
                 card = self._cards.get(task_id)
                 if card:
@@ -381,7 +391,6 @@ class MainScreen:
             pass
 
     def _show_status(self, message: str, color) -> None:
-        """Отобразить сообщение в статус-баре через шину."""
         self._bus.emit(ToolsStatusMessageEvent(message=message, color=color))
 
     @staticmethod

@@ -1,0 +1,214 @@
+"""
+Locale — загрузчик языковых файлов из locale/*.json в типизированный dataclass.
+
+Использование:
+    from locale import Locale
+    strings = Locale.load("ru")
+    print(strings.btn_check)   # "Проверить версии"
+
+Добавить новый язык: положить locale/<code>.json с теми же ключами.
+Добавить новую строку: добавить поле в Strings + ключ во все JSON-файлы.
+"""
+
+import json
+import os
+from dataclasses import dataclass, fields
+
+
+@dataclass
+class Strings:
+    # Заголовки секций
+    section_network:      str = ""
+    section_rules:        str = ""
+    section_deps:         str = ""
+    section_theme:        str = ""
+    section_urls:         str = ""
+    section_appearance:   str = ""
+
+    # Группы цветов
+    theme_group_controls: str = ""
+    theme_group_surfaces: str = ""
+
+    # Поля темы
+    color_accent:    str = ""
+    color_header:    str = ""
+    color_switch:    str = ""
+    color_text:      str = ""
+    color_progress:  str = ""
+    color_button:    str = ""
+    color_appbar:    str = ""
+    color_card:      str = ""
+
+    # Поля настроек
+    proxy_label:        str = ""
+    yt_args_label:      str = ""
+    switch_clean:       str = ""
+    switch_playlist:    str = ""
+    switch_metadata:    str = ""
+    switch_source:      str = ""
+
+    # Куки
+    cookies_label:      str = ""
+    cookies_none:       str = ""
+    cookies_chrome:     str = ""
+    cookies_yandex:     str = ""
+    cookies_firefox:    str = ""
+    cookies_edge:       str = ""
+    cookies_opera:      str = ""
+    cookies_switch_off: str = ""
+    cookies_switch_on:  str = ""  # содержит {browser}
+
+    # Язык
+    language_label:     str = ""
+
+    # Кнопки
+    btn_check:          str = ""
+    btn_update:         str = ""
+    btn_checking:       str = ""
+    btn_updating:       str = ""
+    btn_reset_theme:    str = ""
+    theme_hint:         str = ""
+
+    # Статусы
+    status_waiting:     str = ""
+    status_checking:    str = ""
+    status_ok:          str = ""
+    status_updates:     str = ""
+    status_all_ok:      str = ""  # {mins}
+    status_has_updates: str = ""  # {mins}
+    status_prep:        str = ""
+    status_done_ok:     str = ""
+    status_done_errors: str = ""
+    status_critical:    str = ""  # {err}
+
+    # Инструменты
+    tool_dash:          str = ""  # {name}
+    tool_versions:      str = ""  # {name} {loc} {rem}
+    tool_querying:      str = ""  # {name} {loc}
+
+    # URL поля
+    url_yt_api:          str = ""
+    url_yt_download:     str = ""
+    url_ffmpeg_version:  str = ""
+    url_ffmpeg_download: str = ""
+
+    # main_screen
+    header_folder:        str = ""
+    header_download:      str = ""
+    header_queue:         str = ""
+    folder_not_selected:  str = ""
+    url_label:            str = ""
+    url_hint:             str = ""
+    btn_clear:            str = ""
+    btn_download:         str = ""
+    btn_download_tooltip: str = ""
+    btn_open_log:         str = ""
+    switch_audio_only:    str = ""
+    switch_cookies:       str = ""
+    status_postprocessing: str = ""
+    status_cancelled:     str = ""
+    status_tools_ok:      str = ""
+    status_tools_update:  str = ""
+    status_ytdlp_missing: str = ""
+    err_url_empty:        str = ""
+    err_url_invalid:      str = ""
+    err_max_parallel:     str = ""  # {n}
+
+    # history_screen
+    header_history:       str = ""
+    history_empty:        str = ""
+    filter_all:           str = ""
+    filter_completed:     str = ""
+    filter_failed:        str = ""
+    filter_cancelled:     str = ""
+    btn_refresh:          str = ""
+    btn_open_folder:      str = ""
+    btn_delete_record:    str = ""
+    status_completed:     str = ""
+    status_failed:        str = ""
+    status_running:       str = ""
+    tag_mp3:              str = ""
+    tag_proxy:            str = ""
+    tag_cookies:          str = ""
+    tag_playlist:         str = ""
+    stats_text:           str = ""  # {total} {ok} {fail} {avg}
+    stats_avg:            str = ""  # {n}
+
+    # app.py
+    proxy_on:             str = ""
+    proxy_off:            str = ""
+    proxy_tooltip:        str = ""
+    nav_history:          str = ""
+    appbar_history:       str = ""
+    appbar_settings:      str = ""
+    appbar_main:          str = ""
+    btn_folder:           str = ""
+    btn_exit:             str = ""
+
+    def fmt(self, key: str, **kwargs) -> str:
+        """Получить строку по имени поля и подставить kwargs через format."""
+        text = getattr(self, key, key)
+        if kwargs:
+            try:
+                text = text.format(**kwargs)
+            except (KeyError, ValueError):
+                pass
+        return text
+
+
+class Locale:
+    _cache: dict = {}
+
+    @classmethod
+    def load(cls, lang: str) -> Strings:
+        """
+        Загрузить locale/<lang>.json и вернуть Strings.
+        Результат кэшируется. При отсутствии файла — fallback на 'ru'.
+        """
+        if lang in cls._cache:
+            return cls._cache[lang]
+
+        locale_dir = os.path.join(os.path.dirname(__file__), "locale")
+        path = os.path.join(locale_dir, f"{lang}.json")
+
+        if not os.path.exists(path):
+            if lang != "ru":
+                return cls.load("ru")
+            return Strings()
+
+        try:
+            with open(path, encoding="utf-8") as f:
+                data = json.load(f)
+        except Exception:
+            return Strings()
+
+        # Заполняем только известные поля — лишние ключи в JSON игнорируются
+        known = {f.name for f in fields(Strings)}
+        kwargs = {k: v for k, v in data.items() if k in known}
+        result = Strings(**kwargs)
+        cls._cache[lang] = result
+        return result
+
+    @classmethod
+    def available(cls) -> list[tuple[str, str]]:
+        """
+        Вернуть список (code, native_name) доступных языков.
+        Имя читается из самого JSON (ключ 'language_label' не подходит —
+        используем отдельный ключ '_name' если есть, иначе code).
+        """
+        locale_dir = os.path.join(os.path.dirname(__file__), "locale")
+        result = []
+        try:
+            for fname in sorted(os.listdir(locale_dir)):
+                if fname.endswith(".json"):
+                    code = fname[:-5]
+                    try:
+                        with open(os.path.join(locale_dir, fname), encoding="utf-8") as f:
+                            data = json.load(f)
+                        name = data.get("_name", code)
+                    except Exception:
+                        name = code
+                    result.append((code, name))
+        except Exception:
+            pass
+        return result
