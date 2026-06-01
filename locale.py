@@ -146,6 +146,7 @@ class Strings:
     appbar_main:          str = ""
     btn_folder:           str = ""
     btn_exit:             str = ""
+    folder_select_text:   str = ""
 
     def fmt(self, key: str, **kwargs) -> str:
         """Получить строку по имени поля и подставить kwargs через format."""

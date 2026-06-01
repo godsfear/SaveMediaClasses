@@ -108,7 +108,7 @@ class EventBus:
             try:
                 self._handlers[event_type].remove(handler)
             except (KeyError, ValueError):
-                pass
+                self._log.exception("Unsubscribe failed")
         return unsubscribe
 
     def emit(self, event: object) -> None:

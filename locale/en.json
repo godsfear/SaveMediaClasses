@@ -101,5 +101,6 @@
     "appbar_settings": "Configuration Settings",
     "appbar_main": "SaveMedia [yt-dlp GUI]",
     "btn_folder": "Choose folder",
-    "btn_exit": "Exit"
+    "btn_exit": "Exit",
+    "folder_select_text": "Select a folder to save media"
 }
