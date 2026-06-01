@@ -71,9 +71,10 @@ class SaveMediaApp:
 
         all_headers = [
             main_screen.header_folder, main_screen.header_main, main_screen.header_queue,
-            settings_screen.header_net, settings_screen.header_rules,
-            settings_screen.header_deps, settings_screen.header_theme,
-            settings_screen.header_urls,
+            settings_screen.header_net, settings_screen.header_downloaders,
+            settings_screen.header_cookies, settings_screen.header_ytdlp,
+            settings_screen.header_deps,
+            settings_screen.header_theme, settings_screen.header_appearance,
         ]
         all_switches = [
             main_screen.audio_only_switch, main_screen.cookies_enabled_switch,

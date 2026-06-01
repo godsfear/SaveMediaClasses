@@ -21,10 +21,13 @@ from dataclasses import dataclass, fields
 class Strings:
     # Заголовки секций
     section_network:      str = ""
-    section_rules:        str = ""
+    section_downloaders:  str = ""
+    section_cookies:      str = ""
+    section_ytdlp:        str = ""
+    section_ytdlp_urls:   str = ""
     section_deps:         str = ""
+    section_deps_urls:    str = ""
     section_theme:        str = ""
-    section_urls:         str = ""
     section_appearance:   str = ""
 
     # Группы цветов
