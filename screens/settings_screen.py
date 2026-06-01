@@ -573,7 +573,6 @@ class SettingsScreen:
                     self.clean_titles_switch, self.playlist_switch,
                     self.embed_metadata_switch, self.save_to_source_switch,
                 ], spacing=10),
-                self.yt_status,
                 ft.ExpansionTile(
                     title=self.header_ytdlp_urls,
                     controls=[ft.Container(
@@ -608,8 +607,8 @@ class SettingsScreen:
             ft.Container(
                 content=ft.Column([
                     self.header_deps,
-                    ft.Column([self.ffmpeg_status, self.ffplay_status, self.ffprobe_status],
-                              spacing=6),
+                    ft.Column([self.yt_status, self.ffmpeg_status,
+                               self.ffplay_status, self.ffprobe_status], spacing=6),
                     ft.Row([self.update_btn], alignment=ft.MainAxisAlignment.END),
                     self.progress_bar,
                     self.progress_text,

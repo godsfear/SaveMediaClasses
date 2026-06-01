@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass, field
-from typing import Callable
+from typing import Any, Callable
 
 from app_logging import configure_logging
 from events import EventBus
@@ -75,8 +75,13 @@ class Services:
     # ── Фабричный метод ───────────────────────────────────────────────────────
 
     @staticmethod
-    def create(base_dir: str, safe_update: Callable[[], None]) -> "Services":
-        """Собирает все зависимости в правильном порядке."""
+    def create(
+        base_dir: str,
+        safe_update: Callable[[], None],
+        task_runner: Callable[..., Any],
+    ) -> "Services":
+        """Собирает все зависимости в правильном порядке.
+        task_runner — планировщик coroutine (в app.py: page.run_task)."""
         from managers.providers import YtDlpProvider
 
         tools_dir  = os.path.join(base_dir, "tools")
@@ -93,6 +98,7 @@ class Services:
             provider_factory=lambda: YtDlpProvider(base_dir, tools_dir),
             log_path=os.path.join(base_dir, "savemedia.log"),
             bus=bus,
+            task_runner=task_runner,
             db=db,
         )
 
