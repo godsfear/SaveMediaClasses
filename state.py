@@ -16,6 +16,7 @@ from config import (
     DEFAULT_YT_API_URL, DEFAULT_YT_DOWNLOAD_URL,
     DEFAULT_FFMPEG_VERSION_URL, DEFAULT_FFMPEG_DOWNLOAD_URL,
 )
+from locale import Locale
 
 
 @dataclass
@@ -49,4 +50,4 @@ class AppState:
     # ── Тема и геометрия — типизированные dataclass вместо Dict ──────────────
     theme:    ThemeConfig  = field(default_factory=ThemeConfig)
     window:   WindowConfig = field(default_factory=WindowConfig)
-    language: str          = "ru"
+    language: str          = field(default_factory=Locale.default_language)

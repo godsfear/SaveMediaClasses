@@ -62,7 +62,9 @@ class SettingsScreen:
         s.url_yt_download       = safe_str(self.yt_download_input.value)
         s.url_ffmpeg_version    = safe_str(self.ffmpeg_version_input.value)
         s.url_ffmpeg_download   = safe_str(self.ffmpeg_download_input.value)
-        s.language              = safe_str(self.language_dropdown.value) or "ru"
+        s.language              = Locale.resolve_language(
+            safe_str(self.language_dropdown.value) or Locale.default_language()
+        )
 
     # ── Виджеты ───────────────────────────────────────────────────────────────
 
