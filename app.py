@@ -1,53 +1,41 @@
 import asyncio
-import os
 import time
 
 import flet as ft
 
 from app_logging import get_logger
-from config import CHECK_INTERVAL_HOURS, hex_to_flet
+from config import CHECK_INTERVAL_HOURS
+from controllers import NavigationController, ThemeController, WindowController
 from events import ToolsCheckedEvent, ToolsRestoredEvent, ToolsStatusMessageEvent
-from locale import Locale
 from screens.history_screen import HistoryScreen
 from screens.main_screen import MainScreen
 from screens.settings_screen import SettingsScreen
 from services import Services
+import os
 
 
 class SaveMediaApp:
 
     async def main(self, page: ft.Page) -> None:
         base_dir = os.path.dirname(os.path.abspath(__file__))
-        log = get_logger("app")
+        log      = get_logger("app")
 
+        # ── Тема страницы ─────────────────────────────────────────────────────
         page.theme_mode = ft.ThemeMode.DARK
         page.theme      = ft.Theme(color_scheme_seed=ft.Colors.BLUE)
+        page.title      = "SaveMedia"
+        page.padding    = 15
+        page.safe_area  = True
 
+        # ── safe_update ───────────────────────────────────────────────────────
         def safe_update():
             try:
                 page.update()
             except Exception:
                 log.exception("Failed to page.update")
 
-        # ── DI + геометрия окна до page.add (без второго create — тот же state.window) ──
+        # ── DI ────────────────────────────────────────────────────────────────
         svc = Services.create(base_dir, safe_update, page.run_task)
-        geo = svc.state.window
-        page.window.width  = geo.width
-        page.window.height = geo.height
-        page.window.left   = geo.left
-        page.window.top    = geo.top
-        page.window.icon   = "SaveMedia.png"
-
-        if page.platform in [ft.PagePlatform.WINDOWS, ft.PagePlatform.MACOS, ft.PagePlatform.LINUX]:
-            page.window.min_width     = 500
-            page.window.min_height    = 550
-            page.window.prevent_close = True
-            page.window.visible       = False
-
-        page.update()
-        page.title     = "SaveMedia"
-        page.padding   = 15
-        page.safe_area = True
 
         # ── Экраны ────────────────────────────────────────────────────────────
         main_screen     = MainScreen(page, svc)
@@ -58,236 +46,99 @@ class SaveMediaApp:
         settings_screen.sync_from_state()
         settings_screen.refresh_theme_fields()
 
-        # ── Сохранение ────────────────────────────────────────────────────────
-
+        # ── Сохранение (экраны → state → диск) ───────────────────────────────
         def save_config():
             main_screen.sync_to_state()
             settings_screen.sync_to_state()
-            svc.save_config(page)
+            svc.config_mgr.save(svc.state)
 
-        # ── Тема ──────────────────────────────────────────────────────────────
+        # ── Контроллеры ───────────────────────────────────────────────────────
+        window_ctrl = WindowController(page, svc, on_save=save_config)
 
-        def apply_theme():
-            t = svc.state.theme
-            main_screen.apply_theme(t)
-            settings_screen.apply_theme(t)
-            history_screen.apply_theme(t)
-            if page.appbar:
-                page.appbar.bgcolor = hex_to_flet(t.appbar_color)
+        theme_ctrl = ThemeController(
+            page, svc,
+            screens=[main_screen, settings_screen, history_screen],
+        )
 
-        _s0 = Locale.load(svc.state.language)
-        folder_picker_title = _s0.folder_select_text
+        nav_ctrl = NavigationController(
+            page, svc,
+            main_screen=main_screen,
+            settings_screen=settings_screen,
+            history_screen=history_screen,
+            theme_ctrl=theme_ctrl,
+            window_ctrl=window_ctrl,
+            on_save=save_config,
+        )
 
+        # ── Подписки Settings → контроллеры ──────────────────────────────────
         def _on_lang_changed():
-            nonlocal folder_picker_title
-            s = Locale.load(svc.state.language)
-            folder_picker_title = s.folder_select_text
             settings_screen.rebuild_for_language()
             main_screen.rebuild_for_language()
             history_screen.rebuild_for_language()
-            # Обновляем tooltip кнопок тулбара
-            settings_btn.tooltip = s.appbar_settings
-            history_btn.tooltip  = s.nav_history
-            folder_btn.tooltip   = s.btn_folder
-            exit_btn.tooltip     = s.btn_exit
-            update_proxy_button_ui()
-            # Обновляем заголовок AppBar текущего экрана
-            if page.appbar:
-                if history_screen.layout.visible:
-                    page.appbar.title.value = s.appbar_history
-                elif settings_screen.layout.visible:
-                    page.appbar.title.value = s.appbar_settings
-                else:
-                    page.appbar.title.value = s.appbar_main
+            nav_ctrl.on_language_changed()
             safe_update()
 
         settings_screen.set_on_language_changed(_on_lang_changed)
-        settings_screen.set_on_theme_changed(apply_theme)
+        settings_screen.set_on_theme_changed(theme_ctrl.apply)
         settings_screen.set_on_settings_changed(save_config)
 
         # ── Подписки на шину ──────────────────────────────────────────────────
-
-        status_bar_text = ft.Text("", size=12, color=ft.Colors.GREEN_400)
-
         def _on_tools_checked(e: ToolsCheckedEvent) -> None:
             svc.state.last_check_time   = time.time()
             svc.state.last_needs_update = e.needs_update
             save_config()
 
         def _on_status_message(e: ToolsStatusMessageEvent) -> None:
-            status_bar_text.value = e.message
-            status_bar_text.color = e.color
+            nav_ctrl.status_bar_text.value = e.message
+            nav_ctrl.status_bar_text.color = e.color
             safe_update()
-
-        _pending_restored: list = []
 
         def _on_tools_restored(e: ToolsRestoredEvent) -> None:
             settings_screen.on_tools_restored(e)
-            _pending_restored.clear()
-            _pending_restored.append(e)
+            nav_ctrl.on_tools_restored_pending(e)
 
         svc.bus.on(ToolsCheckedEvent,       _on_tools_checked)
         svc.bus.on(ToolsStatusMessageEvent, _on_status_message)
         svc.bus.on(ToolsRestoredEvent,      _on_tools_restored)
 
-        # ── Кнопки тулбара ────────────────────────────────────────────────────
+        # ── Инициализация окна и AppBar ───────────────────────────────────────
+        window_ctrl.apply_geometry()
+        page.update()
 
-        def update_proxy_button_ui():
-            s = Locale.load(svc.state.language)
-            if svc.state.proxy_enabled:
-                proxy_btn.icon       = ft.Icons.SHIELD_ROUNDED
-                proxy_btn.icon_color = ft.Colors.GREEN_400
-                proxy_btn.tooltip    = s.proxy_on
-            else:
-                proxy_btn.icon       = ft.Icons.SHIELD_OUTLINED
-                proxy_btn.icon_color = ft.Colors.WHITE
-                proxy_btn.tooltip    = s.proxy_off
-
-        def update_cookies_ui():
-            settings_screen.update_cookies_ui(main_screen.cookies_enabled_switch)
-
-        history_btn  = ft.IconButton(icon=ft.Icons.HISTORY_ROUNDED, icon_color=ft.Colors.WHITE, tooltip=_s0.nav_history)
-        folder_btn   = ft.IconButton(icon=ft.Icons.FOLDER_OPEN_ROUNDED, icon_color=ft.Colors.WHITE, tooltip=_s0.btn_folder)
-        proxy_btn    = ft.IconButton(icon=ft.Icons.SHIELD_OUTLINED,     icon_color=ft.Colors.WHITE, tooltip=_s0.proxy_tooltip)
-        settings_btn = ft.IconButton(icon=ft.Icons.SETTINGS_ROUNDED,    icon_color=ft.Colors.WHITE, tooltip=_s0.appbar_settings)
-        exit_btn     = ft.IconButton(icon=ft.Icons.POWER_SETTINGS_NEW_ROUNDED, icon_color=ft.Colors.RED_400, tooltip=_s0.btn_exit)
-
-        async def force_exit_app(_):
-            try:
-                save_config()
-            except Exception:
-                log.exception("Failed to save config before exit")
-            page.window.prevent_close = False
-            page.window.on_event      = None
-            page.update()
-            await page.window.destroy()
-
-        exit_btn.on_click = force_exit_app
-
-        # ── Навигация ─────────────────────────────────────────────────────────
-
-        main_status_container = ft.Container(
-            content=status_bar_text, padding=ft.Padding(left=10, right=10)
-        )
-        settings_status_container = ft.Container(
-            content=ft.Column([settings_screen.progress_text, settings_screen.progress_bar],
-                              spacing=4, tight=True),
-            padding=ft.Padding(left=10, right=10)
-        )
-
-        def show_history(_):
-            main_screen.layout.visible     = False
-            settings_screen.layout.visible = False
-            history_screen.layout.visible  = True
-            history_screen.refresh()
-            page.appbar = ft.AppBar(
-                title=ft.Text(Locale.load(svc.state.language).appbar_history, size=18, weight=ft.FontWeight.W_600),
-                bgcolor=hex_to_flet(svc.state.theme.appbar_color),
-                leading=ft.IconButton(
-                    icon=ft.Icons.ARROW_BACK_IOS_NEW_ROUNDED, icon_color=ft.Colors.WHITE,
-                    icon_size=16, on_click=show_main
-                )
-            )
-            page.bottom_appbar.content = ft.Container(height=0)
-            safe_update()
-
-        def show_settings(_):
-            main_screen.layout.visible     = False
-            history_screen.layout.visible  = False
-            settings_screen.layout.visible = True
-            if _pending_restored:
-                settings_screen.on_tools_restored(_pending_restored[-1])
-            page.appbar = ft.AppBar(
-                title=ft.Text(Locale.load(svc.state.language).appbar_settings, size=18, weight=ft.FontWeight.W_600),
-                bgcolor=hex_to_flet(svc.state.theme.appbar_color),
-                leading=ft.IconButton(
-                    icon=ft.Icons.ARROW_BACK_IOS_NEW_ROUNDED, icon_color=ft.Colors.WHITE,
-                    icon_size=16, on_click=show_main
-                )
-            )
-            page.bottom_appbar.content = settings_status_container
-            safe_update()
-
-        def show_main(_):
-            save_config()
-            update_cookies_ui()
-            main_screen.layout.visible     = True
-            settings_screen.layout.visible = False
-            history_screen.layout.visible  = False
-            page.appbar = ft.AppBar(
-                title=ft.Text("SaveMedia [yt-dlp GUI]", size=18, weight=ft.FontWeight.W_600),
-                bgcolor=hex_to_flet(svc.state.theme.appbar_color),
-                actions=[settings_btn, history_btn, proxy_btn, folder_btn, exit_btn]
-            )
-            page.bottom_appbar.content = main_status_container
-            safe_update()
-
-        async def open_folder_picker(_):
-            path = await ft.FilePicker().get_directory_path(dialog_title=folder_picker_title)
-            if path:
-                svc.state.download_path        = str(path)
-                main_screen.folder_label.value = str(path)
-                main_screen.folder_label.color = ft.Colors.GREEN_400
-                try: os.makedirs(svc.state.download_path, exist_ok=True)
-                except Exception:
-                    log.exception("Failed to create selected download directory: %s", svc.state.download_path)
-                save_config()
-                safe_update()
-
-        def toggle_proxy(_):
-            svc.state.proxy_enabled = not svc.state.proxy_enabled
-            update_proxy_button_ui()
-            save_config()
-            safe_update()
-
-        folder_btn.on_click   = open_folder_picker
-        proxy_btn.on_click    = toggle_proxy
-        settings_btn.on_click = show_settings
-        history_btn.on_click  = show_history
-
-        # ── Закрытие окна ─────────────────────────────────────────────────────
-
-        async def handle_window_event(e):
-            ev = str(getattr(e, "type", None) or getattr(e, "data", None)).lower()
-            if "close" in ev:
-                try:
-                    save_config()
-                except Exception:
-                    log.exception("Failed to save config before window close")
-                page.window.prevent_close = False
-                page.window.on_event      = None
-                page.update()
-                await page.window.destroy()
-
-        page.window.on_event = handle_window_event
-
-        # ── AppBar / BottomAppBar ─────────────────────────────────────────────
         page.appbar = ft.AppBar(
             title=ft.Text("SaveMedia [yt-dlp GUI]", size=18, weight=ft.FontWeight.W_600),
             bgcolor="#1c1c1c",
-            actions=[settings_btn, history_btn, proxy_btn, folder_btn, exit_btn]
+            actions=[
+                nav_ctrl.settings_btn, nav_ctrl.history_btn,
+                nav_ctrl.proxy_btn, nav_ctrl.folder_btn, nav_ctrl.exit_btn,
+            ],
         )
-        page.bottom_appbar = ft.BottomAppBar(content=main_status_container, bgcolor="#141414")
+        page.bottom_appbar = ft.BottomAppBar(
+            content=nav_ctrl.main_status_container, bgcolor="#141414"
+        )
+
+        window_ctrl.register_close_handler()
 
         # ── Финальная инициализация ───────────────────────────────────────────
-        update_proxy_button_ui()
-        update_cookies_ui()
-        apply_theme()
+        nav_ctrl.update_proxy_ui()
+        nav_ctrl.update_cookies_ui()
+        theme_ctrl.apply()
         page.add(main_screen.layout, settings_screen.layout, history_screen.layout)
 
-        if page.platform in [ft.PagePlatform.WINDOWS, ft.PagePlatform.MACOS, ft.PagePlatform.LINUX]:
-            page.window.visible = True
+        window_ctrl.reveal()
         page.update()
 
         await asyncio.sleep(0.1)
 
         # ── Фоновая проверка версий ───────────────────────────────────────────
-        now = time.time()
+        now         = time.time()
         force_check = not svc.state.tool_versions
         if force_check or now - svc.state.last_check_time >= CHECK_INTERVAL_HOURS * 3600:
             page.run_task(settings_screen.check_tools)
         else:
-            mins_left = int((CHECK_INTERVAL_HOURS * 3600 - (now - svc.state.last_check_time)) / 60)
+            mins_left = int(
+                (CHECK_INTERVAL_HOURS * 3600 - (now - svc.state.last_check_time)) / 60
+            )
             svc.bus.emit(ToolsRestoredEvent(
                 needs_update=svc.state.last_needs_update,
                 tool_versions=svc.state.tool_versions,
