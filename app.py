@@ -184,7 +184,7 @@ class SaveMediaApp:
         history_btn  = ft.IconButton(icon=ft.Icons.HISTORY_ROUNDED, icon_color=ft.Colors.WHITE, tooltip=_s0.nav_history)
         folder_btn   = ft.IconButton(icon=ft.Icons.FOLDER_OPEN_ROUNDED, icon_color=ft.Colors.WHITE, tooltip=_s0.btn_folder)
         proxy_btn    = ft.IconButton(icon=ft.Icons.SHIELD_OUTLINED,     icon_color=ft.Colors.WHITE, tooltip=_s0.proxy_tooltip)
-        settings_btn = ft.IconButton(icon=ft.Icons.SETTINGS_ROUNDED,    icon_color=ft.Colors.WHITE, tooltip="Настройки")
+        settings_btn = ft.IconButton(icon=ft.Icons.SETTINGS_ROUNDED,    icon_color=ft.Colors.WHITE, tooltip=_s0.appbar_settings)
         exit_btn     = ft.IconButton(icon=ft.Icons.POWER_SETTINGS_NEW_ROUNDED, icon_color=ft.Colors.RED_400, tooltip=_s0.btn_exit)
 
         async def force_exit_app(_):
