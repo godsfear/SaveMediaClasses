@@ -39,3 +39,188 @@
 2026-06-01 18:09:09 [INFO] [yt-dlp] [Metadata] Adding metadata to "d:\Downloads\Youtube\X-files ИРЛ - Что происходит с файлами пришельцев？ [netstalkers].mp4"
 2026-06-01 18:09:09 [INFO] [yt-dlp] [ThumbnailsConvertor] Converting thumbnail "d:\Downloads\Youtube\X-files ИРЛ - Что происходит с файлами пришельцев？ [netstalkers].webp" to png
 2026-06-01 18:09:10 [INFO] [yt-dlp] [EmbedThumbnail] mutagen: Adding thumbnail to "d:\Downloads\Youtube\X-files ИРЛ - Что происходит с файлами пришельцев？ [netstalkers].mp4"
+2026-06-01 18:54:59 [INFO] [yt-dlp] [youtube:tab] Extracting URL: https://www.youtube.com/watch?v=OjETibEMbJY&list=RDOjETibEMbJY&start_radio=1
+2026-06-01 18:54:59 [INFO] [yt-dlp] [youtube:tab] Downloading playlist RDOjETibEMbJY - add --no-playlist to download just the video OjETibEMbJY
+2026-06-01 18:54:59 [INFO] [yt-dlp] [youtube:tab] RDOjETibEMbJY: Downloading webpage
+2026-06-01 18:55:01 [INFO] [yt-dlp] [download] Downloading playlist: Mix - Kylie Minogue - In Your Eyes (Official Video) [Full HD Remastered]
+2026-06-01 18:55:01 [INFO] [yt-dlp] [youtube:tab] RDOjETibEMbJY page 1: Downloading API JSON
+2026-06-01 18:55:02 [INFO] [yt-dlp] [youtube:tab] RDOjETibEMbJY page 2: Downloading API JSON
+2026-06-01 18:55:03 [INFO] [yt-dlp] [youtube:tab] RDOjETibEMbJY page 3: Downloading API JSON
+2026-06-01 18:55:04 [INFO] [yt-dlp] [youtube:tab] RDOjETibEMbJY page 4: Downloading API JSON
+2026-06-01 18:55:05 [INFO] [yt-dlp] [youtube:tab] RDOjETibEMbJY page 5: Downloading API JSON
+2026-06-01 18:55:06 [INFO] [yt-dlp] [youtube:tab] RDOjETibEMbJY page 6: Downloading API JSON
+2026-06-01 18:55:08 [INFO] [yt-dlp] [youtube:tab] RDOjETibEMbJY page 7: Downloading API JSON
+2026-06-01 18:55:09 [INFO] [yt-dlp] [youtube:tab] RDOjETibEMbJY page 8: Downloading API JSON
+2026-06-01 18:55:10 [INFO] [yt-dlp] [youtube:tab] RDOjETibEMbJY page 9: Downloading API JSON
+2026-06-01 18:55:11 [INFO] [yt-dlp] [youtube:tab] RDOjETibEMbJY page 10: Downloading API JSON
+2026-06-01 18:55:12 [INFO] [yt-dlp] [youtube:tab] RDOjETibEMbJY page 11: Downloading API JSON
+2026-06-01 18:55:13 [INFO] [yt-dlp] [youtube:tab] RDOjETibEMbJY page 12: Downloading API JSON
+2026-06-01 18:55:14 [INFO] [yt-dlp] [youtube:tab] RDOjETibEMbJY page 13: Downloading API JSON
+2026-06-01 18:55:15 [INFO] [yt-dlp] [youtube:tab] RDOjETibEMbJY page 14: Downloading API JSON
+2026-06-01 18:55:16 [INFO] [yt-dlp] [youtube:tab] RDOjETibEMbJY page 15: Downloading API JSON
+2026-06-01 18:55:16 [INFO] [yt-dlp] [info] There are no playlist thumbnails to download
+2026-06-01 18:55:16 [INFO] [yt-dlp] [youtube:tab] Playlist Mix - Kylie Minogue - In Your Eyes (Official Video) [Full HD Remastered]: Downloading 318 items of 318
+2026-06-01 18:55:16 [INFO] [yt-dlp] [download] Downloading item 1 of 318
+2026-06-01 18:55:16 [INFO] [yt-dlp] [youtube] Extracting URL: https://www.youtube.com/watch?v=OjETibEMbJY
+2026-06-01 18:55:16 [INFO] [yt-dlp] [youtube] OjETibEMbJY: Downloading webpage
+2026-06-01 18:55:18 [INFO] [yt-dlp] WARNING: [youtube] No supported JavaScript runtime could be found. Only deno is enabled by default; to use another runtime add  --js-runtimes RUNTIME[:PATH]  to your command/config. YouTube extraction without a JS runtime has been deprecated, and some formats may be missing. See  https://github.com/yt-dlp/yt-dlp/wiki/EJS  for details on installing one
+2026-06-01 18:55:18 [INFO] [yt-dlp] [youtube] OjETibEMbJY: Downloading android vr player API JSON
+2026-06-01 18:55:18 [INFO] [yt-dlp] [info] OjETibEMbJY: Downloading 1 format(s): 399+251
+2026-06-01 18:55:18 [INFO] [yt-dlp] [info] Downloading video thumbnail 41 ...
+2026-06-01 18:55:19 [INFO] [yt-dlp] [info] Writing video thumbnail 41 to: d:\Downloads\Youtube\Mix - Kylie Minogue - In Your Eyes (Official Video) [Full HD Remastered]\001 - Kylie Minogue - In Your Eyes (Official Video) [Full HD Remastered].webp
+2026-06-01 18:55:19 [INFO] [yt-dlp] [download] Destination: d:\Downloads\Youtube\Mix - Kylie Minogue - In Your Eyes (Official Video) [Full HD Remastered]\001 - Kylie Minogue - In Your Eyes (Official Video) [Full HD Remastered].f399.mp4
+2026-06-01 18:55:21 [INFO] [yt-dlp] [download] Destination: d:\Downloads\Youtube\Mix - Kylie Minogue - In Your Eyes (Official Video) [Full HD Remastered]\001 - Kylie Minogue - In Your Eyes (Official Video) [Full HD Remastered].f251.webm
+2026-06-01 18:55:21 [INFO] [yt-dlp] [Merger] Merging formats into "d:\Downloads\Youtube\Mix - Kylie Minogue - In Your Eyes (Official Video) [Full HD Remastered]\001 - Kylie Minogue - In Your Eyes (Official Video) [Full HD Remastered].mp4"
+2026-06-01 18:55:21 [INFO] [yt-dlp] Deleting original file d:\Downloads\Youtube\Mix - Kylie Minogue - In Your Eyes (Official Video) [Full HD Remastered]\001 - Kylie Minogue - In Your Eyes (Official Video) [Full HD Remastered].f251.webm (pass -k to keep)
+2026-06-01 18:55:21 [INFO] [yt-dlp] Deleting original file d:\Downloads\Youtube\Mix - Kylie Minogue - In Your Eyes (Official Video) [Full HD Remastered]\001 - Kylie Minogue - In Your Eyes (Official Video) [Full HD Remastered].f399.mp4 (pass -k to keep)
+2026-06-01 18:55:21 [INFO] [yt-dlp] [Metadata] Adding metadata to "d:\Downloads\Youtube\Mix - Kylie Minogue - In Your Eyes (Official Video) [Full HD Remastered]\001 - Kylie Minogue - In Your Eyes (Official Video) [Full HD Remastered].mp4"
+2026-06-01 18:55:22 [INFO] [yt-dlp] [ThumbnailsConvertor] Converting thumbnail "d:\Downloads\Youtube\Mix - Kylie Minogue - In Your Eyes (Official Video) [Full HD Remastered]\001 - Kylie Minogue - In Your Eyes (Official Video) [Full HD Remastered].webp" to png
+2026-06-01 18:55:22 [INFO] [yt-dlp] [EmbedThumbnail] mutagen: Adding thumbnail to "d:\Downloads\Youtube\Mix - Kylie Minogue - In Your Eyes (Official Video) [Full HD Remastered]\001 - Kylie Minogue - In Your Eyes (Official Video) [Full HD Remastered].mp4"
+2026-06-01 18:55:22 [INFO] [yt-dlp] [download] Downloading item 2 of 318
+2026-06-01 18:55:22 [INFO] [yt-dlp] [youtube] Extracting URL: https://www.youtube.com/watch?v=wf421JsG004
+2026-06-01 18:55:22 [INFO] [yt-dlp] [youtube] wf421JsG004: Downloading webpage
+2026-06-01 18:55:24 [INFO] [yt-dlp] WARNING: [youtube] No supported JavaScript runtime could be found. Only deno is enabled by default; to use another runtime add  --js-runtimes RUNTIME[:PATH]  to your command/config. YouTube extraction without a JS runtime has been deprecated, and some formats may be missing. See  https://github.com/yt-dlp/yt-dlp/wiki/EJS  for details on installing one
+2026-06-01 18:55:24 [INFO] [yt-dlp] [youtube] wf421JsG004: Downloading android vr player API JSON
+2026-06-01 18:55:24 [INFO] [yt-dlp] [info] wf421JsG004: Downloading 1 format(s): 399+251
+2026-06-01 18:55:24 [INFO] [yt-dlp] [info] Downloading video thumbnail 41 ...
+2026-06-01 18:55:24 [INFO] [yt-dlp] [info] Writing video thumbnail 41 to: d:\Downloads\Youtube\Mix - Kylie Minogue - In Your Eyes (Official Video) [Full HD Remastered]\002 - Kylie Minogue - Love At First Sight (Official Video) [Full HD Remastered].webp
+2026-06-01 18:55:24 [INFO] [yt-dlp] [download] Destination: d:\Downloads\Youtube\Mix - Kylie Minogue - In Your Eyes (Official Video) [Full HD Remastered]\002 - Kylie Minogue - Love At First Sight (Official Video) [Full HD Remastered].f399.mp4
+2026-06-01 18:55:26 [INFO] [yt-dlp] [download] Destination: d:\Downloads\Youtube\Mix - Kylie Minogue - In Your Eyes (Official Video) [Full HD Remastered]\002 - Kylie Minogue - Love At First Sight (Official Video) [Full HD Remastered].f251.webm
+2026-06-01 18:55:26 [INFO] [yt-dlp] [Merger] Merging formats into "d:\Downloads\Youtube\Mix - Kylie Minogue - In Your Eyes (Official Video) [Full HD Remastered]\002 - Kylie Minogue - Love At First Sight (Official Video) [Full HD Remastered].mp4"
+2026-06-01 18:55:26 [INFO] [yt-dlp] Deleting original file d:\Downloads\Youtube\Mix - Kylie Minogue - In Your Eyes (Official Video) [Full HD Remastered]\002 - Kylie Minogue - Love At First Sight (Official Video) [Full HD Remastered].f399.mp4 (pass -k to keep)
+2026-06-01 18:55:26 [INFO] [yt-dlp] Deleting original file d:\Downloads\Youtube\Mix - Kylie Minogue - In Your Eyes (Official Video) [Full HD Remastered]\002 - Kylie Minogue - Love At First Sight (Official Video) [Full HD Remastered].f251.webm (pass -k to keep)
+2026-06-01 18:55:26 [INFO] [yt-dlp] [Metadata] Adding metadata to "d:\Downloads\Youtube\Mix - Kylie Minogue - In Your Eyes (Official Video) [Full HD Remastered]\002 - Kylie Minogue - Love At First Sight (Official Video) [Full HD Remastered].mp4"
+2026-06-01 18:55:26 [INFO] [yt-dlp] [ThumbnailsConvertor] Converting thumbnail "d:\Downloads\Youtube\Mix - Kylie Minogue - In Your Eyes (Official Video) [Full HD Remastered]\002 - Kylie Minogue - Love At First Sight (Official Video) [Full HD Remastered].webp" to png
+2026-06-01 18:55:27 [INFO] [yt-dlp] [EmbedThumbnail] mutagen: Adding thumbnail to "d:\Downloads\Youtube\Mix - Kylie Minogue - In Your Eyes (Official Video) [Full HD Remastered]\002 - Kylie Minogue - Love At First Sight (Official Video) [Full HD Remastered].mp4"
+2026-06-01 18:55:27 [INFO] [yt-dlp] [download] Downloading item 3 of 318
+2026-06-01 18:55:27 [INFO] [yt-dlp] [youtube] Extracting URL: https://www.youtube.com/watch?v=t1DWBKk5xHQ
+2026-06-01 18:55:27 [INFO] [yt-dlp] [youtube] t1DWBKk5xHQ: Downloading webpage
+2026-06-01 18:55:28 [INFO] [yt-dlp] WARNING: [youtube] No supported JavaScript runtime could be found. Only deno is enabled by default; to use another runtime add  --js-runtimes RUNTIME[:PATH]  to your command/config. YouTube extraction without a JS runtime has been deprecated, and some formats may be missing. See  https://github.com/yt-dlp/yt-dlp/wiki/EJS  for details on installing one
+2026-06-01 18:55:28 [INFO] [yt-dlp] [youtube] t1DWBKk5xHQ: Downloading android vr player API JSON
+2026-06-01 18:55:28 [INFO] [yt-dlp] [info] t1DWBKk5xHQ: Downloading 1 format(s): 398+251
+2026-06-01 18:55:28 [INFO] [yt-dlp] [info] Downloading video thumbnail 46 ...
+2026-06-01 18:55:28 [INFO] [yt-dlp] [info] Writing video thumbnail 46 to: d:\Downloads\Youtube\Mix - Kylie Minogue - In Your Eyes (Official Video) [Full HD Remastered]\003 - Kylie Minogue - Spinning Around (Official Video).webp
+2026-06-01 18:55:28 [INFO] [yt-dlp] [download] Destination: d:\Downloads\Youtube\Mix - Kylie Minogue - In Your Eyes (Official Video) [Full HD Remastered]\003 - Kylie Minogue - Spinning Around (Official Video).f398.mp4
+2026-06-01 18:55:30 [INFO] [yt-dlp] [download] Destination: d:\Downloads\Youtube\Mix - Kylie Minogue - In Your Eyes (Official Video) [Full HD Remastered]\003 - Kylie Minogue - Spinning Around (Official Video).f251.webm
+2026-06-01 18:55:30 [INFO] [yt-dlp] [Merger] Merging formats into "d:\Downloads\Youtube\Mix - Kylie Minogue - In Your Eyes (Official Video) [Full HD Remastered]\003 - Kylie Minogue - Spinning Around (Official Video).mp4"
+2026-06-01 18:55:30 [INFO] [yt-dlp] Deleting original file d:\Downloads\Youtube\Mix - Kylie Minogue - In Your Eyes (Official Video) [Full HD Remastered]\003 - Kylie Minogue - Spinning Around (Official Video).f251.webm (pass -k to keep)
+2026-06-01 18:55:30 [INFO] [yt-dlp] Deleting original file d:\Downloads\Youtube\Mix - Kylie Minogue - In Your Eyes (Official Video) [Full HD Remastered]\003 - Kylie Minogue - Spinning Around (Official Video).f398.mp4 (pass -k to keep)
+2026-06-01 18:55:30 [INFO] [yt-dlp] [Metadata] Adding metadata to "d:\Downloads\Youtube\Mix - Kylie Minogue - In Your Eyes (Official Video) [Full HD Remastered]\003 - Kylie Minogue - Spinning Around (Official Video).mp4"
+2026-06-01 18:55:31 [INFO] [yt-dlp] [ThumbnailsConvertor] Converting thumbnail "d:\Downloads\Youtube\Mix - Kylie Minogue - In Your Eyes (Official Video) [Full HD Remastered]\003 - Kylie Minogue - Spinning Around (Official Video).webp" to png
+2026-06-01 18:55:31 [INFO] [yt-dlp] [EmbedThumbnail] mutagen: Adding thumbnail to "d:\Downloads\Youtube\Mix - Kylie Minogue - In Your Eyes (Official Video) [Full HD Remastered]\003 - Kylie Minogue - Spinning Around (Official Video).mp4"
+2026-06-01 18:55:31 [INFO] [yt-dlp] [download] Downloading item 4 of 318
+2026-06-01 18:55:31 [INFO] [yt-dlp] [youtube] Extracting URL: https://www.youtube.com/watch?v=63vqob-MljQ
+2026-06-01 18:55:31 [INFO] [yt-dlp] [youtube] 63vqob-MljQ: Downloading webpage
+2026-06-01 18:55:32 [INFO] [yt-dlp] WARNING: [youtube] No supported JavaScript runtime could be found. Only deno is enabled by default; to use another runtime add  --js-runtimes RUNTIME[:PATH]  to your command/config. YouTube extraction without a JS runtime has been deprecated, and some formats may be missing. See  https://github.com/yt-dlp/yt-dlp/wiki/EJS  for details on installing one
+2026-06-01 18:55:32 [INFO] [yt-dlp] [youtube] 63vqob-MljQ: Downloading android vr player API JSON
+2026-06-01 18:55:32 [INFO] [yt-dlp] [info] 63vqob-MljQ: Downloading 1 format(s): 399+251
+2026-06-01 18:55:32 [INFO] [yt-dlp] [info] Downloading video thumbnail 41 ...
+2026-06-01 18:55:32 [INFO] [yt-dlp] [info] Writing video thumbnail 41 to: d:\Downloads\Youtube\Mix - Kylie Minogue - In Your Eyes (Official Video) [Full HD Remastered]\004 - Kylie Minogue - Come Into My World (Official Video) [Full HD Remastered].webp
+2026-06-01 18:55:32 [INFO] [yt-dlp] [download] Destination: d:\Downloads\Youtube\Mix - Kylie Minogue - In Your Eyes (Official Video) [Full HD Remastered]\004 - Kylie Minogue - Come Into My World (Official Video) [Full HD Remastered].f399.mp4
+2026-06-01 18:55:35 [INFO] [yt-dlp] [download] Destination: d:\Downloads\Youtube\Mix - Kylie Minogue - In Your Eyes (Official Video) [Full HD Remastered]\004 - Kylie Minogue - Come Into My World (Official Video) [Full HD Remastered].f251.webm
+2026-06-01 18:55:35 [INFO] [yt-dlp] [Merger] Merging formats into "d:\Downloads\Youtube\Mix - Kylie Minogue - In Your Eyes (Official Video) [Full HD Remastered]\004 - Kylie Minogue - Come Into My World (Official Video) [Full HD Remastered].mp4"
+2026-06-01 18:55:35 [INFO] [yt-dlp] Deleting original file d:\Downloads\Youtube\Mix - Kylie Minogue - In Your Eyes (Official Video) [Full HD Remastered]\004 - Kylie Minogue - Come Into My World (Official Video) [Full HD Remastered].f399.mp4 (pass -k to keep)
+2026-06-01 18:55:35 [INFO] [yt-dlp] Deleting original file d:\Downloads\Youtube\Mix - Kylie Minogue - In Your Eyes (Official Video) [Full HD Remastered]\004 - Kylie Minogue - Come Into My World (Official Video) [Full HD Remastered].f251.webm (pass -k to keep)
+2026-06-01 18:55:35 [INFO] [yt-dlp] [Metadata] Adding metadata to "d:\Downloads\Youtube\Mix - Kylie Minogue - In Your Eyes (Official Video) [Full HD Remastered]\004 - Kylie Minogue - Come Into My World (Official Video) [Full HD Remastered].mp4"
+2026-06-01 18:55:35 [INFO] [yt-dlp] [ThumbnailsConvertor] Converting thumbnail "d:\Downloads\Youtube\Mix - Kylie Minogue - In Your Eyes (Official Video) [Full HD Remastered]\004 - Kylie Minogue - Come Into My World (Official Video) [Full HD Remastered].webp" to png
+2026-06-01 18:55:35 [INFO] [yt-dlp] [EmbedThumbnail] mutagen: Adding thumbnail to "d:\Downloads\Youtube\Mix - Kylie Minogue - In Your Eyes (Official Video) [Full HD Remastered]\004 - Kylie Minogue - Come Into My World (Official Video) [Full HD Remastered].mp4"
+2026-06-01 18:55:35 [INFO] [yt-dlp] [download] Downloading item 5 of 318
+2026-06-01 18:55:35 [INFO] [yt-dlp] [youtube] Extracting URL: https://www.youtube.com/watch?v=c18441Eh_WE
+2026-06-01 18:55:35 [INFO] [yt-dlp] [youtube] c18441Eh_WE: Downloading webpage
+2026-06-01 18:55:36 [INFO] [yt-dlp] WARNING: [youtube] No supported JavaScript runtime could be found. Only deno is enabled by default; to use another runtime add  --js-runtimes RUNTIME[:PATH]  to your command/config. YouTube extraction without a JS runtime has been deprecated, and some formats may be missing. See  https://github.com/yt-dlp/yt-dlp/wiki/EJS  for details on installing one
+2026-06-01 18:55:36 [INFO] [yt-dlp] [youtube] c18441Eh_WE: Downloading android vr player API JSON
+2026-06-01 18:55:37 [INFO] [yt-dlp] [info] c18441Eh_WE: Downloading 1 format(s): 399+251
+2026-06-01 18:55:37 [INFO] [yt-dlp] [info] Downloading video thumbnail 41 ...
+2026-06-01 18:55:38 [INFO] [yt-dlp] [info] Video Thumbnail 41 does not exist
+2026-06-01 18:55:38 [INFO] [yt-dlp] [info] Downloading video thumbnail 40 ...
+2026-06-01 18:55:38 [INFO] [yt-dlp] [info] Writing video thumbnail 40 to: d:\Downloads\Youtube\Mix - Kylie Minogue - In Your Eyes (Official Video) [Full HD Remastered]\005 - Kylie Minogue - Can't Get You Out Of My Head (Official Video).jpg
+2026-06-01 18:55:38 [INFO] [yt-dlp] [download] Destination: d:\Downloads\Youtube\Mix - Kylie Minogue - In Your Eyes (Official Video) [Full HD Remastered]\005 - Kylie Minogue - Can't Get You Out Of My Head (Official Video).f399.mp4
+2026-06-01 18:55:40 [INFO] [yt-dlp] [download] Destination: d:\Downloads\Youtube\Mix - Kylie Minogue - In Your Eyes (Official Video) [Full HD Remastered]\005 - Kylie Minogue - Can't Get You Out Of My Head (Official Video).f251.webm
+2026-06-01 18:55:40 [INFO] [yt-dlp] [Merger] Merging formats into "d:\Downloads\Youtube\Mix - Kylie Minogue - In Your Eyes (Official Video) [Full HD Remastered]\005 - Kylie Minogue - Can't Get You Out Of My Head (Official Video).mp4"
+2026-06-01 18:55:40 [INFO] [yt-dlp] Deleting original file d:\Downloads\Youtube\Mix - Kylie Minogue - In Your Eyes (Official Video) [Full HD Remastered]\005 - Kylie Minogue - Can't Get You Out Of My Head (Official Video).f251.webm (pass -k to keep)
+2026-06-01 18:55:40 [INFO] [yt-dlp] Deleting original file d:\Downloads\Youtube\Mix - Kylie Minogue - In Your Eyes (Official Video) [Full HD Remastered]\005 - Kylie Minogue - Can't Get You Out Of My Head (Official Video).f399.mp4 (pass -k to keep)
+2026-06-01 18:55:40 [INFO] [yt-dlp] [Metadata] Adding metadata to "d:\Downloads\Youtube\Mix - Kylie Minogue - In Your Eyes (Official Video) [Full HD Remastered]\005 - Kylie Minogue - Can't Get You Out Of My Head (Official Video).mp4"
+2026-06-01 18:55:40 [INFO] [yt-dlp] [EmbedThumbnail] mutagen: Adding thumbnail to "d:\Downloads\Youtube\Mix - Kylie Minogue - In Your Eyes (Official Video) [Full HD Remastered]\005 - Kylie Minogue - Can't Get You Out Of My Head (Official Video).mp4"
+2026-06-01 18:55:40 [INFO] [yt-dlp] [download] Downloading item 6 of 318
+2026-06-01 18:55:40 [INFO] [yt-dlp] [youtube] Extracting URL: https://www.youtube.com/watch?v=r72Sbmj2OrM
+2026-06-01 18:55:40 [INFO] [yt-dlp] [youtube] r72Sbmj2OrM: Downloading webpage
+2026-06-01 18:55:41 [INFO] [yt-dlp] WARNING: [youtube] No supported JavaScript runtime could be found. Only deno is enabled by default; to use another runtime add  --js-runtimes RUNTIME[:PATH]  to your command/config. YouTube extraction without a JS runtime has been deprecated, and some formats may be missing. See  https://github.com/yt-dlp/yt-dlp/wiki/EJS  for details on installing one
+2026-06-01 18:55:41 [INFO] [yt-dlp] [youtube] r72Sbmj2OrM: Downloading android vr player API JSON
+2026-06-01 18:55:41 [INFO] [yt-dlp] [info] r72Sbmj2OrM: Downloading 1 format(s): 401+251
+2026-06-01 18:55:41 [INFO] [yt-dlp] [info] Downloading video thumbnail 41 ...
+2026-06-01 18:55:41 [INFO] [yt-dlp] [info] Writing video thumbnail 41 to: d:\Downloads\Youtube\Mix - Kylie Minogue - In Your Eyes (Official Video) [Full HD Remastered]\006 - Sophie Ellis-Bextor - Get Over You (Official Music Video).webp
+2026-06-01 18:55:41 [INFO] [yt-dlp] [download] Destination: d:\Downloads\Youtube\Mix - Kylie Minogue - In Your Eyes (Official Video) [Full HD Remastered]\006 - Sophie Ellis-Bextor - Get Over You (Official Music Video).f401.mp4
+2026-06-01 18:55:51 [INFO] [yt-dlp] [download] Destination: d:\Downloads\Youtube\Mix - Kylie Minogue - In Your Eyes (Official Video) [Full HD Remastered]\006 - Sophie Ellis-Bextor - Get Over You (Official Music Video).f251.webm
+2026-06-01 18:55:51 [INFO] [yt-dlp] [Merger] Merging formats into "d:\Downloads\Youtube\Mix - Kylie Minogue - In Your Eyes (Official Video) [Full HD Remastered]\006 - Sophie Ellis-Bextor - Get Over You (Official Music Video).mp4"
+2026-06-01 18:55:51 [INFO] [yt-dlp] Deleting original file d:\Downloads\Youtube\Mix - Kylie Minogue - In Your Eyes (Official Video) [Full HD Remastered]\006 - Sophie Ellis-Bextor - Get Over You (Official Music Video).f251.webm (pass -k to keep)
+2026-06-01 18:55:51 [INFO] [yt-dlp] Deleting original file d:\Downloads\Youtube\Mix - Kylie Minogue - In Your Eyes (Official Video) [Full HD Remastered]\006 - Sophie Ellis-Bextor - Get Over You (Official Music Video).f401.mp4 (pass -k to keep)
+2026-06-01 18:55:51 [INFO] [yt-dlp] [Metadata] Adding metadata to "d:\Downloads\Youtube\Mix - Kylie Minogue - In Your Eyes (Official Video) [Full HD Remastered]\006 - Sophie Ellis-Bextor - Get Over You (Official Music Video).mp4"
+2026-06-01 18:55:52 [INFO] [yt-dlp] [ThumbnailsConvertor] Converting thumbnail "d:\Downloads\Youtube\Mix - Kylie Minogue - In Your Eyes (Official Video) [Full HD Remastered]\006 - Sophie Ellis-Bextor - Get Over You (Official Music Video).webp" to png
+2026-06-01 18:55:52 [INFO] [yt-dlp] [EmbedThumbnail] mutagen: Adding thumbnail to "d:\Downloads\Youtube\Mix - Kylie Minogue - In Your Eyes (Official Video) [Full HD Remastered]\006 - Sophie Ellis-Bextor - Get Over You (Official Music Video).mp4"
+2026-06-01 18:55:52 [INFO] [yt-dlp] [download] Downloading item 7 of 318
+2026-06-01 18:55:52 [INFO] [yt-dlp] [youtube] Extracting URL: https://www.youtube.com/watch?v=hAx6mYeC6pY
+2026-06-01 18:55:52 [INFO] [yt-dlp] [youtube] hAx6mYeC6pY: Downloading webpage
+2026-06-01 18:55:53 [INFO] [yt-dlp] WARNING: [youtube] No supported JavaScript runtime could be found. Only deno is enabled by default; to use another runtime add  --js-runtimes RUNTIME[:PATH]  to your command/config. YouTube extraction without a JS runtime has been deprecated, and some formats may be missing. See  https://github.com/yt-dlp/yt-dlp/wiki/EJS  for details on installing one
+2026-06-01 18:55:53 [INFO] [yt-dlp] [youtube] hAx6mYeC6pY: Downloading android vr player API JSON
+2026-06-01 18:55:53 [INFO] [yt-dlp] [info] hAx6mYeC6pY: Downloading 1 format(s): 401+251
+2026-06-01 18:55:53 [INFO] [yt-dlp] [info] Downloading video thumbnail 41 ...
+2026-06-01 18:55:53 [INFO] [yt-dlp] [info] Writing video thumbnail 41 to: d:\Downloads\Youtube\Mix - Kylie Minogue - In Your Eyes (Official Video) [Full HD Remastered]\007 - Sophie Ellis-Bextor - Murder On The Dancefloor.webp
+2026-06-01 18:55:54 [INFO] [yt-dlp] [download] Destination: d:\Downloads\Youtube\Mix - Kylie Minogue - In Your Eyes (Official Video) [Full HD Remastered]\007 - Sophie Ellis-Bextor - Murder On The Dancefloor.f401.mp4
+2026-06-01 18:56:04 [INFO] [yt-dlp] [download] Destination: d:\Downloads\Youtube\Mix - Kylie Minogue - In Your Eyes (Official Video) [Full HD Remastered]\007 - Sophie Ellis-Bextor - Murder On The Dancefloor.f251.webm
+2026-06-01 18:56:05 [INFO] [yt-dlp] [Merger] Merging formats into "d:\Downloads\Youtube\Mix - Kylie Minogue - In Your Eyes (Official Video) [Full HD Remastered]\007 - Sophie Ellis-Bextor - Murder On The Dancefloor.mp4"
+2026-06-01 18:56:05 [INFO] [yt-dlp] Deleting original file d:\Downloads\Youtube\Mix - Kylie Minogue - In Your Eyes (Official Video) [Full HD Remastered]\007 - Sophie Ellis-Bextor - Murder On The Dancefloor.f401.mp4 (pass -k to keep)
+2026-06-01 18:56:05 [INFO] [yt-dlp] Deleting original file d:\Downloads\Youtube\Mix - Kylie Minogue - In Your Eyes (Official Video) [Full HD Remastered]\007 - Sophie Ellis-Bextor - Murder On The Dancefloor.f251.webm (pass -k to keep)
+2026-06-01 18:56:05 [INFO] [yt-dlp] [Metadata] Adding metadata to "d:\Downloads\Youtube\Mix - Kylie Minogue - In Your Eyes (Official Video) [Full HD Remastered]\007 - Sophie Ellis-Bextor - Murder On The Dancefloor.mp4"
+2026-06-01 18:56:05 [INFO] [yt-dlp] [ThumbnailsConvertor] Converting thumbnail "d:\Downloads\Youtube\Mix - Kylie Minogue - In Your Eyes (Official Video) [Full HD Remastered]\007 - Sophie Ellis-Bextor - Murder On The Dancefloor.webp" to png
+2026-06-01 18:56:06 [INFO] [yt-dlp] [EmbedThumbnail] mutagen: Adding thumbnail to "d:\Downloads\Youtube\Mix - Kylie Minogue - In Your Eyes (Official Video) [Full HD Remastered]\007 - Sophie Ellis-Bextor - Murder On The Dancefloor.mp4"
+2026-06-01 18:56:06 [INFO] [yt-dlp] [download] Downloading item 8 of 318
+2026-06-01 18:56:06 [INFO] [yt-dlp] [youtube] Extracting URL: https://www.youtube.com/watch?v=EIhSnaqou0I
+2026-06-01 18:56:06 [INFO] [yt-dlp] [youtube] EIhSnaqou0I: Downloading webpage
+2026-06-01 18:56:07 [INFO] [yt-dlp] WARNING: [youtube] No supported JavaScript runtime could be found. Only deno is enabled by default; to use another runtime add  --js-runtimes RUNTIME[:PATH]  to your command/config. YouTube extraction without a JS runtime has been deprecated, and some formats may be missing. See  https://github.com/yt-dlp/yt-dlp/wiki/EJS  for details on installing one
+2026-06-01 18:56:07 [INFO] [yt-dlp] [youtube] EIhSnaqou0I: Downloading android vr player API JSON
+2026-06-01 18:56:07 [INFO] [yt-dlp] [info] EIhSnaqou0I: Downloading 1 format(s): 397+251
+2026-06-01 18:56:07 [INFO] [yt-dlp] [info] Downloading video thumbnail 41 ...
+2026-06-01 18:56:07 [INFO] [yt-dlp] [info] Writing video thumbnail 41 to: d:\Downloads\Youtube\Mix - Kylie Minogue - In Your Eyes (Official Video) [Full HD Remastered]\008 - JENNIFER PAIGE 'CRUSH' - Original Version (Official Video) HQ.webp
+2026-06-01 18:56:07 [INFO] [yt-dlp] [download] Destination: d:\Downloads\Youtube\Mix - Kylie Minogue - In Your Eyes (Official Video) [Full HD Remastered]\008 - JENNIFER PAIGE 'CRUSH' - Original Version (Official Video) HQ.f397.mp4
+2026-06-01 18:56:08 [INFO] [yt-dlp] [download] Destination: d:\Downloads\Youtube\Mix - Kylie Minogue - In Your Eyes (Official Video) [Full HD Remastered]\008 - JENNIFER PAIGE 'CRUSH' - Original Version (Official Video) HQ.f251.webm
+2026-06-01 18:56:08 [INFO] [yt-dlp] [Merger] Merging formats into "d:\Downloads\Youtube\Mix - Kylie Minogue - In Your Eyes (Official Video) [Full HD Remastered]\008 - JENNIFER PAIGE 'CRUSH' - Original Version (Official Video) HQ.mp4"
+2026-06-01 18:56:08 [INFO] [yt-dlp] Deleting original file d:\Downloads\Youtube\Mix - Kylie Minogue - In Your Eyes (Official Video) [Full HD Remastered]\008 - JENNIFER PAIGE 'CRUSH' - Original Version (Official Video) HQ.f397.mp4 (pass -k to keep)
+2026-06-01 18:56:08 [INFO] [yt-dlp] Deleting original file d:\Downloads\Youtube\Mix - Kylie Minogue - In Your Eyes (Official Video) [Full HD Remastered]\008 - JENNIFER PAIGE 'CRUSH' - Original Version (Official Video) HQ.f251.webm (pass -k to keep)
+2026-06-01 18:56:08 [INFO] [yt-dlp] [Metadata] Adding metadata to "d:\Downloads\Youtube\Mix - Kylie Minogue - In Your Eyes (Official Video) [Full HD Remastered]\008 - JENNIFER PAIGE 'CRUSH' - Original Version (Official Video) HQ.mp4"
+2026-06-01 18:56:09 [INFO] [yt-dlp] [ThumbnailsConvertor] Converting thumbnail "d:\Downloads\Youtube\Mix - Kylie Minogue - In Your Eyes (Official Video) [Full HD Remastered]\008 - JENNIFER PAIGE 'CRUSH' - Original Version (Official Video) HQ.webp" to png
+2026-06-01 18:56:09 [INFO] [yt-dlp] [EmbedThumbnail] mutagen: Adding thumbnail to "d:\Downloads\Youtube\Mix - Kylie Minogue - In Your Eyes (Official Video) [Full HD Remastered]\008 - JENNIFER PAIGE 'CRUSH' - Original Version (Official Video) HQ.mp4"
+2026-06-01 18:56:09 [INFO] [yt-dlp] [download] Downloading item 9 of 318
+2026-06-01 18:56:09 [INFO] [yt-dlp] [youtube] Extracting URL: https://www.youtube.com/watch?v=_66jPJVS4JE
+2026-06-01 18:56:09 [INFO] [yt-dlp] [youtube] _66jPJVS4JE: Downloading webpage
+2026-06-01 18:56:10 [INFO] [yt-dlp] WARNING: [youtube] No supported JavaScript runtime could be found. Only deno is enabled by default; to use another runtime add  --js-runtimes RUNTIME[:PATH]  to your command/config. YouTube extraction without a JS runtime has been deprecated, and some formats may be missing. See  https://github.com/yt-dlp/yt-dlp/wiki/EJS  for details on installing one
+2026-06-01 18:56:10 [INFO] [yt-dlp] [youtube] _66jPJVS4JE: Downloading android vr player API JSON
+2026-06-01 18:56:10 [INFO] [yt-dlp] [info] _66jPJVS4JE: Downloading 1 format(s): 397+251
+2026-06-01 18:56:10 [INFO] [yt-dlp] [info] Downloading video thumbnail 41 ...
+2026-06-01 18:56:10 [INFO] [yt-dlp] [info] Writing video thumbnail 41 to: d:\Downloads\Youtube\Mix - Kylie Minogue - In Your Eyes (Official Video) [Full HD Remastered]\009 - Jennifer Lopez - Waiting For Tonight.webp
+2026-06-01 18:56:10 [INFO] [yt-dlp] [download] Destination: d:\Downloads\Youtube\Mix - Kylie Minogue - In Your Eyes (Official Video) [Full HD Remastered]\009 - Jennifer Lopez - Waiting For Tonight.f397.mp4
+2026-06-01 18:56:11 [INFO] [yt-dlp] [download] Destination: d:\Downloads\Youtube\Mix - Kylie Minogue - In Your Eyes (Official Video) [Full HD Remastered]\009 - Jennifer Lopez - Waiting For Tonight.f251.webm
+2026-06-01 18:56:11 [INFO] [yt-dlp] [Merger] Merging formats into "d:\Downloads\Youtube\Mix - Kylie Minogue - In Your Eyes (Official Video) [Full HD Remastered]\009 - Jennifer Lopez - Waiting For Tonight.mp4"
+2026-06-01 18:56:11 [INFO] [yt-dlp] Deleting original file d:\Downloads\Youtube\Mix - Kylie Minogue - In Your Eyes (Official Video) [Full HD Remastered]\009 - Jennifer Lopez - Waiting For Tonight.f251.webm (pass -k to keep)
+2026-06-01 18:56:11 [INFO] [yt-dlp] Deleting original file d:\Downloads\Youtube\Mix - Kylie Minogue - In Your Eyes (Official Video) [Full HD Remastered]\009 - Jennifer Lopez - Waiting For Tonight.f397.mp4 (pass -k to keep)
+2026-06-01 18:56:11 [INFO] [yt-dlp] [Metadata] Adding metadata to "d:\Downloads\Youtube\Mix - Kylie Minogue - In Your Eyes (Official Video) [Full HD Remastered]\009 - Jennifer Lopez - Waiting For Tonight.mp4"
+2026-06-01 18:56:12 [INFO] [yt-dlp] [ThumbnailsConvertor] Converting thumbnail "d:\Downloads\Youtube\Mix - Kylie Minogue - In Your Eyes (Official Video) [Full HD Remastered]\009 - Jennifer Lopez - Waiting For Tonight.webp" to png
+2026-06-01 18:56:12 [INFO] [yt-dlp] [EmbedThumbnail] mutagen: Adding thumbnail to "d:\Downloads\Youtube\Mix - Kylie Minogue - In Your Eyes (Official Video) [Full HD Remastered]\009 - Jennifer Lopez - Waiting For Tonight.mp4"
+2026-06-01 18:56:12 [INFO] [yt-dlp] [download] Downloading item 10 of 318
+2026-06-01 18:56:12 [INFO] [yt-dlp] [youtube] Extracting URL: https://www.youtube.com/watch?v=jsoOtwPXpGE
+2026-06-01 18:56:12 [INFO] [yt-dlp] [youtube] jsoOtwPXpGE: Downloading webpage
+2026-06-01 18:56:13 [INFO] [yt-dlp] WARNING: [youtube] No supported JavaScript runtime could be found. Only deno is enabled by default; to use another runtime add  --js-runtimes RUNTIME[:PATH]  to your command/config. YouTube extraction without a JS runtime has been deprecated, and some formats may be missing. See  https://github.com/yt-dlp/yt-dlp/wiki/EJS  for details on installing one
+2026-06-01 18:56:13 [INFO] [yt-dlp] [youtube] jsoOtwPXpGE: Downloading android vr player API JSON
+2026-06-01 18:56:13 [INFO] [yt-dlp] [info] jsoOtwPXpGE: Downloading 1 format(s): 398+251
+2026-06-01 18:56:13 [INFO] [yt-dlp] [info] Downloading video thumbnail 41 ...
+2026-06-01 18:56:13 [INFO] [yt-dlp] [info] Writing video thumbnail 41 to: d:\Downloads\Youtube\Mix - Kylie Minogue - In Your Eyes (Official Video) [Full HD Remastered]\010 - Kylie Minogue - On A Night Like This (Official Video).webp
+2026-06-01 18:56:13 [INFO] [yt-dlp] [download] Destination: d:\Downloads\Youtube\Mix - Kylie Minogue - In Your Eyes (Official Video) [Full HD Remastered]\010 - Kylie Minogue - On A Night Like This (Official Video).f398.mp4
+2026-06-01 18:56:14 [INFO] [yt-dlp] [download] Destination: d:\Downloads\Youtube\Mix - Kylie Minogue - In Your Eyes (Official Video) [Full HD Remastered]\010 - Kylie Minogue - On A Night Like This (Official Video).f251.webm
+2026-06-01 18:56:14 [INFO] [yt-dlp] [Merger] Merging formats into "d:\Downloads\Youtube\Mix - Kylie Minogue - In Your Eyes (Official Video) [Full HD Remastered]\010 - Kylie Minogue - On A Night Like This (Official Video).mp4"
+2026-06-01 18:56:14 [INFO] [yt-dlp] Deleting original file d:\Downloads\Youtube\Mix - Kylie Minogue - In Your Eyes (Official Video) [Full HD Remastered]\010 - Kylie Minogue - On A Night Like This (Official Video).f251.webm (pass -k to keep)
+2026-06-01 18:56:14 [INFO] [yt-dlp] Deleting original file d:\Downloads\Youtube\Mix - Kylie Minogue - In Your Eyes (Official Video) [Full HD Remastered]\010 - Kylie Minogue - On A Night Like This (Official Video).f398.mp4 (pass -k to keep)
+2026-06-01 18:56:14 [INFO] [yt-dlp] [Metadata] Adding metadata to "d:\Downloads\Youtube\Mix - Kylie Minogue - In Your Eyes (Official Video) [Full HD Remastered]\010 - Kylie Minogue - On A Night Like This (Official Video).mp4"
+2026-06-01 18:56:14 [INFO] [yt-dlp] [ThumbnailsConvertor] Converting thumbnail "d:\Downloads\Youtube\Mix - Kylie Minogue - In Your Eyes (Official Video) [Full HD Remastered]\010 - Kylie Minogue - On A Night Like This (Official Video).webp" to png
+2026-06-01 18:56:14 [INFO] [yt-dlp] [EmbedThumbnail] mutagen: Adding thumbnail to "d:\Downloads\Youtube\Mix - Kylie Minogue - In Your Eyes (Official Video) [Full HD Remastered]\010 - Kylie Minogue - On A Night Like This (Official Video).mp4"
+2026-06-01 18:56:14 [INFO] [yt-dlp] [download] Downloading item 11 of 318
+2026-06-01 18:56:14 [INFO] [yt-dlp] [youtube] Extracting URL: https://www.youtube.com/watch?v=QpbHdIrtpNo
+2026-06-01 18:56:14 [INFO] [yt-dlp] [youtube] QpbHdIrtpNo: Downloading webpage

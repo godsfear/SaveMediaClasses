@@ -14,6 +14,7 @@ from typing import Optional
 import flet as ft
 
 from app_logging import get_logger
+from config import hex_to_flet
 from locale import Locale, Strings
 from managers.download_repository import DownloadRecord, DownloadRepository
 from services import Services
@@ -142,6 +143,10 @@ class HistoryScreen:
         self._rebuild_filter_buttons()
         self._filter_row.update()
         self._render_stats()
+
+    def apply_theme(self, t) -> None:
+        """Применить ThemeConfig к виджетам экрана."""
+        self.header.color = hex_to_flet(t.header_color)
 
     # ── Фильтр ────────────────────────────────────────────────────────────────
 
