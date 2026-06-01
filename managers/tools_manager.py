@@ -6,6 +6,7 @@ import zipfile
 
 import httpx
 
+from app_logging import get_logger
 from config import safe_str, safe_int
 
 
@@ -17,6 +18,7 @@ class ToolsManager:
         self.yt_needs_update     = False
         self.ffmpeg_needs_update = False
         self._ext = ".exe" if os.name == "nt" else ""
+        self._log = get_logger("tools")
 
     def resolve_tool_path(self, filename: str) -> str:
         p_tools = os.path.join(self.tools_dir, filename)
@@ -60,6 +62,7 @@ class ToolsManager:
                     return safe_str(fl.split()[0])
             return "[Не определена]"
         except Exception:
+            self._log.exception("Failed to get local version for %s", tool_name)
             return "[Ошибка вызова]"
 
     # Оригинальная check_tools
@@ -91,6 +94,7 @@ class ToolsManager:
                 )
                 remote_yt = safe_str(res.json().get("tag_name", "Неизвестно")).lstrip('v')
             except Exception:
+                self._log.warning("Failed to get remote yt-dlp version", exc_info=True)
                 remote_yt = "[Ошибка]"
             try:
                 res = await asyncio.wait_for(
@@ -99,6 +103,7 @@ class ToolsManager:
                 )
                 remote_ff = res.text.strip()
             except Exception:
+                self._log.warning("Failed to get remote FFmpeg version", exc_info=True)
                 remote_ff = "[Ошибка]"
 
         for filename, (name,) in tools_map.items():
@@ -162,12 +167,13 @@ class ToolsManager:
                         on_yt_status("yt-dlp: Обновление завершено", "ok")
                     except Exception as err:
                         had_errors = True
+                        self._log.exception("Failed to update yt-dlp")
                         on_yt_status(f"yt-dlp: Ошибка ({err})", "error")
                         try:
                             if os.path.exists(temp_path):
                                 os.remove(temp_path)
                         except Exception:
-                            pass
+                            self._log.exception("Failed to remove temporary yt-dlp file")
 
                 # ── ffmpeg ────────────────────────────────────────────────────
                 if self.ffmpeg_needs_update and os.name == "nt":
@@ -216,14 +222,16 @@ class ToolsManager:
                         on_ff_status("ffmpeg: Обновление завершено", "ok")
                     except Exception as err:
                         had_errors = True
+                        self._log.exception("Failed to update FFmpeg")
                         on_ff_status(f"ffmpeg: Ошибка ({err})", "error")
                         try:
                             if os.path.exists(temp_zip): os.remove(temp_zip)
                             if os.path.exists(zip_path): os.remove(zip_path)
                         except Exception:
-                            pass
+                            self._log.exception("Failed to remove temporary FFmpeg files")
 
             on_done(had_errors)
 
         except Exception as err:
+            self._log.exception("Critical tools update failure")
             on_done(had_errors=True, critical_err=str(err))

@@ -19,6 +19,7 @@ import shlex
 import subprocess
 from typing import Callable, Protocol, runtime_checkable
 
+from app_logging import get_logger
 from config import safe_str
 from managers.download_manager import DownloadSnapshot
 
@@ -72,6 +73,7 @@ class YtDlpProvider:
     Один экземпляр = одна загрузка.
     """
 
+    SOURCE_NAME = "yt-dlp"
     _POST_TAGS = ["[Merger]", "[Metadata]", "[Thumbnails]", "[ExtractAudio]", "[Modify]"]
 
     def __init__(self, base_dir: str, tools_dir: str) -> None:
@@ -246,4 +248,5 @@ class YtDlpProvider:
             return (raw if raw else b""), data
 
         except Exception:
+            get_logger(self.SOURCE_NAME).warning("Failed to fetch thumbnail metadata", exc_info=True)
             return b"", {}

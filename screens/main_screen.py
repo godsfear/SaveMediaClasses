@@ -6,6 +6,7 @@ from typing import Dict
 
 import flet as ft
 
+from app_logging import get_logger
 from config import safe_str
 from events import (
     EventBus,
@@ -109,6 +110,7 @@ class MainScreen:
         self._dm          = svc.dm
         self._bus         = svc.bus
         self._db          = svc.db
+        self._log         = get_logger("app")
 
         self._cards: Dict[str, DownloadCard] = {}
 
@@ -127,7 +129,6 @@ class MainScreen:
         self._bus.on(DownloadCompletedEvent,      self._on_completed)
         self._bus.on(DownloadCancelledEvent,      self._on_cancelled)
         self._bus.on(ToolsCheckedEvent,           self._on_tools_checked)
-        self._bus.on(ToolsStatusMessageEvent,     self._on_tools_status_message)
 
     # ── Обработчики событий ───────────────────────────────────────────────────
 
@@ -163,9 +164,6 @@ class MainScreen:
             self._show_status(s.status_tools_update, ft.Colors.ORANGE)
         else:
             self._show_status(s.status_tools_ok, ft.Colors.GREEN_400)
-
-    def _on_tools_status_message(self, e: ToolsStatusMessageEvent) -> None:
-        self._show_status(e.message, e.color)
 
     async def _remove_card_after_delay(self, task_id: str) -> None:
         await asyncio.sleep(3)
@@ -388,7 +386,7 @@ class MainScreen:
                     card.set_thumbnail(thumb_data)
                     self._safe_update()
         except Exception:
-            pass
+            self._log.warning("Failed to fetch thumbnail for %s", url, exc_info=True)
 
     def _show_status(self, message: str, color) -> None:
         self._bus.emit(ToolsStatusMessageEvent(message=message, color=color))
@@ -403,4 +401,4 @@ class MainScreen:
             else:
                 subprocess.Popen(["xdg-open", path])
         except Exception:
-            pass
+            get_logger("app").exception("Failed to open log file: %s", path)

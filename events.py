@@ -15,6 +15,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Callable, Dict, List, Type, TypeVar
 
+from app_logging import get_logger
+
 E = TypeVar("E")
 
 
@@ -97,6 +99,7 @@ class EventBus:
 
     def __init__(self) -> None:
         self._handlers: Dict[type, List[Callable]] = {}
+        self._log = get_logger("app")
 
     def on(self, event_type: Type[E], handler: Callable[[E], None]) -> Callable:
         """Подписаться на событие. Возвращает функцию отписки."""
@@ -115,4 +118,4 @@ class EventBus:
                 handler(event)
             except Exception:
                 # Один упавший обработчик не должен ломать остальных
-                pass
+                self._log.exception("Event handler failed for %s", type(event).__name__)
