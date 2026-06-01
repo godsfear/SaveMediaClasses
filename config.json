@@ -11,7 +11,7 @@
         "playlist_enabled": true,
         "clean_titles": true,
         "save_to_source_folder": true,
-        "last_check_time": 1780319307.070922,
+        "last_check_time": 1780320447.3318825,
         "last_needs_update": false,
         "tool_versions": {
             "yt-dlp": [
@@ -45,13 +45,13 @@
     "window": {
         "width": 688,
         "height": 991,
-        "left": 3177,
-        "top": 218
+        "left": 2813,
+        "top": 217
     },
     "theme": {
         "accent_color": "00B4D8",
         "switch_color": "00BCD4",
-        "header_color": "00B4D8",
+        "header_color": "00BCD4",
         "text_color": "E0E0E0",
         "progress_color": "4CAF50",
         "button_color": "009688",

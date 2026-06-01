@@ -7,7 +7,7 @@ from typing import Dict
 import flet as ft
 
 from app_logging import get_logger
-from config import safe_str
+from config import safe_str, hex_to_flet
 from events import (
     EventBus,
     DownloadProgressEvent,
@@ -261,6 +261,30 @@ class MainScreen:
     def sync_to_state(self) -> None:
         self._state.audio_only      = bool(self.audio_only_switch.value)
         self._state.cookies_enabled = bool(self.cookies_enabled_switch.value)
+
+    # ── Тема ─────────────────────────────────────────────────────────────────
+
+    def apply_theme(self, t) -> None:
+        """Применить ThemeConfig к виджетам экрана."""
+        header_c = hex_to_flet(t.header_color)
+        switch_c = hex_to_flet(t.switch_color)
+        accent   = hex_to_flet(t.accent_color)
+        text_c   = hex_to_flet(t.text_color)
+        button_c = hex_to_flet(t.button_color)
+        card_c   = hex_to_flet(t.card_color)
+
+        for h in (self.header_folder, self.header_main, self.header_queue):
+            h.color = header_c
+        for sw in (self.audio_only_switch, self.cookies_enabled_switch):
+            sw.active_color = switch_c
+
+        self.download_btn.bgcolor        = button_c
+        self.url_input.focused_border_color = accent
+        if not self._state.download_path:
+            self.folder_label.color = text_c
+
+        for card in (self.folder_card, self.main_card, self._queue_card):
+            card.bgcolor = card_c
 
     # ── Смена языка ───────────────────────────────────────────────────────────
 

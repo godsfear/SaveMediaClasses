@@ -67,54 +67,12 @@ class SaveMediaApp:
 
         # ── Тема ──────────────────────────────────────────────────────────────
 
-        all_headers = [
-            main_screen.header_folder, main_screen.header_main, main_screen.header_queue,
-            settings_screen.header_net, settings_screen.header_downloaders,
-            settings_screen.header_cookies, settings_screen.header_ytdlp,
-            settings_screen.header_deps,
-            settings_screen.header_theme, settings_screen.header_appearance,
-        ]
-        all_switches = [
-            main_screen.audio_only_switch, main_screen.cookies_enabled_switch,
-            settings_screen.clean_titles_switch, settings_screen.playlist_switch,
-            settings_screen.embed_metadata_switch, settings_screen.save_to_source_switch,
-        ]
-
         def apply_theme():
-            t          = svc.state.theme
-            accent     = hex_to_flet(t.accent_color)
-            switch_c   = hex_to_flet(t.switch_color)
-            header_c   = hex_to_flet(t.header_color)
-            text_c     = hex_to_flet(t.text_color)
-            progress_c = hex_to_flet(t.progress_color)
-            button_c   = hex_to_flet(t.button_color)
-            appbar_c   = hex_to_flet(t.appbar_color)
-            card_c     = hex_to_flet(t.card_color)
-
-            for h in all_headers:  h.color        = header_c
-            for sw in all_switches: sw.active_color = switch_c
-
-            main_screen.download_btn.bgcolor    = button_c
-            settings_screen.update_btn.bgcolor  = button_c
-            settings_screen.progress_text.color = progress_c
-            settings_screen.progress_bar.color  = progress_c
-
-            for inp in [
-                main_screen.url_input,
-                settings_screen.proxy_input, settings_screen.yt_args_input,
-                settings_screen.cookies_browser_dropdown,
-                settings_screen.yt_api_input, settings_screen.yt_download_input,
-                settings_screen.ffmpeg_version_input, settings_screen.ffmpeg_download_input,
-            ]:
-                inp.focused_border_color = accent
-
-            main_screen.folder_label.color = text_c
+            t = svc.state.theme
+            main_screen.apply_theme(t)
+            settings_screen.apply_theme(t)
             if page.appbar:
-                page.appbar.bgcolor = appbar_c
-            for layout in [main_screen.layout, settings_screen.layout]:
-                for ctrl in getattr(layout, "controls", []):
-                    if isinstance(ctrl, ft.Container):
-                        ctrl.bgcolor = card_c
+                page.appbar.bgcolor = hex_to_flet(t.appbar_color)
 
         _s0 = Locale.load(svc.state.language)
         folder_picker_title = _s0.folder_select_text
