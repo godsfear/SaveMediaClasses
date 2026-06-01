@@ -71,6 +71,7 @@ class SaveMediaApp:
             t = svc.state.theme
             main_screen.apply_theme(t)
             settings_screen.apply_theme(t)
+            history_screen.apply_theme(t)
             if page.appbar:
                 page.appbar.bgcolor = hex_to_flet(t.appbar_color)
 
