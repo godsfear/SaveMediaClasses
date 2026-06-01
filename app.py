@@ -29,8 +29,9 @@ class SaveMediaApp:
             except Exception:
                 log.exception("Failed to page.update")
 
-        # ── Геометрия окна — до создания Services (нужна до page.add) ─────────
-        geo = Services.create(base_dir, safe_update).config_mgr.load_window_geometry()
+        # ── DI + геометрия окна до page.add (без второго create — тот же state.window) ──
+        svc = Services.create(base_dir, safe_update, page.run_task)
+        geo = svc.state.window
         page.window.width  = geo.width
         page.window.height = geo.height
         page.window.left   = geo.left
@@ -47,9 +48,6 @@ class SaveMediaApp:
         page.title     = "SaveMedia"
         page.padding   = 15
         page.safe_area = True
-
-        # ── Контейнер зависимостей ────────────────────────────────────────────
-        svc = Services.create(base_dir, safe_update)
 
         # ── Экраны ────────────────────────────────────────────────────────────
         main_screen     = MainScreen(page, svc)

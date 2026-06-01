@@ -9,7 +9,7 @@ import asyncio
 import os
 import uuid
 from dataclasses import dataclass, field
-from typing import Callable, Dict, Optional, TYPE_CHECKING
+from typing import Any, Callable, Dict, Optional, TYPE_CHECKING
 
 from app_logging import configure_logging, get_logger
 from events import (
@@ -25,6 +25,9 @@ if TYPE_CHECKING:
     from managers.providers import DownloadProvider
 
 MAX_PARALLEL = 5
+
+# (async_fn, *args) — в Flet: page.run_task
+TaskRunner = Callable[..., Any]
 
 
 # ── Снимок параметров на момент нажатия «Скачать» ────────────────────────────
@@ -67,13 +70,16 @@ class DownloadManager:
                  provider_factory: Callable[[], "DownloadProvider"],
                  log_path: str,
                  bus: EventBus,
+                 task_runner: TaskRunner,
                  db=None) -> None:
         """
         provider_factory — callable без аргументов, возвращает новый DownloadProvider.
         Пример: lambda: YtDlpProvider(base_dir, tools_dir)
+        task_runner — планировщик async-задач (в app.py: page.run_task).
         db — DownloadRepository для сохранения thumbnail после загрузки (опционально).
         """
         self._provider_factory = provider_factory
+        self._task_runner      = task_runner
         configure_logging(log_path)
         self._bus              = bus
         self._db               = db
@@ -92,7 +98,7 @@ class DownloadManager:
     def at_capacity(self) -> bool:
         return self.active_count >= MAX_PARALLEL
 
-    def add(self, page, snapshot: DownloadSnapshot) -> Optional[str]:
+    def add(self, snapshot: DownloadSnapshot) -> Optional[str]:
         """Запустить загрузку. Возвращает task_id или None если exe не найден."""
         provider = self._provider_factory()
         if not provider.resolve_exe():
@@ -101,7 +107,7 @@ class DownloadManager:
         task_id  = str(uuid.uuid4())
         task     = DownloadTask(task_id=task_id, snapshot=snapshot, provider=provider)
         self._active[task_id] = task
-        task._handle = page.run_task(self._run, task)
+        task._handle = self._task_runner(self._run, task)
         return task_id
 
     def cancel(self, task_id: str) -> None:

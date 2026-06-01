@@ -326,7 +326,7 @@ class MainScreen:
             save_to_source=self._state.save_to_source_folder,
         )
 
-        task_id = self._dm.add(self._page, snapshot)
+        task_id = self._dm.add(snapshot)
         if task_id is None:
             self._show_status(s.status_ytdlp_missing, ft.Colors.ORANGE)
             return
