@@ -35,7 +35,7 @@ class SaveMediaApp:
         page.window.height = geo.height
         page.window.left   = geo.left
         page.window.top    = geo.top
-        page.window.icon   = "vload.png"
+        page.window.icon   = "SaveMedia.png"
 
         if page.platform in [ft.PagePlatform.WINDOWS, ft.PagePlatform.MACOS, ft.PagePlatform.LINUX]:
             page.window.min_width     = 500
