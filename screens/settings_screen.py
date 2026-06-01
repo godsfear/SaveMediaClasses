@@ -137,12 +137,15 @@ class SettingsScreen:
             on_click=self._handle_update_button_click,
         )
 
-        self.header_net        = ft.Text(s.section_network,    size=14, weight=ft.FontWeight.BOLD,  color=ft.Colors.CYAN_400)
-        self.header_rules      = ft.Text(s.section_rules,      size=14, weight=ft.FontWeight.BOLD,  color=ft.Colors.CYAN_400)
-        self.header_deps       = ft.Text(s.section_deps,       size=14, weight=ft.FontWeight.BOLD,  color=ft.Colors.CYAN_400)
-        self.header_theme      = ft.Text(s.section_theme,      size=14, weight=ft.FontWeight.BOLD,  color=ft.Colors.CYAN_400)
-        self.header_urls       = ft.Text(s.section_urls,       size=13, weight=ft.FontWeight.W_500, color=ft.Colors.CYAN_400)
-        self.header_appearance = ft.Text(s.section_appearance, size=14, weight=ft.FontWeight.BOLD,  color=ft.Colors.CYAN_400)
+        self.header_net           = ft.Text(s.section_network,     size=14, weight=ft.FontWeight.BOLD,  color=ft.Colors.CYAN_400)
+        self.header_downloaders   = ft.Text(s.section_downloaders, size=14, weight=ft.FontWeight.BOLD,  color=ft.Colors.CYAN_400)
+        self.header_cookies       = ft.Text(s.section_cookies,     size=13, weight=ft.FontWeight.W_600, color=ft.Colors.CYAN_400)
+        self.header_ytdlp         = ft.Text(s.section_ytdlp,       size=13, weight=ft.FontWeight.W_600, color=ft.Colors.CYAN_400)
+        self.header_ytdlp_urls    = ft.Text(s.section_ytdlp_urls,  size=12, weight=ft.FontWeight.W_500, color=ft.Colors.GREY_400)
+        self.header_deps          = ft.Text(s.section_deps,        size=14, weight=ft.FontWeight.BOLD,  color=ft.Colors.CYAN_400)
+        self.header_deps_urls     = ft.Text(s.section_deps_urls,   size=12, weight=ft.FontWeight.W_500, color=ft.Colors.GREY_400)
+        self.header_theme         = ft.Text(s.section_theme,       size=14, weight=ft.FontWeight.BOLD,  color=ft.Colors.CYAN_400)
+        self.header_appearance    = ft.Text(s.section_appearance, size=14, weight=ft.FontWeight.BOLD,  color=ft.Colors.CYAN_400)
 
     # ── Куки UI ───────────────────────────────────────────────────────────────
 
@@ -334,12 +337,15 @@ class SettingsScreen:
         self.ffmpeg_download_input.label = s.url_ffmpeg_download;  self.ffmpeg_download_input.update()
 
         # Заголовки секций
-        self.header_net.value        = s.section_network;    self.header_net.update()
-        self.header_rules.value      = s.section_rules;      self.header_rules.update()
-        self.header_deps.value       = s.section_deps;       self.header_deps.update()
-        self.header_theme.value      = s.section_theme;      self.header_theme.update()
-        self.header_urls.value       = s.section_urls;       self.header_urls.update()
-        self.header_appearance.value = s.section_appearance; self.header_appearance.update()
+        self.header_net.value           = s.section_network;     self.header_net.update()
+        self.header_downloaders.value   = s.section_downloaders; self.header_downloaders.update()
+        self.header_cookies.value       = s.section_cookies;     self.header_cookies.update()
+        self.header_ytdlp.value         = s.section_ytdlp;       self.header_ytdlp.update()
+        self.header_ytdlp_urls.value    = s.section_ytdlp_urls;  self.header_ytdlp_urls.update()
+        self.header_deps.value          = s.section_deps;        self.header_deps.update()
+        self.header_deps_urls.value     = s.section_deps_urls;   self.header_deps_urls.update()
+        self.header_theme.value         = s.section_theme;       self.header_theme.update()
+        self.header_appearance.value    = s.section_appearance;  self.header_appearance.update()
 
         # Кнопка и статус
         self.update_btn_text.value = s.btn_check;     self.update_btn_text.update()
@@ -559,34 +565,63 @@ class SettingsScreen:
     # ── Лэйаут ────────────────────────────────────────────────────────────────
 
     def _build_layout(self) -> None:
+        ytdlp_section = ft.Container(
+            content=ft.Column([
+                self.header_ytdlp,
+                self.yt_args_input,
+                ft.Column([
+                    self.clean_titles_switch, self.playlist_switch,
+                    self.embed_metadata_switch, self.save_to_source_switch,
+                ], spacing=10),
+                self.yt_status,
+                ft.ExpansionTile(
+                    title=self.header_ytdlp_urls,
+                    controls=[ft.Container(
+                        content=ft.Column([
+                            self.yt_api_input, self.yt_download_input,
+                        ], spacing=10, horizontal_alignment=ft.CrossAxisAlignment.STRETCH),
+                        padding=ft.Padding.only(left=8, right=8, bottom=8),
+                    )],
+                ),
+            ], spacing=12, horizontal_alignment=ft.CrossAxisAlignment.STRETCH),
+            bgcolor="#121212", border_radius=6, padding=12,
+            border=ft.Border.all(1, "#2a2a2a"),
+        )
+
         self.layout = ft.Column([
             ft.Container(
                 content=ft.Column([
                     self.header_net,
                     self.proxy_input,
-                    self.cookies_browser_dropdown,
                 ], spacing=12, horizontal_alignment=ft.CrossAxisAlignment.STRETCH),
                 bgcolor="#161616", border_radius=8, padding=15,
             ),
             ft.Container(
                 content=ft.Column([
-                    self.header_rules,
-                    self.yt_args_input,
-                    ft.Column([
-                        self.clean_titles_switch, self.playlist_switch,
-                        self.embed_metadata_switch, self.save_to_source_switch,
-                    ], spacing=10),
+                    self.header_downloaders,
+                    self.header_cookies,
+                    self.cookies_browser_dropdown,
+                    ytdlp_section,
                 ], spacing=12, horizontal_alignment=ft.CrossAxisAlignment.STRETCH),
                 bgcolor="#161616", border_radius=8, padding=15,
             ),
             ft.Container(
                 content=ft.Column([
                     self.header_deps,
-                    ft.Column([self.yt_status, self.ffmpeg_status,
-                               self.ffplay_status, self.ffprobe_status], spacing=6),
+                    ft.Column([self.ffmpeg_status, self.ffplay_status, self.ffprobe_status],
+                              spacing=6),
                     ft.Row([self.update_btn], alignment=ft.MainAxisAlignment.END),
                     self.progress_bar,
                     self.progress_text,
+                    ft.ExpansionTile(
+                        title=self.header_deps_urls,
+                        controls=[ft.Container(
+                            content=ft.Column([
+                                self.ffmpeg_version_input, self.ffmpeg_download_input,
+                            ], spacing=10, horizontal_alignment=ft.CrossAxisAlignment.STRETCH),
+                            padding=ft.Padding.only(left=8, right=8, bottom=8),
+                        )],
+                    ),
                 ], spacing=12, horizontal_alignment=ft.CrossAxisAlignment.STRETCH),
                 bgcolor="#161616", border_radius=8, padding=15,
             ),
@@ -597,16 +632,6 @@ class SettingsScreen:
                     self.language_dropdown,
                 ], spacing=12, horizontal_alignment=ft.CrossAxisAlignment.STRETCH),
                 bgcolor="#161616", border_radius=8, padding=15,
-            ),
-            ft.ExpansionTile(
-                title=self.header_urls,
-                controls=[ft.Container(
-                    content=ft.Column([
-                        self.yt_api_input, self.yt_download_input,
-                        self.ffmpeg_version_input, self.ffmpeg_download_input,
-                    ], spacing=10, horizontal_alignment=ft.CrossAxisAlignment.STRETCH),
-                    padding=10,
-                )],
             ),
         ], visible=False, scroll=ft.ScrollMode.AUTO, expand=True, spacing=15,
            horizontal_alignment=ft.CrossAxisAlignment.STRETCH)
