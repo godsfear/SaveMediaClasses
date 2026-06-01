@@ -8,6 +8,7 @@ from config import (
 )
 from events import EventBus, ToolsCheckedEvent, ToolsRestoredEvent
 from locale import Locale, Strings
+from managers.tools_manager import ToolsManager
 from services import Services
 
 
@@ -25,6 +26,7 @@ class SettingsScreen:
         self._on_language_changed: callable = lambda: None
 
         self._s: Strings = Locale.load(self._state.language)
+        
 
         self._build_widgets()
         self._build_theme_section()
@@ -371,9 +373,9 @@ class SettingsScreen:
             "ffplay": self.ffplay_status, "ffprobe": self.ffprobe_status,
         }
         for name, widget in tool_widgets.items():
-            pair = e.tool_versions.get(name)
-            if pair:
-                loc, rem, status_key = pair
+            tv = e.tool_versions.get(name)
+            if tv and isinstance(tv, tuple) and len(tv) == 3:
+                loc, rem, status_key = tv
                 widget.value = s.fmt("tool_versions", name=name, loc=loc, rem=rem)
                 widget.color = color_map.get(status_key, ft.Colors.GREY_600)
             else:
@@ -396,41 +398,44 @@ class SettingsScreen:
         s = self._s
         self.progress_text.value = s.status_checking
         self.progress_text.color = ft.Colors.GREEN_400
-        await asyncio.sleep(0.02)
+        self.progress_text.update()
 
         tool_widgets = {
             "yt-dlp": self.yt_status, "ffmpeg": self.ffmpeg_status,
             "ffplay": self.ffplay_status, "ffprobe": self.ffprobe_status,
         }
+        color_map = {
+            "ok":       ft.Colors.GREEN_400,
+            "outdated": ft.Colors.ORANGE_400,
+            "missing":  ft.Colors.RED_400,
+            "error":    ft.Colors.AMBER,
+        }
 
-        def on_local_version(name: str, version: str):
-            if name in tool_widgets:
-                tool_widgets[name].value = s.fmt("tool_querying", name=name, loc=version)
-                tool_widgets[name].color = ft.Colors.ORANGE_400
+        def on_local_version(name: str, local: str):
+            if name not in tool_widgets:
+                return
+            loc_text = local if local else s.tool_status_missing
+            tool_widgets[name].value = s.fmt("tool_querying", name=name, loc=loc_text)
+            tool_widgets[name].color = ft.Colors.GREY_500
+            tool_widgets[name].update()
 
         def on_remote_done(name: str, loc: str, rem: str):
             if name not in tool_widgets:
                 return
-            tool_widgets[name].value = s.fmt("tool_versions", name=name, loc=loc, rem=rem)
-            is_equal = (loc == rem) or (
-                "[" not in rem and "[" not in loc
-                and "Отсутствует" not in loc
-                and "Ошибка" not in rem and "[" not in rem
-                and (rem in loc or loc in rem)
-            )
-            if "Отсутствует" in loc:
-                tool_widgets[name].color = ft.Colors.RED_400
-                status_key = "missing"
-            elif "[" in loc or "Ошибка" in rem or "[" in rem:
-                tool_widgets[name].color = ft.Colors.AMBER
-                status_key = "error"
-            elif is_equal:
-                tool_widgets[name].color = ft.Colors.GREEN_400
-                status_key = "ok"
+            # Определяем статус здесь — tools_manager передаёт только версии
+            if not loc:
+                status = "missing"
+            elif not rem or "[" in rem:
+                status = "error"
             else:
-                tool_widgets[name].color = ft.Colors.ORANGE_400
-                status_key = "outdated"
-            self._state.tool_versions[name] = (loc, rem, status_key)
+                status = "ok" if (loc == rem or rem in loc or loc in rem) else "outdated"
+            loc_text = loc if loc else s.tool_status_missing
+            rem_text = rem if rem else s.tool_status_error
+            tool_widgets[name].value = s.fmt("tool_versions", name=name,
+                                             loc=loc_text, rem=rem_text)
+            tool_widgets[name].color = color_map.get(status, ft.Colors.GREY_600)
+            self._state.tool_versions[name] = (loc_text, rem_text, status)
+            tool_widgets[name].update()
 
         proxy_url = self._state.proxy_address.strip() if self._state.proxy_enabled else None
         await self._tools.check_all(
@@ -440,13 +445,12 @@ class SettingsScreen:
             on_local_version=on_local_version,
             on_remote_done=on_remote_done,
         )
-
         needs = self._tools.yt_needs_update or self._tools.ffmpeg_needs_update
         if needs:
             self.update_btn_text.value = s.btn_update
             self.update_btn_icon.name  = ft.Icons.DOWNLOAD_ROUNDED
             self.progress_text.value   = s.status_updates
-            self.progress_text.color   = ft.Colors.ORANGE
+            self.progress_text.color   = ft.Colors.ORANGE_400
         else:
             self.update_btn_text.value = s.btn_check
             self.update_btn_icon.name  = ft.Icons.REFRESH_ROUNDED
@@ -454,8 +458,11 @@ class SettingsScreen:
             self.progress_text.color   = ft.Colors.GREEN_400
 
         self.update_btn.disabled = False
+        self.update_btn_text.update()
+        self.update_btn_icon.update()
+        self.update_btn.update()
+        self.progress_text.update()
         self._bus.emit(ToolsCheckedEvent(needs_update=needs))
-        self._page.update()
 
     async def _update_tools(self) -> None:
         s = self._s
@@ -470,21 +477,32 @@ class SettingsScreen:
 
         proxy_url = self._state.proxy_address.strip() if self._state.proxy_enabled else None
 
-        def on_yt_status(message: str, state: str):
-            self.yt_status.value = message
-            self.yt_status.color = (ft.Colors.ORANGE if state == "orange"
-                                    else ft.Colors.GREEN_400 if state == "ok" else ft.Colors.RED)
+        def on_yt_status(code: str, detail: str):
+            if code == "downloading":
+                self.yt_status.value = f"yt-dlp: {s.tool_update_downloading}"
+                self.yt_status.color = ft.Colors.ORANGE_400
+            elif code == "ok":
+                self.yt_status.value = f"yt-dlp: {s.tool_update_ok}"
+                self.yt_status.color = ft.Colors.GREEN_400
+            else:
+                self.yt_status.value = f"yt-dlp: {s.fmt('tool_update_error', detail=detail)}"
+                self.yt_status.color = ft.Colors.RED_400
             self._safe_update()
 
-        def on_ff_status(message: str, state: str):
-            self.ffmpeg_status.value = message
-            self.ffmpeg_status.color = (ft.Colors.ORANGE if state == "orange"
-                                        else ft.Colors.GREEN_400 if state == "ok" else ft.Colors.RED)
+        def on_ff_status(code: str, detail: str):
+            if code == "downloading":
+                self.ffmpeg_status.value = f"ffmpeg: {s.tool_update_downloading}"
+                self.ffmpeg_status.color = ft.Colors.ORANGE_400
+            elif code == "ok":
+                self.ffmpeg_status.value = f"ffmpeg: {s.tool_update_ok}"
+                self.ffmpeg_status.color = ft.Colors.GREEN_400
+            else:
+                self.ffmpeg_status.value = f"ffmpeg: {s.fmt('tool_update_error', detail=detail)}"
+                self.ffmpeg_status.color = ft.Colors.RED_400
             self._safe_update()
 
-        def on_progress(message: str, value):
-            self.progress_text.value = message
-            self.progress_bar.value  = float(value) if value is not None else None
+        def on_progress(pct):
+            self.progress_bar.value = pct  # None = индетерминированный
             self._safe_update()
 
         result = {"had_errors": False, "critical_err": ""}
@@ -505,6 +523,9 @@ class SettingsScreen:
             self.update_btn.disabled   = False
             self.update_btn_icon.name  = ft.Icons.REFRESH_ROUNDED
             self.update_btn_text.value = s.btn_check
+            self.update_btn_text.update()
+            self.update_btn_icon.update()
+            self.update_btn.update()
             self._safe_update()
 
         await self._tools.update_all(
