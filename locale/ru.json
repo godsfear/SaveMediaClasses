@@ -101,5 +101,6 @@
     "appbar_settings": "Настройки конфигурации",
     "appbar_main": "SaveMedia [yt-dlp GUI]",
     "btn_folder": "Выбрать папку",
-    "btn_exit": "Полный выход"
+    "btn_exit": "Полный выход",
+    "folder_select_text": "Выберите папку сохранения медиа"
 }

@@ -27,7 +27,7 @@ class SaveMediaApp:
             try:
                 page.update()
             except Exception:
-                pass
+                log.exception("Failed to page.update")
 
         # ── Геометрия окна — до создания Services (нужна до page.add) ─────────
         geo = Services.create(base_dir, safe_update).config_mgr.load_window_geometry()
@@ -117,8 +117,13 @@ class SaveMediaApp:
                     if isinstance(ctrl, ft.Container):
                         ctrl.bgcolor = card_c
 
+        _s0 = Locale.load(svc.state.language)
+        folder_picker_title = _s0.folder_select_text
+
         def _on_lang_changed():
+            nonlocal folder_picker_title
             s = Locale.load(svc.state.language)
+            folder_picker_title = s.folder_select_text
             settings_screen.rebuild_for_language()
             main_screen.rebuild_for_language()
             history_screen.rebuild_for_language()
@@ -183,7 +188,6 @@ class SaveMediaApp:
         def update_cookies_ui():
             settings_screen.update_cookies_ui(main_screen.cookies_enabled_switch)
 
-        _s0 = Locale.load(svc.state.language)
         history_btn  = ft.IconButton(icon=ft.Icons.HISTORY_ROUNDED, icon_color=ft.Colors.WHITE, tooltip=_s0.nav_history)
         folder_btn   = ft.IconButton(icon=ft.Icons.FOLDER_OPEN_ROUNDED, icon_color=ft.Colors.WHITE, tooltip=_s0.btn_folder)
         proxy_btn    = ft.IconButton(icon=ft.Icons.SHIELD_OUTLINED,     icon_color=ft.Colors.WHITE, tooltip=_s0.proxy_tooltip)
@@ -261,7 +265,7 @@ class SaveMediaApp:
             safe_update()
 
         async def open_folder_picker(_):
-            path = await ft.FilePicker().get_directory_path(dialog_title="Выберите папку сохранения медиа")
+            path = await ft.FilePicker().get_directory_path(dialog_title=folder_picker_title)
             if path:
                 svc.state.download_path        = str(path)
                 main_screen.folder_label.value = str(path)
