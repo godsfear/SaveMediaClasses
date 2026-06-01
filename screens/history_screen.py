@@ -13,6 +13,7 @@ from typing import Optional
 
 import flet as ft
 
+from app_logging import get_logger
 from locale import Locale, Strings
 from managers.download_repository import DownloadRecord, DownloadRepository
 from services import Services
@@ -299,7 +300,7 @@ def _open_folder(path: str) -> None:
         else:
             subprocess.Popen(["xdg-open", path])
     except Exception:
-        pass
+        get_logger("app").exception("Failed to open download folder: %s", path)
 
 
 def _fmt_ts(ts: Optional[float]) -> str:

@@ -4,6 +4,7 @@ import time
 
 import flet as ft
 
+from app_logging import get_logger
 from config import CHECK_INTERVAL_HOURS, hex_to_flet
 from events import ToolsCheckedEvent, ToolsRestoredEvent, ToolsStatusMessageEvent
 from locale import Locale
@@ -17,6 +18,7 @@ class SaveMediaApp:
 
     async def main(self, page: ft.Page) -> None:
         base_dir = os.path.dirname(os.path.abspath(__file__))
+        log = get_logger("app")
 
         page.theme_mode = ft.ThemeMode.DARK
         page.theme      = ft.Theme(color_scheme_seed=ft.Colors.BLUE)
@@ -189,8 +191,10 @@ class SaveMediaApp:
         exit_btn     = ft.IconButton(icon=ft.Icons.POWER_SETTINGS_NEW_ROUNDED, icon_color=ft.Colors.RED_400, tooltip=_s0.btn_exit)
 
         async def force_exit_app(_):
-            try: save_config()
-            except Exception: pass
+            try:
+                save_config()
+            except Exception:
+                log.exception("Failed to save config before exit")
             page.window.prevent_close = False
             page.window.on_event      = None
             page.update()
@@ -263,7 +267,8 @@ class SaveMediaApp:
                 main_screen.folder_label.value = str(path)
                 main_screen.folder_label.color = ft.Colors.GREEN_400
                 try: os.makedirs(svc.state.download_path, exist_ok=True)
-                except Exception: pass
+                except Exception:
+                    log.exception("Failed to create selected download directory: %s", svc.state.download_path)
                 save_config()
                 safe_update()
 
@@ -283,8 +288,10 @@ class SaveMediaApp:
         async def handle_window_event(e):
             ev = str(getattr(e, "type", None) or getattr(e, "data", None)).lower()
             if "close" in ev:
-                try: save_config()
-                except Exception: pass
+                try:
+                    save_config()
+                except Exception:
+                    log.exception("Failed to save config before window close")
                 page.window.prevent_close = False
                 page.window.on_event      = None
                 page.update()

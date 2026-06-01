@@ -20,6 +20,7 @@ import os
 from dataclasses import dataclass, field
 from typing import Callable
 
+from app_logging import configure_logging
 from events import EventBus
 from managers.config_manager import ConfigManager
 from managers.download_manager import DownloadManager
@@ -80,6 +81,7 @@ class Services:
 
         tools_dir  = os.path.join(base_dir, "tools")
         os.makedirs(tools_dir, exist_ok=True)
+        configure_logging(os.path.join(base_dir, "savemedia.log"))
 
         bus        = EventBus()
         config_mgr = ConfigManager(os.path.join(base_dir, "config.json"))

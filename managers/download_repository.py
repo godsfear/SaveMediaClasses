@@ -25,6 +25,7 @@ from contextlib import contextmanager
 from dataclasses import asdict, fields
 from typing import Any, Dict, Generator, List, Optional
 
+from app_logging import get_logger
 from events import (
     EventBus,
     DownloadStartedEvent,
@@ -122,6 +123,7 @@ class DownloadRepository:
     def __init__(self, db_path: str, bus: EventBus) -> None:
         self._db_path = db_path
         self._bus     = bus
+        self._log     = get_logger("db")
         self._init_db()
         self._subscribe()
 
@@ -135,8 +137,11 @@ class DownloadRepository:
             for migration in (_MIGRATE_THUMBNAIL, _MIGRATE_META):
                 try:
                     conn.execute(migration)
+                except sqlite3.OperationalError as err:
+                    if "duplicate column name" not in str(err).lower():
+                        self._log.exception("Database migration failed")
                 except Exception:
-                    pass
+                    self._log.exception("Database migration failed")
 
     def _subscribe(self) -> None:
         self._bus.on(DownloadStartedEvent,   self._on_started)
@@ -166,7 +171,7 @@ class DownloadRepository:
                     "params":     params_json,
                 })
         except Exception:
-            pass
+            self._log.exception("Failed to insert download record: %s", e.task_id)
 
     def _on_completed(self, e: DownloadCompletedEvent) -> None:
         self._finish(e.task_id, "completed" if e.success else "failed",
@@ -185,7 +190,7 @@ class DownloadRepository:
                     "error_message": error,
                 })
         except Exception:
-            pass
+            self._log.exception("Failed to update download record: %s", task_id)
 
     # ── Публичный API ─────────────────────────────────────────────────────────
 
@@ -223,6 +228,7 @@ class DownloadRepository:
                 """).fetchone()
                 return dict(row) if row else {}
         except Exception:
+            self._log.exception("Failed to get download stats")
             return {}
 
     def save_thumbnail(self, task_id: str, data: bytes) -> None:
@@ -231,7 +237,7 @@ class DownloadRepository:
             with self._connect() as conn:
                 conn.execute(_UPDATE_THUMBNAIL, {"task_id": task_id, "thumbnail": data})
         except Exception:
-            pass
+            self._log.exception("Failed to save thumbnail: %s", task_id)
 
     def save_meta(self, task_id: str, meta: dict) -> None:
         """Сохранить JSON-метаданные из yt-dlp."""
@@ -242,7 +248,7 @@ class DownloadRepository:
                     "meta":    json.dumps(meta, ensure_ascii=False),
                 })
         except Exception:
-            pass
+            self._log.exception("Failed to save metadata: %s", task_id)
 
     def delete(self, task_id: str) -> None:
         """Удалить запись из истории."""
@@ -250,7 +256,7 @@ class DownloadRepository:
             with self._connect() as conn:
                 conn.execute("DELETE FROM downloads WHERE task_id = ?", (task_id,))
         except Exception:
-            pass
+            self._log.exception("Failed to delete download record: %s", task_id)
 
     # ── Приватное ─────────────────────────────────────────────────────────────
 
@@ -261,6 +267,7 @@ class DownloadRepository:
                 rows = conn.execute(query, params).fetchall()
                 return [DownloadRecord(**dict(r)) for r in rows]
         except Exception:
+            self._log.exception("Failed to fetch download records")
             return []
 
     @contextmanager

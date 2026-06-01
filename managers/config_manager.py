@@ -2,6 +2,7 @@ import json
 import os
 from typing import Any, Dict
 
+from app_logging import get_logger
 from config import (
     ThemeConfig, WindowConfig,
     safe_str, safe_int, get_fallback_bool,
@@ -14,6 +15,7 @@ class ConfigManager:
 
     def __init__(self, config_file: str) -> None:
         self.config_file = config_file
+        self._log = get_logger("app")
 
     # ── Загрузка ──────────────────────────────────────────────────────────────
 
@@ -108,7 +110,7 @@ class ConfigManager:
             with open(self.config_file, "w", encoding="utf-8") as f:
                 json.dump(data, f, ensure_ascii=False, indent=4)
         except OSError:
-            pass
+            self._log.exception("Failed to save config: %s", self.config_file)
 
     # ── Приватное ─────────────────────────────────────────────────────────────
 
@@ -120,4 +122,5 @@ class ConfigManager:
                 data = json.load(f)
                 return data if isinstance(data, dict) else None
         except Exception:
+            self._log.exception("Failed to read config: %s", self.config_file)
             return None

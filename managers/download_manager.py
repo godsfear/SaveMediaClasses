@@ -11,6 +11,7 @@ import uuid
 from dataclasses import dataclass, field
 from typing import Callable, Dict, Optional, TYPE_CHECKING
 
+from app_logging import configure_logging, get_logger
 from events import (
     EventBus,
     DownloadStartedEvent,
@@ -73,9 +74,10 @@ class DownloadManager:
         db — DownloadRepository для сохранения thumbnail после загрузки (опционально).
         """
         self._provider_factory = provider_factory
-        self._log_path         = log_path
+        configure_logging(log_path)
         self._bus              = bus
         self._db               = db
+        self._log              = get_logger("app")
 
         self._semaphore = asyncio.Semaphore(MAX_PARALLEL)
         self._active: Dict[str, DownloadTask] = {}
@@ -124,19 +126,20 @@ class DownloadManager:
             provider = task.provider
             snap     = task.snapshot
             exe      = provider.resolve_exe()
+            source   = self._provider_source(provider)
 
             # Сообщаем репозиторию о старте — он запишет snapshot в БД
             self._bus.emit(DownloadStartedEvent(
                 task_id=task.task_id,
                 snapshot=snap,
-                source=type(provider).__name__,
+                source=source,
             ))
 
             if snap.download_path:
                 try:
                     os.makedirs(snap.download_path, exist_ok=True)
                 except Exception:
-                    pass
+                    self._log.exception("Failed to create download directory: %s", snap.download_path)
 
             cmd_args = provider.build_command(exe, snap)
             returncode_holder = [0]
@@ -146,18 +149,18 @@ class DownloadManager:
                     return
                 pct = provider.parse_progress(line)
                 if pct is None:
-                    self._write_log(line)
+                    self._write_log(line, source)
                 if pct is not None and pct - task._last_pct >= 0.01:
                     task._last_pct = pct
                     status = line.replace("[download]", "").strip()
                     self._bus.emit(DownloadProgressEvent(
                         task_id=task.task_id, pct=pct, status=status[:80],
-                        source=type(provider).__name__,
+                        source=source,
                     ))
                 elif any(tag in line for tag in provider.post_processing_tags()):
                     self._bus.emit(DownloadPostprocessingEvent(
                         task_id=task.task_id,
-                        source=type(provider).__name__,
+                        source=source,
                     ))
 
             def on_finish(rc: int) -> None:
@@ -166,11 +169,12 @@ class DownloadManager:
             try:
                 await provider.run(cmd_args, on_line, on_finish)
             except Exception as err:
+                self._log.exception("Download process failed: %s", snap.url)
                 self._finish(task)
                 self._bus.emit(DownloadCompletedEvent(
                     task_id=task.task_id, success=False,
                     message=f"Ошибка ОС: {err}",
-                    source=type(provider).__name__,
+                    source=source,
                 ))
                 return
 
@@ -178,16 +182,18 @@ class DownloadManager:
                 self._finish(task)
                 self._bus.emit(DownloadCancelledEvent(
                     task_id=task.task_id,
-                    source=type(provider).__name__,
+                    source=source,
                 ))
                 return
 
             success = returncode_holder[0] == 0
             message = "Загрузка завершена!" if success else f"Ошибка (код {returncode_holder[0]})"
+            if not success:
+                get_logger(source).error("Process finished with return code %s", returncode_holder[0])
             self._finish(task)
             self._bus.emit(DownloadCompletedEvent(
                 task_id=task.task_id, success=success, message=message,
-                source=type(provider).__name__,
+                source=source,
             ))
 
 
@@ -195,9 +201,10 @@ class DownloadManager:
     def _finish(self, task: DownloadTask) -> None:
         self._active.pop(task.task_id, None)
 
-    def _write_log(self, line: str) -> None:
-        try:
-            with open(self._log_path, "a", encoding="utf-8") as f:
-                f.write(line + "\n")
-        except Exception:
-            pass
+    @staticmethod
+    def _provider_source(provider: "DownloadProvider") -> str:
+        return getattr(provider, "SOURCE_NAME", type(provider).__name__)
+
+    @staticmethod
+    def _write_log(line: str, source: str) -> None:
+        get_logger(source).info(line)
