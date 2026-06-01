@@ -66,6 +66,45 @@ class SettingsScreen:
             safe_str(self.language_dropdown.value) or Locale.default_language()
         )
 
+    # ── Тема ─────────────────────────────────────────────────────────────────
+
+    def apply_theme(self, t) -> None:
+        """Применить ThemeConfig к виджетам экрана."""
+        header_c   = hex_to_flet(t.header_color)
+        switch_c   = hex_to_flet(t.switch_color)
+        accent     = hex_to_flet(t.accent_color)
+        button_c   = hex_to_flet(t.button_color)
+        progress_c = hex_to_flet(t.progress_color)
+        card_c     = hex_to_flet(t.card_color)
+
+        for h in (
+            self.header_net, self.header_downloaders, self.header_cookies,
+            self.header_ytdlp, self.header_deps,
+            self.header_theme, self.header_appearance,
+        ):
+            h.color = header_c
+        for sw in (
+            self.clean_titles_switch, self.playlist_switch,
+            self.embed_metadata_switch, self.save_to_source_switch,
+        ):
+            sw.active_color = switch_c
+
+        self.update_btn.bgcolor  = button_c
+        self.progress_text.color = progress_c
+        self.progress_bar.color  = progress_c
+
+        for inp in (
+            self.proxy_input, self.yt_args_input,
+            self.cookies_browser_dropdown,
+            self.yt_api_input, self.yt_download_input,
+            self.ffmpeg_version_input, self.ffmpeg_download_input,
+        ):
+            inp.focused_border_color = accent
+
+        for ctrl in getattr(self.layout, "controls", []):
+            if isinstance(ctrl, ft.Container):
+                ctrl.bgcolor = card_c
+
     # ── Виджеты ───────────────────────────────────────────────────────────────
 
     def _build_widgets(self) -> None:
