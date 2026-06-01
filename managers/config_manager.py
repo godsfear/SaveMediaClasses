@@ -6,6 +6,7 @@ from config import (
     ThemeConfig, WindowConfig,
     safe_str, safe_int, get_fallback_bool,
 )
+from locale import Locale
 from state import AppState
 
 
@@ -62,7 +63,7 @@ class ConfigManager:
             },
             theme    = ThemeConfig.from_dict(raw.get("theme", {})),
             window   = WindowConfig.from_dict(raw.get("window", {})),
-            language = str(raw.get("language", "ru")) or "ru",
+            language = Locale.resolve_language(raw.get("language") or defaults.language),
         )
 
     def load_window_geometry(self) -> WindowConfig:

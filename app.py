@@ -121,6 +121,7 @@ class SaveMediaApp:
             main_screen.rebuild_for_language()
             history_screen.rebuild_for_language()
             # Обновляем tooltip кнопок тулбара
+            settings_btn.tooltip = s.appbar_settings
             history_btn.tooltip  = s.nav_history
             folder_btn.tooltip   = s.btn_folder
             exit_btn.tooltip     = s.btn_exit
