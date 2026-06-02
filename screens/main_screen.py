@@ -8,6 +8,7 @@ import flet as ft
 
 from app_logging import get_logger
 from config import safe_str, hex_to_flet
+from controllers.theme_target import ThemeTarget
 from events import (
     EventBus,
     DownloadProgressEvent,
@@ -99,9 +100,10 @@ class DownloadCard:
         )
 
 
-class MainScreen:
+class MainScreen(ThemeTarget):
 
     def __init__(self, page: ft.Page, svc: Services) -> None:
+        super().__init__()
         self._page        = page
         self._base_dir    = svc.base_dir
         self._tools_dir   = svc.tools_dir
@@ -248,6 +250,13 @@ class MainScreen:
            horizontal_alignment=ft.CrossAxisAlignment.STRETCH,
            scroll=ft.ScrollMode.AUTO)
 
+        # ── Регистрация виджетов для ThemeTarget ──────────────────────────────
+        self.register_headers(self.header_folder, self.header_main, self.header_queue)
+        self.register_switches(self.audio_only_switch, self.cookies_enabled_switch)
+        self.register_accents(self.url_input)
+        self.register_buttons(self.download_btn)
+        self.register_cards(self.folder_card, self.main_card, self._queue_card)
+
     # ── Синхронизация ─────────────────────────────────────────────────────────
 
     def sync_from_state(self) -> None:
@@ -266,25 +275,11 @@ class MainScreen:
 
     def apply_theme(self, t) -> None:
         """Применить ThemeConfig к виджетам экрана."""
-        header_c = hex_to_flet(t.header_color)
-        switch_c = hex_to_flet(t.switch_color)
-        accent   = hex_to_flet(t.accent_color)
-        text_c   = hex_to_flet(t.text_color)
-        button_c = hex_to_flet(t.button_color)
-        card_c   = hex_to_flet(t.card_color)
-
-        for h in (self.header_folder, self.header_main, self.header_queue):
-            h.color = header_c
-        for sw in (self.audio_only_switch, self.cookies_enabled_switch):
-            sw.active_color = switch_c
-
-        self.download_btn.bgcolor        = button_c
-        self.url_input.focused_border_color = accent
+        super().apply_theme(t)
+        # folder_label получает text_color только если путь не выбран
+        # (при выбранном пути цвет GREEN_400 проставляется в sync_from_state)
         if not self._state.download_path:
-            self.folder_label.color = text_c
-
-        for card in (self.folder_card, self.main_card, self._queue_card):
-            card.bgcolor = card_c
+            self.folder_label.color = hex_to_flet(t.text_color)
 
     # ── Смена языка ───────────────────────────────────────────────────────────
 

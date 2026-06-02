@@ -1,6 +1,7 @@
 from controllers.navigation_controller import NavigationController
 from controllers.theme_controller import ThemeController
+from controllers.theme_target import ThemeTarget
 from controllers.tools_controller import ToolsController
 from controllers.window_controller import WindowController
 
-__all__ = ["NavigationController", "ThemeController", "ToolsController", "WindowController"]
+__all__ = ["NavigationController", "ThemeController", "ThemeTarget", "ToolsController", "WindowController"]

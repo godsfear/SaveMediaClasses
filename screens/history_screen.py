@@ -15,6 +15,7 @@ import flet as ft
 
 from app_logging import get_logger
 from config import hex_to_flet
+from controllers.theme_target import ThemeTarget
 from locale import Locale, Strings
 from managers.download_repository import DownloadRecord, DownloadRepository
 from services import Services
@@ -33,9 +34,10 @@ _STATUS_ICON = {
 }
 
 
-class HistoryScreen:
+class HistoryScreen(ThemeTarget):
 
     def __init__(self, page: ft.Page, svc: Services) -> None:
+        super().__init__()
         self._page           = page
         self._db             = svc.db
         self._state          = svc.state
@@ -95,38 +97,45 @@ class HistoryScreen:
 
     def _build_layout(self) -> None:
         s = self._s()
-        self.layout = ft.Column(
-            [
-                ft.Container(
-                    content=ft.Column([
-                        ft.Row([
-                            self.header,
-                            ft.IconButton(
-                                icon=ft.Icons.REFRESH_ROUNDED,
-                                icon_color=ft.Colors.GREY_500,
-                                icon_size=18, tooltip=s.btn_refresh,
-                                on_click=lambda _: self.refresh(),
-                            ),
-                        ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
-                           vertical_alignment=ft.CrossAxisAlignment.CENTER),
-                        self._filter_row,
-                        self._stats_text,
-                    ], spacing=10, horizontal_alignment=ft.CrossAxisAlignment.STRETCH),
-                    bgcolor="#161616", border_radius=8, padding=15,
-                ),
-                ft.Container(
-                    content=ft.Column(
-                        [self._empty, self._list],
-                        expand=True,
-                        scroll=ft.ScrollMode.AUTO,
-                        horizontal_alignment=ft.CrossAxisAlignment.STRETCH,
+        self._card_header = ft.Container(
+            content=ft.Column([
+                ft.Row([
+                    self.header,
+                    ft.IconButton(
+                        icon=ft.Icons.REFRESH_ROUNDED,
+                        icon_color=ft.Colors.GREY_500,
+                        icon_size=18, tooltip=s.btn_refresh,
+                        on_click=lambda _: self.refresh(),
                     ),
-                    bgcolor="#161616", border_radius=8, padding=15, expand=True,
-                ),
-            ],
+                ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                   vertical_alignment=ft.CrossAxisAlignment.CENTER),
+                self._filter_row,
+                self._stats_text,
+            ], spacing=10, horizontal_alignment=ft.CrossAxisAlignment.STRETCH),
+            bgcolor="#161616", border_radius=8, padding=15,
+        )
+        self._card_list = ft.Container(
+            content=ft.Column(
+                [self._empty, self._list],
+                expand=True,
+                scroll=ft.ScrollMode.AUTO,
+                horizontal_alignment=ft.CrossAxisAlignment.STRETCH,
+            ),
+            bgcolor="#161616", border_radius=8, padding=15, expand=True,
+        )
+        self.layout = ft.Column(
+            [self._card_header, self._card_list],
             visible=False, expand=True, spacing=15,
             horizontal_alignment=ft.CrossAxisAlignment.STRETCH,
         )
+
+        # ── Регистрация виджетов для ThemeTarget ──────────────────────────────
+        self.register_headers(self.header)
+        self.register_cards(self._card_header, self._card_list)
+
+    def apply_theme(self, t) -> None:
+        """Применить ThemeConfig к виджетам экрана."""
+        super().apply_theme(t)
 
     # ── Публичный API ─────────────────────────────────────────────────────────
 
@@ -143,10 +152,6 @@ class HistoryScreen:
         self._rebuild_filter_buttons()
         self._filter_row.update()
         self._render_stats()
-
-    def apply_theme(self, t) -> None:
-        """Применить ThemeConfig к виджетам экрана."""
-        self.header.color = hex_to_flet(t.header_color)
 
     # ── Фильтр ────────────────────────────────────────────────────────────────
 

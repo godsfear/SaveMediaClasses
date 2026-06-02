@@ -286,3 +286,18 @@
 2026-06-02 10:46:44 [INFO] [yt-dlp] [Metadata] Adding metadata to "d:\Downloads\Youtube\Конвейер, который работает 3,8 млрд лет [Clockwork].mp4"
 2026-06-02 10:46:48 [INFO] [yt-dlp] [ThumbnailsConvertor] Converting thumbnail "d:\Downloads\Youtube\Конвейер, который работает 3,8 млрд лет [Clockwork].webp" to png
 2026-06-02 10:46:48 [INFO] [yt-dlp] [EmbedThumbnail] mutagen: Adding thumbnail to "d:\Downloads\Youtube\Конвейер, который работает 3,8 млрд лет [Clockwork].mp4"
+2026-06-02 11:03:09 [INFO] [yt-dlp] [youtube] Extracting URL: https://www.youtube.com/watch?v=gtxhpV4zMrQ
+2026-06-02 11:03:09 [INFO] [yt-dlp] [youtube] gtxhpV4zMrQ: Downloading webpage
+2026-06-02 11:03:10 [INFO] [yt-dlp] WARNING: [youtube] No supported JavaScript runtime could be found. Only deno is enabled by default; to use another runtime add  --js-runtimes RUNTIME[:PATH]  to your command/config. YouTube extraction without a JS runtime has been deprecated, and some formats may be missing. See  https://github.com/yt-dlp/yt-dlp/wiki/EJS  for details on installing one
+2026-06-02 11:03:10 [INFO] [yt-dlp] [youtube] gtxhpV4zMrQ: Downloading android vr player API JSON
+2026-06-02 11:03:11 [INFO] [yt-dlp] [info] gtxhpV4zMrQ: Downloading 1 format(s): 400+251
+2026-06-02 11:03:11 [INFO] [yt-dlp] [info] Downloading video thumbnail 41 ...
+2026-06-02 11:03:11 [INFO] [yt-dlp] [info] Writing video thumbnail 41 to: d:\Downloads\Youtube\This is probably the biggest misconception about Python.webp
+2026-06-02 11:03:12 [INFO] [yt-dlp] [download] Destination: d:\Downloads\Youtube\This is probably the biggest misconception about Python.f400.mp4
+2026-06-02 11:03:13 [INFO] [yt-dlp] [download] Destination: d:\Downloads\Youtube\This is probably the biggest misconception about Python.f251.webm
+2026-06-02 11:03:13 [INFO] [yt-dlp] [Merger] Merging formats into "d:\Downloads\Youtube\This is probably the biggest misconception about Python.mp4"
+2026-06-02 11:03:14 [INFO] [yt-dlp] Deleting original file d:\Downloads\Youtube\This is probably the biggest misconception about Python.f400.mp4 (pass -k to keep)
+2026-06-02 11:03:14 [INFO] [yt-dlp] Deleting original file d:\Downloads\Youtube\This is probably the biggest misconception about Python.f251.webm (pass -k to keep)
+2026-06-02 11:03:14 [INFO] [yt-dlp] [Metadata] Adding metadata to "d:\Downloads\Youtube\This is probably the biggest misconception about Python.mp4"
+2026-06-02 11:03:14 [INFO] [yt-dlp] [ThumbnailsConvertor] Converting thumbnail "d:\Downloads\Youtube\This is probably the biggest misconception about Python.webp" to png
+2026-06-02 11:03:14 [INFO] [yt-dlp] [EmbedThumbnail] mutagen: Adding thumbnail to "d:\Downloads\Youtube\This is probably the biggest misconception about Python.mp4"

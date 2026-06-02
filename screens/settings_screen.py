@@ -4,15 +4,17 @@ from config import (
     THEME_FIELDS, THEME_GROUPS, PALETTE, ThemeConfig,
     hex_to_flet, is_valid_hex, safe_str
 )
+from controllers.theme_target import ThemeTarget
 from controllers.tools_controller import ToolsController
 from events import ToolsRestoredEvent
 from locale import Locale, Strings
 from services import Services
 
 
-class SettingsScreen:
+class SettingsScreen(ThemeTarget):
 
     def __init__(self, page: ft.Page, svc: Services) -> None:
+        super().__init__()
         self._page        = page
         self._safe_update = svc.safe_update
         self._state       = svc.state
@@ -83,40 +85,7 @@ class SettingsScreen:
 
     def apply_theme(self, t) -> None:
         """Применить ThemeConfig к виджетам экрана."""
-        header_c   = hex_to_flet(t.header_color)
-        switch_c   = hex_to_flet(t.switch_color)
-        accent     = hex_to_flet(t.accent_color)
-        button_c   = hex_to_flet(t.button_color)
-        progress_c = hex_to_flet(t.progress_color)
-        card_c     = hex_to_flet(t.card_color)
-
-        for h in (
-            self.header_net, self.header_downloaders, self.header_cookies,
-            self.header_ytdlp, self.header_deps,
-            self.header_theme, self.header_appearance,
-        ):
-            h.color = header_c
-        for sw in (
-            self.clean_titles_switch, self.playlist_switch,
-            self.embed_metadata_switch, self.save_to_source_switch,
-        ):
-            sw.active_color = switch_c
-
-        self.update_btn.bgcolor  = button_c
-        self.progress_text.color = progress_c
-        self.progress_bar.color  = progress_c
-
-        for inp in (
-            self.proxy_input, self.yt_args_input,
-            self.cookies_browser_dropdown,
-            self.yt_api_input, self.yt_download_input,
-            self.ffmpeg_version_input, self.ffmpeg_download_input,
-        ):
-            inp.focused_border_color = accent
-
-        for ctrl in getattr(self.layout, "controls", []):
-            if isinstance(ctrl, ft.Container):
-                ctrl.bgcolor = card_c
+        super().apply_theme(t)
 
     # ── Виджеты ───────────────────────────────────────────────────────────────
 
@@ -607,50 +576,78 @@ class SettingsScreen:
             border=ft.Border.all(1, "#2a2a2a"),
         )
 
+        self._card_net = ft.Container(
+            content=ft.Column([
+                self.header_net,
+                self.proxy_input,
+            ], spacing=12, horizontal_alignment=ft.CrossAxisAlignment.STRETCH),
+            bgcolor="#161616", border_radius=8, padding=15,
+        )
+        self._card_downloaders = ft.Container(
+            content=ft.Column([
+                self.header_downloaders,
+                self.header_cookies,
+                self.cookies_browser_dropdown,
+                ytdlp_section,
+            ], spacing=12, horizontal_alignment=ft.CrossAxisAlignment.STRETCH),
+            bgcolor="#161616", border_radius=8, padding=15,
+        )
+        self._card_deps = ft.Container(
+            content=ft.Column([
+                self.header_deps,
+                ft.Column([self.yt_status, self.ffmpeg_status,
+                           self.ffplay_status, self.ffprobe_status], spacing=6),
+                ft.Row([self.update_btn], alignment=ft.MainAxisAlignment.END),
+                self.progress_bar,
+                self.progress_text,
+                ft.ExpansionTile(
+                    title=self.header_deps_urls,
+                    controls=[ft.Container(
+                        content=ft.Column([
+                            self.ffmpeg_version_input, self.ffmpeg_download_input,
+                        ], spacing=10, horizontal_alignment=ft.CrossAxisAlignment.STRETCH),
+                        padding=ft.Padding.only(left=8, right=8, bottom=8),
+                    )],
+                ),
+            ], spacing=12, horizontal_alignment=ft.CrossAxisAlignment.STRETCH),
+            bgcolor="#161616", border_radius=8, padding=15,
+        )
+        self._card_appearance = ft.Container(
+            content=ft.Column([
+                self.header_appearance,
+                self.language_dropdown,
+            ], spacing=12, horizontal_alignment=ft.CrossAxisAlignment.STRETCH),
+            bgcolor="#161616", border_radius=8, padding=15,
+        )
+
         self.layout = ft.Column([
-            ft.Container(
-                content=ft.Column([
-                    self.header_net,
-                    self.proxy_input,
-                ], spacing=12, horizontal_alignment=ft.CrossAxisAlignment.STRETCH),
-                bgcolor="#161616", border_radius=8, padding=15,
-            ),
-            ft.Container(
-                content=ft.Column([
-                    self.header_downloaders,
-                    self.header_cookies,
-                    self.cookies_browser_dropdown,
-                    ytdlp_section,
-                ], spacing=12, horizontal_alignment=ft.CrossAxisAlignment.STRETCH),
-                bgcolor="#161616", border_radius=8, padding=15,
-            ),
-            ft.Container(
-                content=ft.Column([
-                    self.header_deps,
-                    ft.Column([self.yt_status, self.ffmpeg_status,
-                               self.ffplay_status, self.ffprobe_status], spacing=6),
-                    ft.Row([self.update_btn], alignment=ft.MainAxisAlignment.END),
-                    self.progress_bar,
-                    self.progress_text,
-                    ft.ExpansionTile(
-                        title=self.header_deps_urls,
-                        controls=[ft.Container(
-                            content=ft.Column([
-                                self.ffmpeg_version_input, self.ffmpeg_download_input,
-                            ], spacing=10, horizontal_alignment=ft.CrossAxisAlignment.STRETCH),
-                            padding=ft.Padding.only(left=8, right=8, bottom=8),
-                        )],
-                    ),
-                ], spacing=12, horizontal_alignment=ft.CrossAxisAlignment.STRETCH),
-                bgcolor="#161616", border_radius=8, padding=15,
-            ),
+            self._card_net,
+            self._card_downloaders,
+            self._card_deps,
             self.theme_section,
-            ft.Container(
-                content=ft.Column([
-                    self.header_appearance,
-                    self.language_dropdown,
-                ], spacing=12, horizontal_alignment=ft.CrossAxisAlignment.STRETCH),
-                bgcolor="#161616", border_radius=8, padding=15,
-            ),
+            self._card_appearance,
         ], visible=False, scroll=ft.ScrollMode.AUTO, expand=True, spacing=15,
            horizontal_alignment=ft.CrossAxisAlignment.STRETCH)
+
+        # ── Регистрация виджетов для ThemeTarget ──────────────────────────────
+        self.register_headers(
+            self.header_net, self.header_downloaders, self.header_cookies,
+            self.header_ytdlp, self.header_deps,
+            self.header_theme, self.header_appearance,
+        )
+        self.register_switches(
+            self.clean_titles_switch, self.playlist_switch,
+            self.embed_metadata_switch, self.save_to_source_switch,
+        )
+        self.register_accents(
+            self.proxy_input, self.yt_args_input,
+            self.cookies_browser_dropdown,
+            self.yt_api_input, self.yt_download_input,
+            self.ffmpeg_version_input, self.ffmpeg_download_input,
+        )
+        self.register_buttons(self.update_btn)
+        self.register_cards(
+            self._card_net, self._card_downloaders,
+            self._card_deps, self._card_appearance,
+        )
+        self.register_progress(self.progress_bar, self.progress_text)
