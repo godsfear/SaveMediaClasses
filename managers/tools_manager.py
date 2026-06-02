@@ -3,11 +3,22 @@ import os
 import re
 import subprocess
 import zipfile
+from typing import Callable, Optional
 
 import httpx
 
 from app_logging import get_logger
 from config import safe_str, safe_int
+
+# ── Типизированные алиасы коллбэков ──────────────────────────────────────────
+# check_all
+OnLocalVersion = Callable[[str, str], None]        # (tool_name, local_version)
+OnRemoteDone   = Callable[[str, str, str], None]   # (tool_name, local, remote)
+
+# update_all
+OnToolStatus = Callable[[str, str], None]          # (status_code, detail)  code: "downloading"|"ok"|"error"
+OnProgress   = Callable[[Optional[float]], None]   # pct 0.0–1.0, или None = индетерминированный
+OnDone       = Callable[..., None]                 # (had_errors: bool, critical_err: str = "")
 
 
 class ToolsManager:
@@ -67,7 +78,8 @@ class ToolsManager:
 
     # Оригинальная check_tools
     async def check_all(self, yt_api_url: str, ffmpeg_version_url: str, proxy_url: str | None,
-                        on_local_version, on_remote_done) -> None:
+                        on_local_version: OnLocalVersion,
+                        on_remote_done:   OnRemoteDone) -> None:
         self.yt_needs_update     = False
         self.ffmpeg_needs_update = False
 
@@ -129,7 +141,10 @@ class ToolsManager:
 
     # Оригинальная update_tools — единый клиент на весь блок
     async def update_all(self, proxy_url: str | None, yt_download_url: str, ffmpeg_download_url: str,
-                         on_yt_status, on_ff_status, on_progress, on_done) -> None:
+                         on_yt_status: OnToolStatus,
+                         on_ff_status: OnToolStatus,
+                         on_progress:  OnProgress,
+                         on_done:      OnDone) -> None:
         ext = self._ext
         had_errors = False
 
@@ -138,7 +153,7 @@ class ToolsManager:
 
                 # ── yt-dlp ────────────────────────────────────────────────────
                 if self.yt_needs_update:
-                    on_yt_status("yt-dlp: Скачивание релиза...", "orange")
+                    on_yt_status("downloading", "")
                     final_path = os.path.join(self.tools_dir, f"yt-dlp{ext}")
                     temp_path  = final_path + ".part"
                     try:
@@ -156,19 +171,19 @@ class ToolsManager:
                                     downloaded += len(chunk)
                                     if total_size > 0:
                                         pct = min(int(downloaded * 100 / total_size), 100)
-                                        on_progress(f"Загрузка yt-dlp: {pct}%", pct / 100)
+                                        on_progress(pct / 100)
 
                         if not os.path.exists(temp_path) or os.path.getsize(temp_path) == 0:
-                            raise RuntimeError("yt-dlp скачан пустым файлом")
+                            raise RuntimeError("yt-dlp downloaded as empty file")
 
                         os.replace(temp_path, final_path)
                         if os.name != "nt":
                             os.chmod(final_path, 0o755)
-                        on_yt_status("yt-dlp: Обновление завершено", "ok")
+                        on_yt_status("ok", "")
                     except Exception as err:
                         had_errors = True
                         self._log.exception("Failed to update yt-dlp")
-                        on_yt_status(f"yt-dlp: Ошибка ({err})", "error")
+                        on_yt_status("error", str(err))
                         try:
                             if os.path.exists(temp_path):
                                 os.remove(temp_path)
@@ -177,7 +192,7 @@ class ToolsManager:
 
                 # ── ffmpeg ────────────────────────────────────────────────────
                 if self.ffmpeg_needs_update and os.name == "nt":
-                    on_ff_status("ffmpeg: Скачивание пакета...", "orange")
+                    on_ff_status("downloading", "")
                     zip_path = os.path.join(self.tools_dir, "ffmpeg_temp.zip")
                     temp_zip = zip_path + ".part"
                     try:
@@ -195,13 +210,13 @@ class ToolsManager:
                                     downloaded += len(chunk)
                                     if total_size > 0:
                                         pct = min(int(downloaded * 100 / total_size), 100)
-                                        on_progress(f"Загрузка FFmpeg: {pct}%", pct / 100)
+                                        on_progress(pct / 100)
 
                         if not os.path.exists(temp_zip) or os.path.getsize(temp_zip) == 0:
-                            raise RuntimeError("Архив FFmpeg пуст")
+                            raise RuntimeError("FFmpeg archive is empty")
 
                         os.replace(temp_zip, zip_path)
-                        on_progress("Архив получен. Распаковка...", None)
+                        on_progress(None)  # индетерминированный — идёт распаковка
 
                         def extract_zip():
                             found_files = 0
@@ -216,14 +231,14 @@ class ToolsManager:
                             if os.path.exists(zip_path):
                                 os.remove(zip_path)
                             if found_files == 0:
-                                raise RuntimeError("EXE файлы FFmpeg не найдены")
+                                raise RuntimeError("FFmpeg EXE files not found in archive")
 
                         await asyncio.to_thread(extract_zip)
-                        on_ff_status("ffmpeg: Обновление завершено", "ok")
+                        on_ff_status("ok", "")
                     except Exception as err:
                         had_errors = True
                         self._log.exception("Failed to update FFmpeg")
-                        on_ff_status(f"ffmpeg: Ошибка ({err})", "error")
+                        on_ff_status("error", str(err))
                         try:
                             if os.path.exists(temp_zip): os.remove(temp_zip)
                             if os.path.exists(zip_path): os.remove(zip_path)

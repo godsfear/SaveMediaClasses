@@ -301,3 +301,18 @@
 2026-06-02 11:03:14 [INFO] [yt-dlp] [Metadata] Adding metadata to "d:\Downloads\Youtube\This is probably the biggest misconception about Python.mp4"
 2026-06-02 11:03:14 [INFO] [yt-dlp] [ThumbnailsConvertor] Converting thumbnail "d:\Downloads\Youtube\This is probably the biggest misconception about Python.webp" to png
 2026-06-02 11:03:14 [INFO] [yt-dlp] [EmbedThumbnail] mutagen: Adding thumbnail to "d:\Downloads\Youtube\This is probably the biggest misconception about Python.mp4"
+2026-06-02 18:19:07 [INFO] [yt-dlp] [youtube] Extracting URL: https://www.youtube.com/watch?v=H_cwsrywyp0
+2026-06-02 18:19:07 [INFO] [yt-dlp] [youtube] H_cwsrywyp0: Downloading webpage
+2026-06-02 18:19:08 [INFO] [yt-dlp] WARNING: [youtube] No supported JavaScript runtime could be found. Only deno is enabled by default; to use another runtime add  --js-runtimes RUNTIME[:PATH]  to your command/config. YouTube extraction without a JS runtime has been deprecated, and some formats may be missing. See  https://github.com/yt-dlp/yt-dlp/wiki/EJS  for details on installing one
+2026-06-02 18:19:08 [INFO] [yt-dlp] [youtube] H_cwsrywyp0: Downloading android vr player API JSON
+2026-06-02 18:19:08 [INFO] [yt-dlp] [info] H_cwsrywyp0: Downloading 1 format(s): 399+251
+2026-06-02 18:19:08 [INFO] [yt-dlp] [info] Downloading video thumbnail 41 ...
+2026-06-02 18:19:09 [INFO] [yt-dlp] [info] Writing video thumbnail 41 to: d:\Downloads\Youtube\Главные события промышленности за май ｜ авиация, космос и море.webp
+2026-06-02 18:19:09 [INFO] [yt-dlp] [download] Destination: d:\Downloads\Youtube\Главные события промышленности за май ｜ авиация, космос и море.f399.mp4
+2026-06-02 18:19:11 [INFO] [yt-dlp] [download] Destination: d:\Downloads\Youtube\Главные события промышленности за май ｜ авиация, космос и море.f251.webm
+2026-06-02 18:19:11 [INFO] [yt-dlp] [Merger] Merging formats into "d:\Downloads\Youtube\Главные события промышленности за май ｜ авиация, космос и море.mp4"
+2026-06-02 18:19:12 [INFO] [yt-dlp] Deleting original file d:\Downloads\Youtube\Главные события промышленности за май ｜ авиация, космос и море.f399.mp4 (pass -k to keep)
+2026-06-02 18:19:12 [INFO] [yt-dlp] Deleting original file d:\Downloads\Youtube\Главные события промышленности за май ｜ авиация, космос и море.f251.webm (pass -k to keep)
+2026-06-02 18:19:12 [INFO] [yt-dlp] [Metadata] Adding metadata to "d:\Downloads\Youtube\Главные события промышленности за май ｜ авиация, космос и море.mp4"
+2026-06-02 18:19:12 [INFO] [yt-dlp] [ThumbnailsConvertor] Converting thumbnail "d:\Downloads\Youtube\Главные события промышленности за май ｜ авиация, космос и море.webp" to png
+2026-06-02 18:19:12 [INFO] [yt-dlp] [EmbedThumbnail] mutagen: Adding thumbnail to "d:\Downloads\Youtube\Главные события промышленности за май ｜ авиация, космос и море.mp4"
