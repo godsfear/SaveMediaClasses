@@ -35,7 +35,7 @@ class WindowController:
         page     — Flet Page.
         svc      — DI-контейнер.
         on_save  — коллбэк, который сначала синхронизирует экраны → state,
-                   затем вызывает svc.save_config(). Передаётся снаружи,
+                   затем сохраняет state через config_mgr. Передаётся снаружи,
                    чтобы WindowController не зависел от экранов напрямую.
         """
         self._page    = page

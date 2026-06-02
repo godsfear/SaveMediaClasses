@@ -62,16 +62,6 @@ class Services:
     def config_path(self) -> str:
         return os.path.join(self.base_dir, "config.json")
 
-    def save_config(self, page) -> None:
-        """Снять актуальные значения окна и сохранить state в JSON.
-        page передаётся для чтения текущей геометрии окна."""
-        w, h, l, t = page.window.width, page.window.height, page.window.left, page.window.top
-        if w and w > 10:    self.state.window.width  = int(w)
-        if h and h > 10:    self.state.window.height = int(h)
-        if l is not None:   self.state.window.left   = int(l)
-        if t is not None:   self.state.window.top    = int(t)
-        self.config_mgr.save(self.state)
-
     # ── Фабричный метод ───────────────────────────────────────────────────────
 
     @staticmethod
