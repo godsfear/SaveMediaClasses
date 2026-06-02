@@ -5,7 +5,7 @@ import flet as ft
 
 from app_logging import get_logger
 from config import CHECK_INTERVAL_HOURS
-from controllers import NavigationController, ThemeController, WindowController
+from controllers import NavigationController, ThemeController, ToolsController, WindowController
 from events import ToolsCheckedEvent, ToolsRestoredEvent, ToolsStatusMessageEvent
 from screens.history_screen import HistoryScreen
 from screens.main_screen import MainScreen
@@ -59,6 +59,9 @@ class SaveMediaApp:
             page, svc,
             screens=[main_screen, settings_screen, history_screen],
         )
+
+        tools_ctrl = ToolsController(svc)
+        settings_screen.bind_tools_controller(tools_ctrl)
 
         nav_ctrl = NavigationController(
             page, svc,

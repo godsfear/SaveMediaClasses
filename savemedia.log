@@ -239,3 +239,50 @@
 2026-06-02 00:39:55 [INFO] [yt-dlp] [Metadata] Adding metadata to "d:\Downloads\Youtube\Это ОЧЕНЬ СТРАННЫЕ ДЕЛА, но всем героям по 70+ лет.mp4"
 2026-06-02 00:39:56 [INFO] [yt-dlp] [ThumbnailsConvertor] Converting thumbnail "d:\Downloads\Youtube\Это ОЧЕНЬ СТРАННЫЕ ДЕЛА, но всем героям по 70+ лет.webp" to png
 2026-06-02 00:39:56 [INFO] [yt-dlp] [EmbedThumbnail] mutagen: Adding thumbnail to "d:\Downloads\Youtube\Это ОЧЕНЬ СТРАННЫЕ ДЕЛА, но всем героям по 70+ лет.mp4"
+2026-06-02 10:44:41 [ERROR] [tools] Failed to get local version for yt-dlp
+2026-06-02 10:44:41 [ERROR] [tools] Traceback (most recent call last):
+2026-06-02 10:44:41 [ERROR] [tools]   File "C:\Users\DRDmitriy\AppData\Roaming\uv\python\cpython-3.14-windows-x86_64-none\Lib\asyncio\tasks.py", line 488, in wait_for
+2026-06-02 10:44:41 [ERROR] [tools]     return await fut
+2026-06-02 10:44:41 [ERROR] [tools]            ^^^^^^^^^
+2026-06-02 10:44:41 [ERROR] [tools]   File "C:\Users\DRDmitriy\AppData\Roaming\uv\python\cpython-3.14-windows-x86_64-none\Lib\asyncio\subprocess.py", line 201, in communicate
+2026-06-02 10:44:41 [ERROR] [tools]     stdin, stdout, stderr = await tasks.gather(stdin, stdout, stderr)
+2026-06-02 10:44:41 [ERROR] [tools]                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-06-02 10:44:41 [ERROR] [tools]   File "C:\Users\DRDmitriy\AppData\Roaming\uv\python\cpython-3.14-windows-x86_64-none\Lib\asyncio\subprocess.py", line 181, in _read_stream
+2026-06-02 10:44:41 [ERROR] [tools]     output = await stream.read()
+2026-06-02 10:44:41 [ERROR] [tools]              ^^^^^^^^^^^^^^^^^^^
+2026-06-02 10:44:41 [ERROR] [tools]   File "C:\Users\DRDmitriy\AppData\Roaming\uv\python\cpython-3.14-windows-x86_64-none\Lib\asyncio\streams.py", line 723, in read
+2026-06-02 10:44:41 [ERROR] [tools]     block = await self.read(self._limit)
+2026-06-02 10:44:41 [ERROR] [tools]             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-06-02 10:44:41 [ERROR] [tools]   File "C:\Users\DRDmitriy\AppData\Roaming\uv\python\cpython-3.14-windows-x86_64-none\Lib\asyncio\streams.py", line 730, in read
+2026-06-02 10:44:41 [ERROR] [tools]     await self._wait_for_data('read')
+2026-06-02 10:44:41 [ERROR] [tools]   File "C:\Users\DRDmitriy\AppData\Roaming\uv\python\cpython-3.14-windows-x86_64-none\Lib\asyncio\streams.py", line 539, in _wait_for_data
+2026-06-02 10:44:41 [ERROR] [tools]     await self._waiter
+2026-06-02 10:44:41 [ERROR] [tools] asyncio.exceptions.CancelledError
+2026-06-02 10:44:41 [ERROR] [tools] 
+2026-06-02 10:44:41 [ERROR] [tools] The above exception was the direct cause of the following exception:
+2026-06-02 10:44:41 [ERROR] [tools] 
+2026-06-02 10:44:41 [ERROR] [tools] Traceback (most recent call last):
+2026-06-02 10:44:41 [ERROR] [tools]   File "D:\gdrive\Мой диск\src\python\savemediaclasses\managers\tools_manager.py", line 45, in get_local_tool_version
+2026-06-02 10:44:41 [ERROR] [tools]     stdout_bytes, _ = await asyncio.wait_for(proc.communicate(), timeout=5)
+2026-06-02 10:44:41 [ERROR] [tools]                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-06-02 10:44:41 [ERROR] [tools]   File "C:\Users\DRDmitriy\AppData\Roaming\uv\python\cpython-3.14-windows-x86_64-none\Lib\asyncio\tasks.py", line 487, in wait_for
+2026-06-02 10:44:41 [ERROR] [tools]     async with timeouts.timeout(timeout):
+2026-06-02 10:44:41 [ERROR] [tools]                ~~~~~~~~~~~~~~~~^^^^^^^^^
+2026-06-02 10:44:41 [ERROR] [tools]   File "C:\Users\DRDmitriy\AppData\Roaming\uv\python\cpython-3.14-windows-x86_64-none\Lib\asyncio\timeouts.py", line 114, in __aexit__
+2026-06-02 10:44:41 [ERROR] [tools]     raise TimeoutError from exc_val
+2026-06-02 10:44:41 [ERROR] [tools] TimeoutError
+2026-06-02 10:46:05 [INFO] [yt-dlp] [youtube] Extracting URL: https://www.youtube.com/watch?v=xasilTN-Q2c
+2026-06-02 10:46:05 [INFO] [yt-dlp] [youtube] xasilTN-Q2c: Downloading webpage
+2026-06-02 10:46:06 [INFO] [yt-dlp] WARNING: [youtube] No supported JavaScript runtime could be found. Only deno is enabled by default; to use another runtime add  --js-runtimes RUNTIME[:PATH]  to your command/config. YouTube extraction without a JS runtime has been deprecated, and some formats may be missing. See  https://github.com/yt-dlp/yt-dlp/wiki/EJS  for details on installing one
+2026-06-02 10:46:06 [INFO] [yt-dlp] [youtube] xasilTN-Q2c: Downloading android vr player API JSON
+2026-06-02 10:46:07 [INFO] [yt-dlp] [info] xasilTN-Q2c: Downloading 1 format(s): 401+251
+2026-06-02 10:46:07 [INFO] [yt-dlp] [info] Downloading video thumbnail 41 ...
+2026-06-02 10:46:07 [INFO] [yt-dlp] [info] Writing video thumbnail 41 to: d:\Downloads\Youtube\Конвейер, который работает 3,8 млрд лет [Clockwork].webp
+2026-06-02 10:46:07 [INFO] [yt-dlp] [download] Destination: d:\Downloads\Youtube\Конвейер, который работает 3,8 млрд лет [Clockwork].f401.mp4
+2026-06-02 10:46:41 [INFO] [yt-dlp] [download] Destination: d:\Downloads\Youtube\Конвейер, который работает 3,8 млрд лет [Clockwork].f251.webm
+2026-06-02 10:46:41 [INFO] [yt-dlp] [Merger] Merging formats into "d:\Downloads\Youtube\Конвейер, который работает 3,8 млрд лет [Clockwork].mp4"
+2026-06-02 10:46:44 [INFO] [yt-dlp] Deleting original file d:\Downloads\Youtube\Конвейер, который работает 3,8 млрд лет [Clockwork].f401.mp4 (pass -k to keep)
+2026-06-02 10:46:44 [INFO] [yt-dlp] Deleting original file d:\Downloads\Youtube\Конвейер, который работает 3,8 млрд лет [Clockwork].f251.webm (pass -k to keep)
+2026-06-02 10:46:44 [INFO] [yt-dlp] [Metadata] Adding metadata to "d:\Downloads\Youtube\Конвейер, который работает 3,8 млрд лет [Clockwork].mp4"
+2026-06-02 10:46:48 [INFO] [yt-dlp] [ThumbnailsConvertor] Converting thumbnail "d:\Downloads\Youtube\Конвейер, который работает 3,8 млрд лет [Clockwork].webp" to png
+2026-06-02 10:46:48 [INFO] [yt-dlp] [EmbedThumbnail] mutagen: Adding thumbnail to "d:\Downloads\Youtube\Конвейер, который работает 3,8 млрд лет [Clockwork].mp4"
