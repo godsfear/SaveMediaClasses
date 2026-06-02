@@ -1,14 +1,12 @@
-import asyncio
-
 import flet as ft
 
 from config import (
     THEME_FIELDS, THEME_GROUPS, PALETTE, ThemeConfig,
     hex_to_flet, is_valid_hex, safe_str
 )
-from events import EventBus, ToolsCheckedEvent, ToolsRestoredEvent
+from controllers.tools_controller import ToolsController
+from events import ToolsRestoredEvent
 from locale import Locale, Strings
-from managers.tools_manager import ToolsManager
 from services import Services
 
 
@@ -16,7 +14,6 @@ class SettingsScreen:
 
     def __init__(self, page: ft.Page, svc: Services) -> None:
         self._page        = page
-        self._tools       = svc.tools
         self._safe_update = svc.safe_update
         self._state       = svc.state
         self._bus         = svc.bus
@@ -26,11 +23,27 @@ class SettingsScreen:
         self._on_language_changed: callable = lambda: None
 
         self._s: Strings = Locale.load(self._state.language)
-        
 
         self._build_widgets()
         self._build_theme_section()
         self._build_layout()
+
+    def bind_tools_controller(self, ctrl: ToolsController) -> None:
+        """Подключить ToolsController после построения виджетов.
+        Вызывается из app.py после создания экрана и контроллера."""
+        s = self._s
+
+        # Передаём коллбэки для обновления виджетов в контроллер
+        ctrl.set_on_tool_local(self._on_tool_local)
+        ctrl.set_on_tool_remote(self._on_tool_remote)
+        ctrl.set_on_btn_state(self._on_btn_state)
+        ctrl.set_on_progress_pct(self._on_progress_pct)
+        ctrl.set_on_progress_bar_visible(self._on_progress_bar_visible)
+        ctrl.set_on_progress_msg(self._on_progress_msg)
+        ctrl.set_on_yt_status(self._on_yt_status_update)
+        ctrl.set_on_ff_status(self._on_ff_status_update)
+
+        self._tools_ctrl = ctrl
 
     # ── Синхронизация ─────────────────────────────────────────────────────────
 
@@ -441,159 +454,127 @@ class SettingsScreen:
             self.progress_text.color   = ft.Colors.GREEN_400
         self._safe_update()
 
-    async def check_tools(self) -> None:
-        s = self._s
-        self.progress_text.value = s.status_checking
-        self.progress_text.color = ft.Colors.GREEN_400
-        self.progress_text.update()
+    # ── Коллбэки для ToolsController (обновление виджетов) ───────────────────
 
-        tool_widgets = {
-            "yt-dlp": self.yt_status, "ffmpeg": self.ffmpeg_status,
-            "ffplay": self.ffplay_status, "ffprobe": self.ffprobe_status,
-        }
+    def _on_tool_local(self, name: str, local: str) -> None:
+        """Показать локальную версию инструмента во время проверки."""
+        s = self._s
+        widget = self._tool_widget(name)
+        if widget is None:
+            return
+        loc_text = local if local else s.tool_status_missing
+        widget.value = s.fmt("tool_querying", name=name, loc=loc_text)
+        widget.color = ft.Colors.GREY_500
+        widget.update()
+
+    def _on_tool_remote(self, name: str, loc: str, rem: str, status: str) -> None:
+        """Показать итоговые версии инструмента после получения удалённых данных."""
+        s = self._s
         color_map = {
             "ok":       ft.Colors.GREEN_400,
             "outdated": ft.Colors.ORANGE_400,
             "missing":  ft.Colors.RED_400,
             "error":    ft.Colors.AMBER,
         }
+        widget = self._tool_widget(name)
+        if widget is None:
+            return
+        loc_text = loc if loc else s.tool_status_missing
+        rem_text = rem if rem else s.tool_status_error
+        widget.value = s.fmt("tool_versions", name=name, loc=loc_text, rem=rem_text)
+        widget.color = color_map.get(status, ft.Colors.GREY_600)
+        widget.update()
 
-        def on_local_version(name: str, local: str):
-            if name not in tool_widgets:
-                return
-            loc_text = local if local else s.tool_status_missing
-            tool_widgets[name].value = s.fmt("tool_querying", name=name, loc=loc_text)
-            tool_widgets[name].color = ft.Colors.GREY_500
-            tool_widgets[name].update()
-
-        def on_remote_done(name: str, loc: str, rem: str):
-            if name not in tool_widgets:
-                return
-            # Определяем статус здесь — tools_manager передаёт только версии
-            if not loc:
-                status = "missing"
-            elif not rem or "[" in rem:
-                status = "error"
-            else:
-                status = "ok" if (loc == rem or rem in loc or loc in rem) else "outdated"
-            loc_text = loc if loc else s.tool_status_missing
-            rem_text = rem if rem else s.tool_status_error
-            tool_widgets[name].value = s.fmt("tool_versions", name=name,
-                                             loc=loc_text, rem=rem_text)
-            tool_widgets[name].color = color_map.get(status, ft.Colors.GREY_600)
-            self._state.tool_versions[name] = (loc_text, rem_text, status)
-            tool_widgets[name].update()
-
-        proxy_url = self._state.proxy_address.strip() if self._state.proxy_enabled else None
-        await self._tools.check_all(
-            yt_api_url=self._state.url_yt_api,
-            ffmpeg_version_url=self._state.url_ffmpeg_version,
-            proxy_url=proxy_url,
-            on_local_version=on_local_version,
-            on_remote_done=on_remote_done,
-        )
-        needs = self._tools.yt_needs_update or self._tools.ffmpeg_needs_update
-        if needs:
-            self.update_btn_text.value = s.btn_update
-            self.update_btn_icon.name  = ft.Icons.DOWNLOAD_ROUNDED
-            self.progress_text.value   = s.status_updates
-            self.progress_text.color   = ft.Colors.ORANGE_400
-        else:
-            self.update_btn_text.value = s.btn_check
-            self.update_btn_icon.name  = ft.Icons.REFRESH_ROUNDED
-            self.progress_text.value   = s.status_ok
-            self.progress_text.color   = ft.Colors.GREEN_400
-
-        self.update_btn.disabled = False
-        self.update_btn_text.update()
-        self.update_btn_icon.update()
-        self.update_btn.update()
-        self.progress_text.update()
-        self._bus.emit(ToolsCheckedEvent(needs_update=needs))
-
-    async def _update_tools(self) -> None:
+    def _on_btn_state(self, mode: str) -> None:
+        """Синхронизировать состояние кнопки по явному mode-ключу."""
         s = self._s
-        self.update_btn.disabled   = True
-        self.update_btn_icon.name  = ft.Icons.HOURGLASS_TOP_ROUNDED
-        self.update_btn_text.value = s.btn_updating
-        self.progress_bar.visible  = True
-        self.progress_bar.value    = 0.0
-        self.progress_text.value   = s.status_prep
-        self.progress_text.color   = ft.Colors.GREEN_400
-        self._safe_update()
-
-        proxy_url = self._state.proxy_address.strip() if self._state.proxy_enabled else None
-
-        def on_yt_status(code: str, detail: str):
-            if code == "downloading":
-                self.yt_status.value = f"yt-dlp: {s.tool_update_downloading}"
-                self.yt_status.color = ft.Colors.ORANGE_400
-            elif code == "ok":
-                self.yt_status.value = f"yt-dlp: {s.tool_update_ok}"
-                self.yt_status.color = ft.Colors.GREEN_400
-            else:
-                self.yt_status.value = f"yt-dlp: {s.fmt('tool_update_error', detail=detail)}"
-                self.yt_status.color = ft.Colors.RED_400
-            self._safe_update()
-
-        def on_ff_status(code: str, detail: str):
-            if code == "downloading":
-                self.ffmpeg_status.value = f"ffmpeg: {s.tool_update_downloading}"
-                self.ffmpeg_status.color = ft.Colors.ORANGE_400
-            elif code == "ok":
-                self.ffmpeg_status.value = f"ffmpeg: {s.tool_update_ok}"
-                self.ffmpeg_status.color = ft.Colors.GREEN_400
-            else:
-                self.ffmpeg_status.value = f"ffmpeg: {s.fmt('tool_update_error', detail=detail)}"
-                self.ffmpeg_status.color = ft.Colors.RED_400
-            self._safe_update()
-
-        def on_progress(pct):
-            self.progress_bar.value = pct  # None = индетерминированный
-            self._safe_update()
-
-        result = {"had_errors": False, "critical_err": ""}
-
-        def on_done(had_errors: bool, critical_err: str = ""):
-            result["had_errors"]   = had_errors
-            result["critical_err"] = critical_err
-            self.progress_bar.visible  = False
-            if critical_err:
-                self.progress_text.value = s.fmt("status_critical", err=critical_err)
-                self.progress_text.color = ft.Colors.RED_400
-            elif had_errors:
-                self.progress_text.value = s.status_done_errors
-                self.progress_text.color = ft.Colors.RED_400
-            else:
-                self.progress_text.value = s.status_done_ok
-                self.progress_text.color = ft.Colors.GREEN_400
+        if mode == "check":
             self.update_btn.disabled   = False
             self.update_btn_icon.name  = ft.Icons.REFRESH_ROUNDED
             self.update_btn_text.value = s.btn_check
-            self.update_btn_text.update()
-            self.update_btn_icon.update()
-            self.update_btn.update()
-            self._safe_update()
-
-        await self._tools.update_all(
-            proxy_url=proxy_url,
-            yt_download_url=self._state.url_yt_download,
-            ffmpeg_download_url=self._state.url_ffmpeg_download,
-            on_yt_status=on_yt_status, on_ff_status=on_ff_status,
-            on_progress=on_progress, on_done=on_done,
-        )
-        if not result["had_errors"] and not result["critical_err"]:
-            await self.check_tools()
-
-    async def _handle_update_button_click(self, _):
-        s = self._s
-        if self.update_btn_text.value == s.btn_update:
-            await self._update_tools()
-        else:
+        elif mode == "update":
+            self.update_btn.disabled   = False
+            self.update_btn_icon.name  = ft.Icons.DOWNLOAD_ROUNDED
+            self.update_btn_text.value = s.btn_update
+        elif mode == "checking":
             self.update_btn.disabled   = True
             self.update_btn_text.value = s.btn_checking
-            self._safe_update()
-            await self.check_tools()
+        elif mode == "updating":
+            self.update_btn.disabled   = True
+            self.update_btn_icon.name  = ft.Icons.HOURGLASS_TOP_ROUNDED
+            self.update_btn_text.value = s.btn_updating
+        self.update_btn_text.update()
+        self.update_btn_icon.update()
+        self.update_btn.update()
+
+    def _on_progress_pct(self, pct: float | None) -> None:
+        self.progress_bar.value = pct
+        self._safe_update()
+
+    def _on_progress_bar_visible(self, visible: bool) -> None:
+        self.progress_bar.visible = visible
+        self._safe_update()
+
+    def _on_progress_msg(self, key: str, color: str) -> None:
+        """Обновить текст статуса по ключу (или raw-строке для критических ошибок)."""
+        s = self._s
+        msg_map = {
+            "checking":    (s.status_checking,   ft.Colors.GREEN_400),
+            "prep":        (s.status_prep,        ft.Colors.GREEN_400),
+            "updates":     (s.status_updates,     ft.Colors.ORANGE_400),
+            "ok":          (s.status_ok,          ft.Colors.GREEN_400),
+            "done_ok":     (s.status_done_ok,     ft.Colors.GREEN_400),
+            "done_errors": (s.status_done_errors, ft.Colors.RED_400),
+        }
+        if key in msg_map:
+            text, clr = msg_map[key]
+        elif key.startswith("critical:"):
+            detail = key[len("critical:"):]
+            text = s.fmt("status_critical", err=detail)
+            clr  = ft.Colors.RED_400
+        else:
+            text, clr = key, color
+        self.progress_text.value = text
+        self.progress_text.color = clr
+        self.progress_text.update()
+
+    def _on_yt_status_update(self, code: str, detail: str) -> None:
+        self._apply_tool_status("yt-dlp", self.yt_status, code, detail)
+
+    def _on_ff_status_update(self, code: str, detail: str) -> None:
+        self._apply_tool_status("ffmpeg", self.ffmpeg_status, code, detail)
+
+    def _apply_tool_status(self, name: str, widget: ft.Text, code: str, detail: str) -> None:
+        s = self._s
+        if code == "downloading":
+            widget.value = f"{name}: {s.tool_update_downloading}"
+            widget.color = ft.Colors.ORANGE_400
+        elif code == "ok":
+            widget.value = f"{name}: {s.tool_update_ok}"
+            widget.color = ft.Colors.GREEN_400
+        else:
+            widget.value = f"{name}: {s.fmt('tool_update_error', detail=detail)}"
+            widget.color = ft.Colors.RED_400
+        self._safe_update()
+
+    def _tool_widget(self, name: str) -> ft.Text | None:
+        return {
+            "yt-dlp":  self.yt_status,
+            "ffmpeg":  self.ffmpeg_status,
+            "ffplay":  self.ffplay_status,
+            "ffprobe": self.ffprobe_status,
+        }.get(name)
+
+    # ── Обработчик кнопки — делегирует в контроллер ───────────────────────────
+
+    async def _handle_update_button_click(self, _) -> None:
+        await self._tools_ctrl.handle_button_click()
+
+    # ── Совместимость: check_tools вызывается из app.py напрямую ─────────────
+
+    async def check_tools(self) -> None:
+        """Прокси для app.py — делегирует в ToolsController."""
+        await self._tools_ctrl.check_tools()
 
     # ── Колбэки из App ────────────────────────────────────────────────────────
 
