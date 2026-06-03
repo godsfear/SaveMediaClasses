@@ -17,6 +17,7 @@ from typing import Callable, Literal
 import flet as ft
 
 from events import ToolsCheckedEvent
+from state import ToolVersionInfo
 from managers.tools_manager import (
     TOOL_VERSION_MISSING, TOOL_VERSION_CALL_ERROR,
     TOOL_VERSION_REMOTE_ERR, TOOL_VERSION_UNKNOWN,
@@ -62,7 +63,10 @@ class ToolsController:
         return self._btn_mode
 
     async def handle_button_click(self) -> None:
-        """Роутер клика по кнопке Check/Update."""
+        """Роутер клика по кнопке Check/Update.
+        Игнорирует повторный клик пока предыдущая операция не завершена."""
+        if self._tools.is_checking:
+            return
         if self._btn_mode == "update":
             await self._update_tools()
         else:
@@ -78,7 +82,7 @@ class ToolsController:
 
         def on_remote_done(name: str, loc: str, rem: str) -> None:
             status = _classify_version(loc, rem)
-            self._state.tool_versions[name] = (loc, rem, status)
+            self._state.tool_versions[name] = ToolVersionInfo(local=loc, remote=rem, status=status)
             self._on_tool_remote(name, loc, rem, status)
 
         proxy_url = self._state.proxy_address.strip() if self._state.proxy_enabled else None

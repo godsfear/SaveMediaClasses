@@ -20,7 +20,7 @@ import subprocess
 from typing import Callable, Protocol, runtime_checkable
 
 from app_logging import get_logger
-from config import safe_str
+from config import safe_str, THUMBNAIL_TIMEOUT, THUMBNAIL_SOCK_TIMEOUT
 from managers.download_manager import DownloadSnapshot
 
 
@@ -231,19 +231,18 @@ class YtDlpProvider:
             if not thumb_url:
                 return b"", data
 
-            # Скачиваем байты синхронно в executor чтобы не блокировать event loop
-            loop = asyncio.get_event_loop()
+            # Скачиваем байты в потоке — не блокируем event loop
             def _download() -> bytes:
                 req = urllib.request.Request(
                     thumb_url,
                     headers={"User-Agent": "Mozilla/5.0"},
                 )
-                with urllib.request.urlopen(req, timeout=10) as resp:
+                with urllib.request.urlopen(req, timeout=THUMBNAIL_SOCK_TIMEOUT) as resp:
                     return resp.read()
 
             raw = await asyncio.wait_for(
-                loop.run_in_executor(None, _download),
-                timeout=15,
+                asyncio.to_thread(_download),
+                timeout=THUMBNAIL_TIMEOUT,
             )
             return (raw if raw else b""), data
 

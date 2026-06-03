@@ -144,9 +144,16 @@ class DownloadRepository:
                     self._log.exception("Database migration failed")
 
     def _subscribe(self) -> None:
-        self._bus.on(DownloadStartedEvent,   self._on_started)
-        self._bus.on(DownloadCompletedEvent, self._on_completed)
-        self._bus.on(DownloadCancelledEvent, self._on_cancelled)
+        self._unsubs = [
+            self._bus.on(DownloadStartedEvent,   self._on_started),
+            self._bus.on(DownloadCompletedEvent, self._on_completed),
+            self._bus.on(DownloadCancelledEvent, self._on_cancelled),
+        ]
+
+    def dispose(self) -> None:
+        """Отписаться от всех событий шины. Вызывать при уничтожении объекта."""
+        for unsub in getattr(self, "_unsubs", []):
+            unsub()
 
     # ── Обработчики событий ───────────────────────────────────────────────────
 

@@ -6,6 +6,12 @@ from typing import Any, Dict
 
 CHECK_INTERVAL_HOURS = 6
 
+# ── Сетевые константы (chunk / timeout) ──────────────────────────────────────
+YT_DLP_CHUNK_SIZE      = 8_192   # байт/итерацию при скачивании yt-dlp
+FFMPEG_CHUNK_SIZE      = 16_384  # байт/итерацию при скачивании ffmpeg zip
+THUMBNAIL_TIMEOUT      = 15.0    # секунд — общий async-таймаут скачивания thumbnail
+THUMBNAIL_SOCK_TIMEOUT = 10      # секунд — socket-таймаут urllib для thumbnail
+
 DEFAULT_DOWNLOAD_PATH = os.path.join(os.path.expanduser("~"), "Downloads")
 DEFAULT_PROXY_ADDRESS = "socks5://127.0.0.1:1080"
 DEFAULT_YT_DLP_ARGS   = "-f bestvideo+bestaudio/best --merge-output-format mp4"

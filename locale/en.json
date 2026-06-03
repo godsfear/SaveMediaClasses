@@ -111,5 +111,9 @@
     "tool_status_call_error": "[Call error]",
     "download_completed": "Download complete!",
     "download_error_os": "OS error: {detail}",
-    "download_error_code": "Error (code {code})"
+    "download_error_code": "Error (code {code})",
+    "tool_update_downloading": "downloading...",
+    "tool_update_ok": "updated successfully",
+    "tool_update_error": "error: {detail}",
+    "tool_update_manual": "install manually: {hint}"
 }

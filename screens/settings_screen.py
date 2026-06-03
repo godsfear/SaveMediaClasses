@@ -1,3 +1,5 @@
+from typing import Callable
+
 import flet as ft
 
 from config import (
@@ -37,9 +39,9 @@ class SettingsScreen(ThemeTarget):
         self._state       = svc.state
         self._bus         = svc.bus
 
-        self._on_theme_changed:    callable = lambda: None
-        self._on_settings_changed: callable = lambda: None
-        self._on_language_changed: callable = lambda: None
+        self._on_theme_changed:    Callable = lambda: None
+        self._on_settings_changed: Callable = lambda: None
+        self._on_language_changed: Callable = lambda: None
 
         self._s: Strings = Locale.load(self._state.language)
 
@@ -541,6 +543,10 @@ class SettingsScreen(ThemeTarget):
         elif code == "ok":
             widget.value = f"{name}: {s.tool_update_ok}"
             widget.color = ft.Colors.GREEN_400
+        elif code == "manual":
+            # Не-Windows: ffmpeg нельзя поставить автоматически
+            widget.value = f"{name}: {s.fmt('tool_update_manual', hint=detail)}"
+            widget.color = ft.Colors.AMBER
         else:
             widget.value = f"{name}: {s.fmt('tool_update_error', detail=detail)}"
             widget.color = ft.Colors.RED_400
