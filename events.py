@@ -36,10 +36,12 @@ class DownloadPostprocessingEvent:
 
 @dataclass(frozen=True)
 class DownloadCompletedEvent:
-    task_id: str
-    success: bool
-    message: str
-    source:  str = "yt-dlp"
+    task_id:      str
+    success:      bool
+    message:      str        # технический текст для БД (на английском)
+    source:       str = "yt-dlp"
+    error_code:   int | None = None  # код возврата процесса (только при success=False)
+    error_detail: str = ""           # текст ошибки ОС (только при сбое запуска)
 
 @dataclass(frozen=True)
 class DownloadStartedEvent:

@@ -17,6 +17,10 @@ from typing import Callable, Literal
 import flet as ft
 
 from events import ToolsCheckedEvent
+from managers.tools_manager import (
+    TOOL_VERSION_MISSING, TOOL_VERSION_CALL_ERROR,
+    TOOL_VERSION_REMOTE_ERR, TOOL_VERSION_UNKNOWN,
+)
 from services import Services
 
 
@@ -151,10 +155,11 @@ class ToolsController:
 # ── Вспомогательная функция ────────────────────────────────────────────────────
 
 def _classify_version(loc: str, rem: str) -> str:
-    """Определить статус версии инструмента по двум строкам."""
-    if not loc or loc in ("Отсутствует",):
+    """Определить статус версии инструмента по двум строкам.
+    Использует sentinel-константы из tools_manager — не строковый поиск."""
+    if loc == TOOL_VERSION_MISSING:
         return "missing"
-    if not rem or "[" in rem:
+    if loc == TOOL_VERSION_CALL_ERROR or rem in (TOOL_VERSION_REMOTE_ERR, TOOL_VERSION_UNKNOWN):
         return "error"
     if loc == rem or rem in loc or loc in rem:
         return "ok"

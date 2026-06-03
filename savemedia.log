@@ -316,3 +316,18 @@
 2026-06-02 18:19:12 [INFO] [yt-dlp] [Metadata] Adding metadata to "d:\Downloads\Youtube\Главные события промышленности за май ｜ авиация, космос и море.mp4"
 2026-06-02 18:19:12 [INFO] [yt-dlp] [ThumbnailsConvertor] Converting thumbnail "d:\Downloads\Youtube\Главные события промышленности за май ｜ авиация, космос и море.webp" to png
 2026-06-02 18:19:12 [INFO] [yt-dlp] [EmbedThumbnail] mutagen: Adding thumbnail to "d:\Downloads\Youtube\Главные события промышленности за май ｜ авиация, космос и море.mp4"
+2026-06-03 16:12:31 [INFO] [yt-dlp] [youtube] Extracting URL: https://www.youtube.com/watch?v=yvz88iC3iU8
+2026-06-03 16:12:31 [INFO] [yt-dlp] [youtube] yvz88iC3iU8: Downloading webpage
+2026-06-03 16:12:32 [INFO] [yt-dlp] WARNING: [youtube] No supported JavaScript runtime could be found. Only deno is enabled by default; to use another runtime add  --js-runtimes RUNTIME[:PATH]  to your command/config. YouTube extraction without a JS runtime has been deprecated, and some formats may be missing. See  https://github.com/yt-dlp/yt-dlp/wiki/EJS  for details on installing one
+2026-06-03 16:12:32 [INFO] [yt-dlp] [youtube] yvz88iC3iU8: Downloading android vr player API JSON
+2026-06-03 16:12:33 [INFO] [yt-dlp] [info] yvz88iC3iU8: Downloading 1 format(s): 400+251
+2026-06-03 16:12:33 [INFO] [yt-dlp] [info] Downloading video thumbnail 41 ...
+2026-06-03 16:12:33 [INFO] [yt-dlp] [info] Writing video thumbnail 41 to: d:\Downloads\Youtube\PiD (Pixel Diffusion Decoder) - модель для х4 апскейла с сохранением деталей. Локально в ComfyUI.webp
+2026-06-03 16:12:33 [INFO] [yt-dlp] [download] Destination: d:\Downloads\Youtube\PiD (Pixel Diffusion Decoder) - модель для х4 апскейла с сохранением деталей. Локально в ComfyUI.f400.mp4
+2026-06-03 16:12:43 [INFO] [yt-dlp] [download] Destination: d:\Downloads\Youtube\PiD (Pixel Diffusion Decoder) - модель для х4 апскейла с сохранением деталей. Локально в ComfyUI.f251.webm
+2026-06-03 16:12:44 [INFO] [yt-dlp] [Merger] Merging formats into "d:\Downloads\Youtube\PiD (Pixel Diffusion Decoder) - модель для х4 апскейла с сохранением деталей. Локально в ComfyUI.mp4"
+2026-06-03 16:12:45 [INFO] [yt-dlp] Deleting original file d:\Downloads\Youtube\PiD (Pixel Diffusion Decoder) - модель для х4 апскейла с сохранением деталей. Локально в ComfyUI.f251.webm (pass -k to keep)
+2026-06-03 16:12:45 [INFO] [yt-dlp] Deleting original file d:\Downloads\Youtube\PiD (Pixel Diffusion Decoder) - модель для х4 апскейла с сохранением деталей. Локально в ComfyUI.f400.mp4 (pass -k to keep)
+2026-06-03 16:12:45 [INFO] [yt-dlp] [Metadata] Adding metadata to "d:\Downloads\Youtube\PiD (Pixel Diffusion Decoder) - модель для х4 апскейла с сохранением деталей. Локально в ComfyUI.mp4"
+2026-06-03 16:12:46 [INFO] [yt-dlp] [ThumbnailsConvertor] Converting thumbnail "d:\Downloads\Youtube\PiD (Pixel Diffusion Decoder) - модель для х4 апскейла с сохранением деталей. Локально в ComfyUI.webp" to png
+2026-06-03 16:12:46 [INFO] [yt-dlp] [EmbedThumbnail] mutagen: Adding thumbnail to "d:\Downloads\Youtube\PiD (Pixel Diffusion Decoder) - модель для х4 апскейла с сохранением деталей. Локально в ComfyUI.mp4"

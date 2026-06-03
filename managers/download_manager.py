@@ -179,7 +179,8 @@ class DownloadManager:
                 self._finish(task)
                 self._bus.emit(DownloadCompletedEvent(
                     task_id=task.task_id, success=False,
-                    message=f"Ошибка ОС: {err}",
+                    message=f"OS error: {err}",   # для БД — английский технический текст
+                    error_detail=str(err),
                     source=source,
                 ))
                 return
@@ -193,12 +194,14 @@ class DownloadManager:
                 return
 
             success = returncode_holder[0] == 0
-            message = "Загрузка завершена!" if success else f"Ошибка (код {returncode_holder[0]})"
+            # Технический текст для БД; перевод для UI строится в main_screen
+            message = "" if success else f"Exit code {returncode_holder[0]}"
             if not success:
                 get_logger(source).error("Process finished with return code %s", returncode_holder[0])
             self._finish(task)
             self._bus.emit(DownloadCompletedEvent(
                 task_id=task.task_id, success=success, message=message,
+                error_code=returncode_holder[0] if not success else None,
                 source=source,
             ))
 

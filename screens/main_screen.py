@@ -149,7 +149,14 @@ class MainScreen(ThemeTarget):
     def _on_completed(self, e: DownloadCompletedEvent) -> None:
         card = self._cards.get(e.task_id)
         if card:
-            card.set_done(e.success, e.message)
+            s = self._s()
+            if e.success:
+                msg = s.download_completed
+            elif e.error_detail:
+                msg = s.fmt("download_error_os", detail=e.error_detail)
+            else:
+                msg = s.fmt("download_error_code", code=e.error_code or 1)
+            card.set_done(e.success, msg)
             self._safe_update()
             self._page.run_task(self._remove_card_after_delay, e.task_id)
 
