@@ -5,6 +5,13 @@ import subprocess
 import zipfile
 from typing import Callable, Optional
 
+# ── Sentinel-константы статусов версий (не для отображения) ──────────────────
+# Используются в бизнес-логике; перевод на язык UI происходит в settings_screen.
+TOOL_VERSION_MISSING    = ""         # бинарник не найден (falsy → UI подставит перевод)
+TOOL_VERSION_CALL_ERROR = "\x00CALL"  # ошибка вызова --version
+TOOL_VERSION_REMOTE_ERR = "\x00NET"   # сетевая ошибка при запросе удалённой версии
+TOOL_VERSION_UNKNOWN    = "\x00UNK"   # ответ API не содержит поля с версией
+
 import httpx
 
 from app_logging import get_logger
@@ -38,7 +45,7 @@ class ToolsManager:
     # Оригинальная get_local_tool_version
     async def get_local_tool_version(self, tool_path: str, tool_name: str) -> str:
         if not tool_path or not os.path.exists(tool_path):
-            return "Отсутствует"
+            return TOOL_VERSION_MISSING
         try:
             proc_startup = None
             if os.name == "nt":
@@ -71,10 +78,10 @@ class ToolsManager:
                     if match:
                         return safe_str(match.group(1))
                     return safe_str(fl.split()[0])
-            return "[Не определена]"
+            return TOOL_VERSION_CALL_ERROR
         except Exception:
             self._log.exception("Failed to get local version for %s", tool_name)
-            return "[Ошибка вызова]"
+            return TOOL_VERSION_CALL_ERROR
 
     # Оригинальная check_tools
     async def check_all(self, yt_api_url: str, ffmpeg_version_url: str, proxy_url: str | None,
@@ -104,10 +111,10 @@ class ToolsManager:
                     client.get(yt_api_url, headers={"User-Agent": "Mozilla/5.0"}),
                     timeout=8.0
                 )
-                remote_yt = safe_str(res.json().get("tag_name", "Неизвестно")).lstrip('v')
+                remote_yt = safe_str(res.json().get("tag_name", TOOL_VERSION_UNKNOWN)).lstrip('v')
             except Exception:
                 self._log.warning("Failed to get remote yt-dlp version", exc_info=True)
-                remote_yt = "[Ошибка]"
+                remote_yt = TOOL_VERSION_REMOTE_ERR
             try:
                 res = await asyncio.wait_for(
                     client.get(ffmpeg_version_url, headers={"User-Agent": "Mozilla/5.0"}),
@@ -116,24 +123,24 @@ class ToolsManager:
                 remote_ff = res.text.strip()
             except Exception:
                 self._log.warning("Failed to get remote FFmpeg version", exc_info=True)
-                remote_ff = "[Ошибка]"
+                remote_ff = TOOL_VERSION_REMOTE_ERR
 
         for filename, (name,) in tools_map.items():
-            loc = local_versions.get(name, "Отсутствует")
+            loc = local_versions.get(name, TOOL_VERSION_MISSING)
             rem = remote_yt if name == "yt-dlp" else remote_ff
             on_remote_done(name, loc, rem)
 
             is_equal = (loc == rem) or (
-                "[" not in rem and "[" not in loc
-                and "Ошибка" not in rem and "Отсутствует" not in loc
+                loc not in (TOOL_VERSION_CALL_ERROR, TOOL_VERSION_MISSING)
+                and rem not in (TOOL_VERSION_REMOTE_ERR, TOOL_VERSION_UNKNOWN)
                 and (rem in loc or loc in rem)
             )
 
-            if "Отсутствует" in loc:
-                if "Ошибка" not in rem and rem != "[Ошибка]":
+            if loc == TOOL_VERSION_MISSING:
+                if rem not in (TOOL_VERSION_REMOTE_ERR, TOOL_VERSION_UNKNOWN):
                     if name == "yt-dlp":   self.yt_needs_update     = True
                     elif name == "ffmpeg": self.ffmpeg_needs_update = True
-            elif "[" in loc or "Ошибка" in rem or "[" in rem:
+            elif loc == TOOL_VERSION_CALL_ERROR or rem in (TOOL_VERSION_REMOTE_ERR, TOOL_VERSION_UNKNOWN):
                 pass  # AMBER — не обновляем
             elif not is_equal:
                 if name == "yt-dlp":   self.yt_needs_update     = True

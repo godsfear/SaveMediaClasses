@@ -91,6 +91,16 @@ class Strings:
     tool_versions:      str = ""  # {name} {loc} {rem}
     tool_querying:      str = ""  # {name} {loc}
 
+    # Инструменты — отображаемые статусы (перевод sentinel-значений из tools_manager)
+    tool_status_missing:    str = ""  # "Not installed" / "Отсутствует"
+    tool_status_error:      str = ""  # "[Error]" / "[Ошибка]"
+    tool_status_call_error: str = ""  # "[Call error]" / "[Ошибка вызова]"
+
+    # Загрузки — финальные сообщения в карточке
+    download_completed:  str = ""  # "Download complete!" / "Загрузка завершена!"
+    download_error_os:   str = ""  # "OS error: {detail}"
+    download_error_code: str = ""  # "Error (code {code})"
+
     # URL поля
     url_yt_api:          str = ""
     url_yt_download:     str = ""

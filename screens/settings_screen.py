@@ -4,11 +4,28 @@ from config import (
     THEME_FIELDS, THEME_GROUPS, PALETTE, ThemeConfig,
     hex_to_flet, is_valid_hex, safe_str
 )
+from managers.tools_manager import (
+    TOOL_VERSION_MISSING, TOOL_VERSION_CALL_ERROR,
+    TOOL_VERSION_REMOTE_ERR, TOOL_VERSION_UNKNOWN,
+)
 from controllers.theme_target import ThemeTarget
 from controllers.tools_controller import ToolsController
 from events import ToolsRestoredEvent
 from locale import Locale, Strings
 from services import Services
+
+
+def _resolve_version(version: str, s) -> str:
+    """Перевести sentinel-значение версии инструмента в отображаемую строку.
+
+    Sentinel-константы из tools_manager не содержат переведённого текста —
+    они языконезависимы. Перевод происходит здесь, на уровне UI.
+    """
+    if version == TOOL_VERSION_MISSING:    return s.tool_status_missing
+    if version == TOOL_VERSION_CALL_ERROR: return s.tool_status_call_error
+    if version in (TOOL_VERSION_REMOTE_ERR, TOOL_VERSION_UNKNOWN):
+        return s.tool_status_error
+    return version
 
 
 class SettingsScreen(ThemeTarget):
@@ -405,7 +422,10 @@ class SettingsScreen(ThemeTarget):
             tv = e.tool_versions.get(name)
             if tv and isinstance(tv, tuple) and len(tv) == 3:
                 loc, rem, status_key = tv
-                widget.value = s.fmt("tool_versions", name=name, loc=loc, rem=rem)
+                widget.value = s.fmt("tool_versions",
+                                     name=name,
+                                     loc=_resolve_version(loc, s),
+                                     rem=_resolve_version(rem, s))
                 widget.color = color_map.get(status_key, ft.Colors.GREY_600)
             else:
                 widget.value = s.fmt("tool_dash", name=name)
@@ -431,7 +451,7 @@ class SettingsScreen(ThemeTarget):
         widget = self._tool_widget(name)
         if widget is None:
             return
-        loc_text = local if local else s.tool_status_missing
+        loc_text = _resolve_version(local, s)
         widget.value = s.fmt("tool_querying", name=name, loc=loc_text)
         widget.color = ft.Colors.GREY_500
         widget.update()
@@ -448,8 +468,8 @@ class SettingsScreen(ThemeTarget):
         widget = self._tool_widget(name)
         if widget is None:
             return
-        loc_text = loc if loc else s.tool_status_missing
-        rem_text = rem if rem else s.tool_status_error
+        loc_text = _resolve_version(loc, s)
+        rem_text = _resolve_version(rem, s)
         widget.value = s.fmt("tool_versions", name=name, loc=loc_text, rem=rem_text)
         widget.color = color_map.get(status, ft.Colors.GREY_600)
         widget.update()

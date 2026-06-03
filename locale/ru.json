@@ -105,5 +105,11 @@
     "appbar_main": "SaveMedia [yt-dlp GUI]",
     "btn_folder": "Выбрать папку",
     "btn_exit": "Полный выход",
-    "folder_select_text": "Выберите папку сохранения медиа"
+    "folder_select_text": "Выберите папку сохранения медиа",
+    "tool_status_missing": "Отсутствует",
+    "tool_status_error": "[Ошибка]",
+    "tool_status_call_error": "[Ошибка вызова]",
+    "download_completed": "Загрузка завершена!",
+    "download_error_os": "Ошибка ОС: {detail}",
+    "download_error_code": "Ошибка (код {code})"
 }

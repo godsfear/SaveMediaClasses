@@ -105,5 +105,11 @@
     "appbar_main": "SaveMedia [yt-dlp GUI]",
     "btn_folder": "Choose folder",
     "btn_exit": "Exit",
-    "folder_select_text": "Select a folder to save media"
+    "folder_select_text": "Select a folder to save media",
+    "tool_status_missing": "Not installed",
+    "tool_status_error": "[Error]",
+    "tool_status_call_error": "[Call error]",
+    "download_completed": "Download complete!",
+    "download_error_os": "OS error: {detail}",
+    "download_error_code": "Error (code {code})"
 }
