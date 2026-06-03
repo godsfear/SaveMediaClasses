@@ -1,2 +1,6 @@
 /.venv/
 /tools/
+__pycache__/
+*.log
+*.db
+.idea
