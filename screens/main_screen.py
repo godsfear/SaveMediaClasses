@@ -126,11 +126,18 @@ class MainScreen(ThemeTarget):
     # ── Подписка на шину ──────────────────────────────────────────────────────
 
     def _subscribe(self) -> None:
-        self._bus.on(DownloadProgressEvent,       self._on_progress)
-        self._bus.on(DownloadPostprocessingEvent, self._on_postprocessing)
-        self._bus.on(DownloadCompletedEvent,      self._on_completed)
-        self._bus.on(DownloadCancelledEvent,      self._on_cancelled)
-        self._bus.on(ToolsCheckedEvent,           self._on_tools_checked)
+        self._unsubs = [
+            self._bus.on(DownloadProgressEvent,       self._on_progress),
+            self._bus.on(DownloadPostprocessingEvent, self._on_postprocessing),
+            self._bus.on(DownloadCompletedEvent,      self._on_completed),
+            self._bus.on(DownloadCancelledEvent,      self._on_cancelled),
+            self._bus.on(ToolsCheckedEvent,           self._on_tools_checked),
+        ]
+
+    def dispose(self) -> None:
+        """Отписаться от всех событий шины. Вызывать при пересоздании экрана."""
+        for unsub in getattr(self, "_unsubs", []):
+            unsub()
 
     # ── Обработчики событий ───────────────────────────────────────────────────
 

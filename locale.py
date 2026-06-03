@@ -96,6 +96,12 @@ class Strings:
     tool_status_error:      str = ""  # "[Error]" / "[Ошибка]"
     tool_status_call_error: str = ""  # "[Call error]" / "[Ошибка вызова]"
 
+    # Статусы обновления инструментов (показываются во время update_all)
+    tool_update_downloading: str = ""  # "downloading..."
+    tool_update_ok:          str = ""  # "updated successfully"
+    tool_update_error:       str = ""  # "error: {detail}"
+    tool_update_manual:      str = ""  # "install manually: {hint}" (non-Windows ffmpeg)
+
     # Загрузки — финальные сообщения в карточке
     download_completed:  str = ""  # "Download complete!" / "Загрузка завершена!"
     download_error_os:   str = ""  # "OS error: {detail}"
@@ -175,6 +181,7 @@ class Strings:
 class Locale:
     DEFAULT_LANG = "en"
     _cache: dict = {}
+    _available_cache: list | None = None  # кэш списка доступных языков
 
     @classmethod
     def load(cls, lang: str | None = None) -> Strings:
@@ -284,9 +291,11 @@ class Locale:
     def available(cls) -> list[tuple[str, str]]:
         """
         Вернуть список (code, native_name) доступных языков.
-        Имя читается из самого JSON (ключ 'language_label' не подходит —
-        используем отдельный ключ '_name' если есть, иначе code).
+        Имя читается из самого JSON (ключ '_name' если есть, иначе code).
+        Результат кэшируется — файлы читаются только при первом вызове.
         """
+        if cls._available_cache is not None:
+            return cls._available_cache
         locale_dir = os.path.join(os.path.dirname(__file__), "locale")
         result = []
         try:
@@ -302,4 +311,5 @@ class Locale:
                     result.append((code, name))
         except Exception:
             pass
+        cls._available_cache = result
         return result

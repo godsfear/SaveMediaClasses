@@ -111,5 +111,9 @@
     "tool_status_call_error": "[Ошибка вызова]",
     "download_completed": "Загрузка завершена!",
     "download_error_os": "Ошибка ОС: {detail}",
-    "download_error_code": "Ошибка (код {code})"
+    "download_error_code": "Ошибка (код {code})",
+    "tool_update_downloading": "загружается...",
+    "tool_update_ok": "обновлён успешно",
+    "tool_update_error": "ошибка: {detail}",
+    "tool_update_manual": "установите вручную: {hint}"
 }

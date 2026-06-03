@@ -11,7 +11,7 @@ import uuid
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, Optional, TYPE_CHECKING
 
-from app_logging import configure_logging, get_logger
+from app_logging import get_logger
 from events import (
     EventBus,
     DownloadStartedEvent,
@@ -80,7 +80,6 @@ class DownloadManager:
         """
         self._provider_factory = provider_factory
         self._task_runner      = task_runner
-        configure_logging(log_path)
         self._bus              = bus
         self._db               = db
         self._log              = get_logger("app")
@@ -148,7 +147,7 @@ class DownloadManager:
                     self._log.exception("Failed to create download directory: %s", snap.download_path)
 
             cmd_args = provider.build_command(exe, snap)
-            returncode_holder = [0]
+            returncode = 0
 
             def on_line(line: str) -> None:
                 if task.cancelled:
@@ -170,7 +169,8 @@ class DownloadManager:
                     ))
 
             def on_finish(rc: int) -> None:
-                returncode_holder[0] = rc
+                nonlocal returncode
+                returncode = rc
 
             try:
                 await provider.run(cmd_args, on_line, on_finish)
@@ -193,15 +193,15 @@ class DownloadManager:
                 ))
                 return
 
-            success = returncode_holder[0] == 0
+            success = returncode == 0
             # Технический текст для БД; перевод для UI строится в main_screen
-            message = "" if success else f"Exit code {returncode_holder[0]}"
+            message = "" if success else f"Exit code {returncode}"
             if not success:
-                get_logger(source).error("Process finished with return code %s", returncode_holder[0])
+                get_logger(source).error("Process finished with return code %s", returncode)
             self._finish(task)
             self._bus.emit(DownloadCompletedEvent(
                 task_id=task.task_id, success=success, message=message,
-                error_code=returncode_holder[0] if not success else None,
+                error_code=returncode if not success else None,
                 source=source,
             ))
 
