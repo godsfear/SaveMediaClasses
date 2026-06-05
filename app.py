@@ -1,6 +1,5 @@
 import asyncio
 import time
-
 import flet as ft
 
 from app_logging import get_logger
@@ -11,13 +10,13 @@ from screens.history_screen import HistoryScreen
 from screens.main_screen import MainScreen
 from screens.settings_screen import SettingsScreen
 from services import Services
-import os
+from paths import AppPaths
 
 
 class SaveMediaApp:
 
     async def main(self, page: ft.Page) -> None:
-        base_dir = os.path.dirname(os.path.abspath(__file__))
+        base_dir = str(AppPaths.app_dir())
         log      = get_logger("app")
 
         # ── Тема страницы ─────────────────────────────────────────────────────
