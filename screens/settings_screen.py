@@ -13,7 +13,7 @@ from managers.tools_manager import (
 from controllers.theme_target import ThemeTarget
 from controllers.tools_controller import ToolsController
 from events import ToolsRestoredEvent
-from locale import Locale, Strings
+from i18l import Locale, Strings
 from services import Services
 
 

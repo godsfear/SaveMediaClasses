@@ -16,7 +16,7 @@ from config import (
     DEFAULT_YT_API_URL, DEFAULT_YT_DOWNLOAD_URL,
     DEFAULT_FFMPEG_VERSION_URL, DEFAULT_FFMPEG_DOWNLOAD_URL,
 )
-from locale import Locale
+from i18l import Locale
 
 
 class ToolVersionInfo(NamedTuple):

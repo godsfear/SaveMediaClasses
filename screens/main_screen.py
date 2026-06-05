@@ -18,7 +18,7 @@ from events import (
     ToolsCheckedEvent,
     ToolsStatusMessageEvent,
 )
-from locale import Locale, Strings
+from i18l import Locale, Strings
 from managers.download_manager import DownloadManager, DownloadSnapshot, MAX_PARALLEL
 from services import Services
 from managers.providers import YtDlpProvider as _DefaultProvider

@@ -2,7 +2,7 @@
 Locale — загрузчик языковых файлов из locale/*.json в типизированный dataclass.
 
 Использование:
-    from locale import Locale
+    from i18l import Locale
     strings = Locale.load()
     print(strings.btn_check)
 
