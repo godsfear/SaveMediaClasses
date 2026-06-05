@@ -81,7 +81,7 @@ class Services:
         configure_logging(AppPaths.log_file())
 
         bus        = EventBus()
-        config_mgr = ConfigManager(os.path.join(base_dir, "config.json"))
+        config_mgr = ConfigManager(AppPaths.config_file())
         tools      = ToolsManager(base_dir, tools_dir)
         state = config_mgr.load()
         db_path = AppPaths.db_file()
