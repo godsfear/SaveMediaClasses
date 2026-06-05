@@ -78,7 +78,7 @@ class Services:
 
         tools_dir  = AppPaths.tools_dir()
         os.makedirs(tools_dir, exist_ok=True)
-        configure_logging(AppPaths.config_file())
+        configure_logging(AppPaths.log_file())
 
         bus        = EventBus()
         config_mgr = ConfigManager(os.path.join(base_dir, "config.json"))
