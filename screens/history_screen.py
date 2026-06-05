@@ -16,7 +16,7 @@ import flet as ft
 from app_logging import get_logger
 from config import hex_to_flet
 from controllers.theme_target import ThemeTarget
-from locale import Locale, Strings
+from i18l import Locale, Strings
 from managers.download_repository import DownloadRecord, DownloadRepository
 from services import Services
 

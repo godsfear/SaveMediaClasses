@@ -11,7 +11,7 @@
         "playlist_enabled": true,
         "clean_titles": true,
         "save_to_source_folder": true,
-        "last_check_time": 1780522926.41004,
+        "last_check_time": 1780653783.0266542,
         "last_needs_update": false,
         "tool_versions": {
             "yt-dlp": [
@@ -45,8 +45,8 @@
     "window": {
         "width": 688,
         "height": 991,
-        "left": 3047,
-        "top": 274
+        "left": 3156,
+        "top": 225
     },
     "theme": {
         "accent_color": "00B4D8",
