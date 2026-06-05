@@ -1,6 +1,7 @@
 import os
 from dataclasses import dataclass
 from typing import Any, Dict
+import ctypes
 
 # ── Константы приложения ──────────────────────────────────────────────────────
 
@@ -68,10 +69,13 @@ class ThemeConfig:
 
 @dataclass
 class WindowConfig:
-    width:  int = 600
-    height: int = 650
-    left:   int = 100
-    top:    int = 100
+    width:     int = 600
+    height:    int = 650
+    left:      int = 100
+    top:       int = 100
+    user32         = ctypes.windll.user32
+    maxwidth:  int = user32.GetSystemMetrics(0)
+    maxheight: int = user32.GetSystemMetrics(1)
 
     def to_dict(self) -> Dict[str, int]:
         return {"width": self.width, "height": self.height,
@@ -80,13 +84,37 @@ class WindowConfig:
     @staticmethod
     def from_dict(d: Dict[str, Any]) -> "WindowConfig":
         defaults = WindowConfig()
-        return WindowConfig(
-            width  = safe_int(d.get("width"),  defaults.width),
-            height = safe_int(d.get("height"), defaults.height),
-            left   = safe_int(d.get("left"),   defaults.left),
-            top    = safe_int(d.get("top"),     defaults.top),
+
+        user32 = ctypes.windll.user32
+        screen_width = user32.GetSystemMetrics(0)
+        screen_height = user32.GetSystemMetrics(1)
+
+        width = min(
+            safe_int(d.get("width"), defaults.width),
+            screen_width
         )
 
+        height = min(
+            safe_int(d.get("height"), defaults.height),
+            screen_height
+        )
+
+        left = min(
+            safe_int(d.get("left"), defaults.left),
+            max(0, screen_width - width)
+        )
+
+        top = min(
+            safe_int(d.get("top"), defaults.top),
+            max(0, screen_height - height)
+        )
+
+        return WindowConfig(
+            width  = width,
+            height = height,
+            left   = max(0, left),
+            top    = max(0, top),
+        )
 
 # ── UI-метаданные темы (порядок полей для Settings) ──────────────────────────
 
