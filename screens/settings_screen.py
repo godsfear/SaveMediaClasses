@@ -477,7 +477,7 @@ class SettingsScreen(ThemeTarget):
         widget.update()
 
     def _on_btn_state(self, mode: str) -> None:
-        """Синхронизировать состояние кнопки по явному mode-ключу."""
+        """Синхронизировать состояние кнопки по-явному mode-ключу."""
         s = self._s
         if mode == "check":
             self.update_btn.disabled   = False
