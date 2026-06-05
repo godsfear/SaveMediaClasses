@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any, Callable
 
 from app_logging import configure_logging
@@ -26,6 +27,7 @@ from managers.config_manager import ConfigManager
 from managers.download_manager import DownloadManager
 from managers.download_repository import DownloadRepository
 from managers.tools_manager import ToolsManager
+from paths import AppPaths
 from state import AppState
 
 
@@ -51,16 +53,16 @@ class Services:
     # ── Вспомогательные свойства ──────────────────────────────────────────────
 
     @property
-    def db_path(self) -> str:
-        return os.path.join(self.base_dir, "savemedia.db")
+    def db_path(self) -> Path:
+        return AppPaths.db_file()
 
     @property
-    def log_path(self) -> str:
-        return os.path.join(self.base_dir, "savemedia.log")
+    def log_path(self) -> Path:
+        return AppPaths.log_file()
 
     @property
-    def config_path(self) -> str:
-        return os.path.join(self.base_dir, "config.json")
+    def config_path(self) -> Path:
+        return AppPaths.config_file()
 
     # ── Фабричный метод ───────────────────────────────────────────────────────
 
@@ -74,19 +76,19 @@ class Services:
         task_runner — планировщик coroutine (в app.py: page.run_task)."""
         from managers.providers import YtDlpProvider
 
-        tools_dir  = os.path.join(base_dir, "tools")
+        tools_dir  = AppPaths.tools_dir()
         os.makedirs(tools_dir, exist_ok=True)
-        configure_logging(os.path.join(base_dir, "savemedia.log"))
+        configure_logging(AppPaths.config_file())
 
         bus        = EventBus()
         config_mgr = ConfigManager(os.path.join(base_dir, "config.json"))
         tools      = ToolsManager(base_dir, tools_dir)
         state = config_mgr.load()
-        db_path = os.path.join(base_dir, "savemedia.db")
+        db_path = AppPaths.db_file()
         db      = DownloadRepository(db_path=db_path, bus=bus)
-        dm         = DownloadManager(
+        dm      = DownloadManager(
             provider_factory=lambda: YtDlpProvider(base_dir, tools_dir),
-            log_path=os.path.join(base_dir, "savemedia.log"),
+            log_path=AppPaths.log_file(),
             bus=bus,
             task_runner=task_runner,
             db=db,
