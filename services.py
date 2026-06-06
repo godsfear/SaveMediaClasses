@@ -50,25 +50,10 @@ class Services:
     # ── Состояние приложения ──────────────────────────────────────────────────
     state: AppState
 
-    # ── Вспомогательные свойства ──────────────────────────────────────────────
-
-    @property
-    def db_path(self) -> Path:
-        return AppPaths.db_file()
-
-    @property
-    def log_path(self) -> Path:
-        return AppPaths.log_file()
-
-    @property
-    def config_path(self) -> Path:
-        return AppPaths.config_file()
-
     # ── Фабричный метод ───────────────────────────────────────────────────────
 
     @staticmethod
     def create(
-        base_dir: str,
         safe_update: Callable[[], None],
         task_runner: Callable[..., Any],
     ) -> "Services":
@@ -76,18 +61,17 @@ class Services:
         task_runner — планировщик coroutine (в app.py: page.run_task)."""
         from managers.providers import YtDlpProvider
 
-        tools_dir  = AppPaths.tools_dir()
-        os.makedirs(tools_dir, exist_ok=True)
+        os.makedirs(AppPaths.tools_dir(), exist_ok=True)
         configure_logging(AppPaths.log_file())
 
         bus        = EventBus()
         config_mgr = ConfigManager(AppPaths.config_file())
-        tools      = ToolsManager(base_dir, tools_dir)
+        tools      = ToolsManager(AppPaths.app_dir(), AppPaths.tools_dir())
         state = config_mgr.load()
         db_path = AppPaths.db_file()
         db      = DownloadRepository(db_path=db_path, bus=bus)
         dm      = DownloadManager(
-            provider_factory=lambda: YtDlpProvider(base_dir, tools_dir),
+            provider_factory=lambda: YtDlpProvider(),
             log_path=AppPaths.log_file(),
             bus=bus,
             task_runner=task_runner,
@@ -95,8 +79,8 @@ class Services:
         )
 
         return Services(
-            base_dir=base_dir,
-            tools_dir=tools_dir,
+            base_dir=AppPaths.app_dir(),
+            tools_dir=AppPaths.tools_dir(),
             safe_update=safe_update,
             bus=bus,
             config_mgr=config_mgr,
