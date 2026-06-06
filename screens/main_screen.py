@@ -403,7 +403,7 @@ class MainScreen(ThemeTarget):
     async def _fetch_and_show_thumbnail(self, task_id: str, url: str) -> None:
         try:
             from managers.providers import YtDlpProvider
-            provider = YtDlpProvider(self._base_dir, self._tools_dir)
+            provider = YtDlpProvider()
             exe = provider.resolve_exe()
             if not exe:
                 return

@@ -16,8 +16,7 @@ from paths import AppPaths
 class SaveMediaApp:
 
     async def main(self, page: ft.Page) -> None:
-        base_dir = str(AppPaths.app_dir())
-        log      = get_logger("app")
+        log = get_logger("app")
 
         # ── Тема страницы ─────────────────────────────────────────────────────
         page.theme_mode = ft.ThemeMode.DARK
@@ -34,7 +33,7 @@ class SaveMediaApp:
                 log.exception("Failed to page.update")
 
         # ── DI ────────────────────────────────────────────────────────────────
-        svc = Services.create(base_dir, safe_update, page.run_task)
+        svc = Services.create(safe_update, page.run_task)
 
         # ── Экраны ────────────────────────────────────────────────────────────
         main_screen     = MainScreen(page, svc)

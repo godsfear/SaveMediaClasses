@@ -74,7 +74,7 @@ class DownloadManager:
                  db=None) -> None:
         """
         provider_factory — callable без аргументов, возвращает новый DownloadProvider.
-        Пример: lambda: YtDlpProvider(base_dir, tools_dir)
+        Пример: lambda: YtDlpProvider()
         task_runner — планировщик async-задач (в app.py: page.run_task).
         db — DownloadRepository для сохранения thumbnail после загрузки (опционально).
         """
