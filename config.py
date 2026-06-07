@@ -1,7 +1,6 @@
 import os
 from dataclasses import dataclass
 from typing import Any, Dict
-import ctypes
 
 # ── Константы приложения ──────────────────────────────────────────────────────
 
@@ -69,13 +68,18 @@ class ThemeConfig:
 
 @dataclass
 class WindowConfig:
-    width:     int = 600
-    height:    int = 650
-    left:      int = 100
-    top:       int = 100
-    user32         = ctypes.windll.user32
-    maxwidth:  int = user32.GetSystemMetrics(0)
-    maxheight: int = user32.GetSystemMetrics(1)
+    width:  int = 600
+    height: int = 650
+    left:   int = 100
+    top:    int = 100
+
+    @staticmethod
+    def _get_screen_metrics() -> tuple[int, int]:
+        if os.name == "nt":
+            import ctypes
+            user32 = ctypes.windll.user32
+            return user32.GetSystemMetrics(0), user32.GetSystemMetrics(1)
+        return 1920, 1080
 
     def to_dict(self) -> Dict[str, int]:
         return {"width": self.width, "height": self.height,
@@ -84,10 +88,7 @@ class WindowConfig:
     @staticmethod
     def from_dict(d: Dict[str, Any]) -> "WindowConfig":
         defaults = WindowConfig()
-
-        user32 = ctypes.windll.user32
-        screen_width = user32.GetSystemMetrics(0)
-        screen_height = user32.GetSystemMetrics(1)
+        screen_width, screen_height = WindowConfig._get_screen_metrics()
 
         width = min(
             safe_int(d.get("width"), defaults.width),
