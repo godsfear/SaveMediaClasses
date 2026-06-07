@@ -59,7 +59,7 @@ class SaveMediaApp:
         )
 
         tools_ctrl = ToolsController(svc)
-        settings_screen.bind_tools_controller(tools_ctrl)
+        settings_screen.set_tools_controller(tools_ctrl)
 
         nav_ctrl = NavigationController(
             page, svc,
@@ -135,7 +135,7 @@ class SaveMediaApp:
         now         = time.time()
         force_check = not svc.state.tool_versions
         if force_check or now - svc.state.last_check_time >= CHECK_INTERVAL_HOURS * 3600:
-            page.run_task(settings_screen.check_tools)
+            page.run_task(tools_ctrl.check_tools)
         else:
             mins_left = int(
                 (CHECK_INTERVAL_HOURS * 3600 - (now - svc.state.last_check_time)) / 60
