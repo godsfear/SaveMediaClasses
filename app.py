@@ -3,7 +3,7 @@ import time
 import flet as ft
 
 from app_logging import get_logger
-from config import CHECK_INTERVAL_HOURS
+from config import CHECK_INTERVAL_SECONDS
 from controllers import NavigationController, ThemeController, ToolsController, WindowController
 from events import ToolsCheckedEvent, ToolsRestoredEvent, ToolsStatusMessageEvent
 from screens.history_screen import HistoryScreen
@@ -149,11 +149,11 @@ class SaveMediaApp:
         # ── Фоновая проверка версий ───────────────────────────────────────────
         now         = time.time()
         force_check = not svc.state.tool_versions
-        if force_check or now - svc.state.last_check_time >= CHECK_INTERVAL_HOURS * 3600:
+        if force_check or now - svc.state.last_check_time >= CHECK_INTERVAL_SECONDS:
             page.run_task(tools_ctrl.check_tools)
         else:
             mins_left = int(
-                (CHECK_INTERVAL_HOURS * 3600 - (now - svc.state.last_check_time)) / 60
+                (CHECK_INTERVAL_SECONDS - (now - svc.state.last_check_time)) / 60
             )
             svc.bus.emit(ToolsRestoredEvent(
                 needs_update=svc.state.last_needs_update,
