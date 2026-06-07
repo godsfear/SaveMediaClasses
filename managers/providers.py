@@ -125,7 +125,19 @@ class YtDlpProvider:
         return args
 
     def cancel(self) -> None:
-        if self._proc and self._proc.returncode is None:
+        if not self._proc or self._proc.returncode is not None:
+            return
+        try:
+            if os.name == "nt":
+                # taskkill /T убивает yt-dlp и все его дочерние процессы (ffmpeg и др.)
+                subprocess.run(
+                    ["taskkill", "/F", "/T", "/PID", str(self._proc.pid)],
+                    capture_output=True,
+                )
+            else:
+                import signal
+                os.killpg(os.getpgid(self._proc.pid), signal.SIGTERM)
+        except Exception:
             try:
                 self._proc.terminate()
             except Exception:
@@ -149,6 +161,8 @@ class YtDlpProvider:
             stderr=subprocess.STDOUT,
             env=env,
             startupinfo=startup,
+            # новая сессия = отдельная группа процессов; killpg убьёт yt-dlp + ffmpeg разом
+            **({} if os.name == "nt" else {"start_new_session": True}),
         )
         while True:
             raw = await self._proc.stdout.readline()
@@ -175,7 +189,7 @@ class YtDlpProvider:
 
     @classmethod
     def is_valid_url(cls, url: str) -> bool:
-        return url.startswith("http://") or url.startswith("https://")
+        return bool(url.strip())
 
     @classmethod
     def post_processing_tags(cls) -> list[str]:
