@@ -1,15 +1,14 @@
 [project]
-name = "savemediaclasses"
+name = "SaveMedia"
 version = "0.1.0"
-requires-python = ">=3.14"
+requires-python = ">=3.13"
 dependencies = [
     "flet>=0.85.1",
     "httpx>=0.28.1",
-    "pillow>=12.2.0",
-    "pyinstaller>=6.20.0",
 ]
 
 [project.optional-dependencies]
 dev = [
+    "pillow>=12.2.0",
     "pyinstaller>=6.20.0",
 ]

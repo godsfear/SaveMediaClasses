@@ -13,7 +13,6 @@ WindowController — управление окном приложения.
 from __future__ import annotations
 
 import os
-from pathlib import Path
 from typing import TYPE_CHECKING, Callable
 
 import flet as ft
@@ -56,7 +55,6 @@ class WindowController:
         page.window.height = geo.height
         page.window.left   = geo.left
         page.window.top    = geo.top
-        page.window.icon   = str(Path(__file__).parent / "SaveMedia.png")
 
         if page.platform in [
             ft.PagePlatform.WINDOWS,
