@@ -131,6 +131,7 @@ class DownloadRepository:
 
     def _init_db(self) -> None:
         with self._connect() as conn:
+            conn.execute("PRAGMA journal_mode=WAL")
             conn.execute(_CREATE_TABLE)
             for idx in _CREATE_INDEXES:
                 conn.execute(idx)
@@ -280,7 +281,6 @@ class DownloadRepository:
     @contextmanager
     def _connect(self) -> Generator[sqlite3.Connection, None, None]:
         conn = sqlite3.connect(self._db_path, timeout=5)
-        conn.execute("PRAGMA journal_mode=WAL")
         try:
             yield conn
             conn.commit()
