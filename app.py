@@ -10,7 +10,6 @@ from screens.history_screen import HistoryScreen
 from screens.main_screen import MainScreen
 from screens.settings_screen import SettingsScreen
 from services import Services
-from paths import AppPaths
 
 
 _SESSION_CLOSED_MARKERS = ("session", "disconnect", "closed", "connection reset", "pipe")
