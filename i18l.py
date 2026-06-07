@@ -214,6 +214,14 @@ class Locale:
         known = {f.name for f in fields(Strings)}
         kwargs = {k: v for k, v in data.items() if k in known}
         result = Strings(**kwargs)
+
+        # Пустые поля заполняем английскими значениями (fallback для неполных переводов)
+        if lang != cls.DEFAULT_LANG:
+            en = cls.load(cls.DEFAULT_LANG)
+            for f in fields(Strings):
+                if not getattr(result, f.name):
+                    setattr(result, f.name, getattr(en, f.name))
+
         cls._cache[lang] = result
         return result
 
