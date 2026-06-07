@@ -57,6 +57,8 @@ class NavigationController:
 
         self._pending_restored: list = []
 
+        self._folder_picker = ft.FilePicker()
+
         s = Locale.load(svc.state.language)
         self._folder_picker_title: str = s.folder_select_text
 
@@ -186,7 +188,7 @@ class NavigationController:
         self.exit_btn.on_click     = self._window_ctrl.force_exit
 
     async def _open_folder_picker(self, _) -> None:
-        path = await ft.FilePicker().get_directory_path(
+        path = await self._folder_picker.get_directory_path(
             dialog_title=self._folder_picker_title
         )
         if path:
