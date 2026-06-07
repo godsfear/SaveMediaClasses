@@ -30,18 +30,19 @@ class WindowController:
         page: ft.Page,
         svc: "Services",
         on_save: Callable[[], None],
+        on_close: Callable[[], None] | None = None,
     ) -> None:
         """
-        page     — Flet Page.
-        svc      — DI-контейнер.
-        on_save  — коллбэк, который сначала синхронизирует экраны → state,
-                   затем сохраняет state через config_mgr. Передаётся снаружи,
-                   чтобы WindowController не зависел от экранов напрямую.
+        page      — Flet Page.
+        svc       — DI-контейнер.
+        on_save   — коллбэк синхронизации экранов → state → диск.
+        on_close  — коллбэк teardown (dispose подписок) перед уничтожением окна.
         """
-        self._page    = page
-        self._svc     = svc
-        self._on_save = on_save
-        self._log     = get_logger("app")
+        self._page     = page
+        self._svc      = svc
+        self._on_save  = on_save
+        self._on_close = on_close
+        self._log      = get_logger("app")
 
     # ── Публичный API ─────────────────────────────────────────────────────────
 
@@ -114,7 +115,12 @@ class WindowController:
             await self._page.window.destroy()
 
     def _close(self) -> None:
-        """Снять блокировку закрытия перед уничтожением окна."""
+        """Снять блокировку закрытия и вызвать teardown подписок."""
         self._page.window.prevent_close = False
         self._page.window.on_event      = None
+        if self._on_close:
+            try:
+                self._on_close()
+            except Exception:
+                self._log.exception("Teardown failed on window close")
         self._page.update()
