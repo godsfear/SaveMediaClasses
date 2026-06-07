@@ -80,6 +80,47 @@ class ToolsRestoredEvent:
     mins_until_check: int
 
 
+# ── Детальные события инструментов (для SettingsScreen) ───────────────────────
+
+@dataclass(frozen=True)
+class ToolVersionLocalEvent:
+    """Найдена локальная версия инструмента — промежуточный результат проверки."""
+    tool_name:     str
+    local_version: str
+
+@dataclass(frozen=True)
+class ToolVersionRemoteEvent:
+    """Получены обе версии инструмента после сетевого запроса."""
+    tool_name:      str
+    local_version:  str
+    remote_version: str
+    status:         str   # "ok" | "outdated" | "missing" | "error"
+
+@dataclass(frozen=True)
+class ToolButtonStateEvent:
+    """Смена отображаемого состояния кнопки Check/Update."""
+    mode: str   # "check" | "update" | "checking" | "updating"
+
+@dataclass(frozen=True)
+class ToolProgressEvent:
+    """Обновление прогресс-бара скачивания/установки."""
+    pct:     float | None   # 0.0–1.0 или None (indeterminate)
+    visible: bool = True
+
+@dataclass(frozen=True)
+class ToolProgressMessageEvent:
+    """Строка статуса операции с инструментами (для виджета progress_text)."""
+    key:   str   # "checking"|"prep"|"updates"|"ok"|"done_ok"|"done_errors"|"critical:<text>"
+    color: str   # hex или ft.Colors.*
+
+@dataclass(frozen=True)
+class ToolInstallStatusEvent:
+    """Статус загрузки/установки конкретного инструмента."""
+    tool_name: str    # "yt-dlp" | "ffmpeg"
+    code:      str    # "downloading" | "ok" | "error" | "manual"
+    detail:    str = ""
+
+
 # ── Шина ──────────────────────────────────────────────────────────────────────
 
 class EventBus:

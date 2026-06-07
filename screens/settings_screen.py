@@ -12,7 +12,13 @@ from managers.tools_manager import (
 )
 from controllers.theme_target import ThemeTarget
 from controllers.tools_controller import ToolsController
-from events import ToolsRestoredEvent
+from events import (
+    ToolsRestoredEvent,
+    ToolVersionLocalEvent, ToolVersionRemoteEvent,
+    ToolButtonStateEvent,
+    ToolProgressEvent, ToolProgressMessageEvent,
+    ToolInstallStatusEvent,
+)
 from i18l import Locale, Strings
 from services import Services
 
@@ -43,28 +49,30 @@ class SettingsScreen(ThemeTarget):
         self._on_settings_changed: Callable = lambda: None
         self._on_language_changed: Callable = lambda: None
 
+        self._tools_ctrl: ToolsController | None = None
         self._s: Strings = Locale.load(self._state.language)
 
         self._build_widgets()
         self._build_theme_section()
         self._build_layout()
 
-    def bind_tools_controller(self, ctrl: ToolsController) -> None:
-        """Подключить ToolsController после построения виджетов.
-        Вызывается из app.py после создания экрана и контроллера."""
-        s = self._s
+        self._unsubs = [
+            self._bus.on(ToolVersionLocalEvent,    self._on_tool_local),
+            self._bus.on(ToolVersionRemoteEvent,   self._on_tool_remote),
+            self._bus.on(ToolButtonStateEvent,     self._on_btn_state),
+            self._bus.on(ToolProgressEvent,        self._on_progress),
+            self._bus.on(ToolProgressMessageEvent, self._on_progress_msg),
+            self._bus.on(ToolInstallStatusEvent,   self._on_install_status),
+        ]
 
-        # Передаём коллбэки для обновления виджетов в контроллер
-        ctrl.set_on_tool_local(self._on_tool_local)
-        ctrl.set_on_tool_remote(self._on_tool_remote)
-        ctrl.set_on_btn_state(self._on_btn_state)
-        ctrl.set_on_progress_pct(self._on_progress_pct)
-        ctrl.set_on_progress_bar_visible(self._on_progress_bar_visible)
-        ctrl.set_on_progress_msg(self._on_progress_msg)
-        ctrl.set_on_yt_status(self._on_yt_status_update)
-        ctrl.set_on_ff_status(self._on_ff_status_update)
-
+    def set_tools_controller(self, ctrl: ToolsController) -> None:
+        """Установить контроллер для делегирования кликов по кнопке."""
         self._tools_ctrl = ctrl
+
+    def dispose(self) -> None:
+        """Отписаться от шины при уничтожении экрана."""
+        for unsub in self._unsubs:
+            unsub()
 
     # ── Синхронизация ─────────────────────────────────────────────────────────
 
@@ -445,21 +453,18 @@ class SettingsScreen(ThemeTarget):
             self.progress_text.color   = ft.Colors.GREEN_400
         self._safe_update()
 
-    # ── Коллбэки для ToolsController (обновление виджетов) ───────────────────
+    # ── Обработчики событий шины (инструменты) ───────────────────────────────
 
-    def _on_tool_local(self, name: str, local: str) -> None:
-        """Показать локальную версию инструмента во время проверки."""
+    def _on_tool_local(self, e: ToolVersionLocalEvent) -> None:
         s = self._s
-        widget = self._tool_widget(name)
+        widget = self._tool_widget(e.tool_name)
         if widget is None:
             return
-        loc_text = _resolve_version(local, s)
-        widget.value = s.fmt("tool_querying", name=name, loc=loc_text)
+        widget.value = s.fmt("tool_querying", name=e.tool_name, loc=_resolve_version(e.local_version, s))
         widget.color = ft.Colors.GREY_500
         widget.update()
 
-    def _on_tool_remote(self, name: str, loc: str, rem: str, status: str) -> None:
-        """Показать итоговые версии инструмента после получения удалённых данных."""
+    def _on_tool_remote(self, e: ToolVersionRemoteEvent) -> None:
         s = self._s
         color_map = {
             "ok":       ft.Colors.GREEN_400,
@@ -467,30 +472,29 @@ class SettingsScreen(ThemeTarget):
             "missing":  ft.Colors.RED_400,
             "error":    ft.Colors.AMBER,
         }
-        widget = self._tool_widget(name)
+        widget = self._tool_widget(e.tool_name)
         if widget is None:
             return
-        loc_text = _resolve_version(loc, s)
-        rem_text = _resolve_version(rem, s)
-        widget.value = s.fmt("tool_versions", name=name, loc=loc_text, rem=rem_text)
-        widget.color = color_map.get(status, ft.Colors.GREY_600)
+        widget.value = s.fmt("tool_versions", name=e.tool_name,
+                             loc=_resolve_version(e.local_version, s),
+                             rem=_resolve_version(e.remote_version, s))
+        widget.color = color_map.get(e.status, ft.Colors.GREY_600)
         widget.update()
 
-    def _on_btn_state(self, mode: str) -> None:
-        """Синхронизировать состояние кнопки по-явному mode-ключу."""
+    def _on_btn_state(self, e: ToolButtonStateEvent) -> None:
         s = self._s
-        if mode == "check":
+        if e.mode == "check":
             self.update_btn.disabled   = False
             self.update_btn_icon.name  = ft.Icons.REFRESH_ROUNDED
             self.update_btn_text.value = s.btn_check
-        elif mode == "update":
+        elif e.mode == "update":
             self.update_btn.disabled   = False
             self.update_btn_icon.name  = ft.Icons.DOWNLOAD_ROUNDED
             self.update_btn_text.value = s.btn_update
-        elif mode == "checking":
+        elif e.mode == "checking":
             self.update_btn.disabled   = True
             self.update_btn_text.value = s.btn_checking
-        elif mode == "updating":
+        elif e.mode == "updating":
             self.update_btn.disabled   = True
             self.update_btn_icon.name  = ft.Icons.HOURGLASS_TOP_ROUNDED
             self.update_btn_text.value = s.btn_updating
@@ -498,16 +502,12 @@ class SettingsScreen(ThemeTarget):
         self.update_btn_icon.update()
         self.update_btn.update()
 
-    def _on_progress_pct(self, pct: float | None) -> None:
-        self.progress_bar.value = pct
+    def _on_progress(self, e: ToolProgressEvent) -> None:
+        self.progress_bar.visible = e.visible
+        self.progress_bar.value   = e.pct
         self._safe_update()
 
-    def _on_progress_bar_visible(self, visible: bool) -> None:
-        self.progress_bar.visible = visible
-        self._safe_update()
-
-    def _on_progress_msg(self, key: str, color: str) -> None:
-        """Обновить текст статуса по ключу (или raw-строке для критических ошибок)."""
+    def _on_progress_msg(self, e: ToolProgressMessageEvent) -> None:
         s = self._s
         msg_map = {
             "checking":    (s.status_checking,   ft.Colors.GREEN_400),
@@ -517,38 +517,33 @@ class SettingsScreen(ThemeTarget):
             "done_ok":     (s.status_done_ok,     ft.Colors.GREEN_400),
             "done_errors": (s.status_done_errors, ft.Colors.RED_400),
         }
-        if key in msg_map:
-            text, clr = msg_map[key]
-        elif key.startswith("critical:"):
-            detail = key[len("critical:"):]
-            text = s.fmt("status_critical", err=detail)
+        if e.key in msg_map:
+            text, clr = msg_map[e.key]
+        elif e.key.startswith("critical:"):
+            text = s.fmt("status_critical", err=e.key[len("critical:"):])
             clr  = ft.Colors.RED_400
         else:
-            text, clr = key, color
+            text, clr = e.key, e.color
         self.progress_text.value = text
         self.progress_text.color = clr
         self.progress_text.update()
 
-    def _on_yt_status_update(self, code: str, detail: str) -> None:
-        self._apply_tool_status("yt-dlp", self.yt_status, code, detail)
-
-    def _on_ff_status_update(self, code: str, detail: str) -> None:
-        self._apply_tool_status("ffmpeg", self.ffmpeg_status, code, detail)
-
-    def _apply_tool_status(self, name: str, widget: ft.Text, code: str, detail: str) -> None:
+    def _on_install_status(self, e: ToolInstallStatusEvent) -> None:
         s = self._s
-        if code == "downloading":
-            widget.value = f"{name}: {s.tool_update_downloading}"
+        widget = self._tool_widget(e.tool_name)
+        if widget is None:
+            return
+        if e.code == "downloading":
+            widget.value = f"{e.tool_name}: {s.tool_update_downloading}"
             widget.color = ft.Colors.ORANGE_400
-        elif code == "ok":
-            widget.value = f"{name}: {s.tool_update_ok}"
+        elif e.code == "ok":
+            widget.value = f"{e.tool_name}: {s.tool_update_ok}"
             widget.color = ft.Colors.GREEN_400
-        elif code == "manual":
-            # Не-Windows: ffmpeg нельзя поставить автоматически
-            widget.value = f"{name}: {s.fmt('tool_update_manual', hint=detail)}"
+        elif e.code == "manual":
+            widget.value = f"{e.tool_name}: {s.fmt('tool_update_manual', hint=e.detail)}"
             widget.color = ft.Colors.AMBER
         else:
-            widget.value = f"{name}: {s.fmt('tool_update_error', detail=detail)}"
+            widget.value = f"{e.tool_name}: {s.fmt('tool_update_error', detail=e.detail)}"
             widget.color = ft.Colors.RED_400
         self._safe_update()
 
@@ -563,13 +558,8 @@ class SettingsScreen(ThemeTarget):
     # ── Обработчик кнопки — делегирует в контроллер ───────────────────────────
 
     async def _handle_update_button_click(self, _) -> None:
-        await self._tools_ctrl.handle_button_click()
-
-    # ── Совместимость: check_tools вызывается из app.py напрямую ─────────────
-
-    async def check_tools(self) -> None:
-        """Прокси для app.py — делегирует в ToolsController."""
-        await self._tools_ctrl.check_tools()
+        if self._tools_ctrl is not None:
+            await self._tools_ctrl.handle_button_click()
 
     # ── Колбэки из App ────────────────────────────────────────────────────────
 

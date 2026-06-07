@@ -407,7 +407,8 @@ class MainScreen(ThemeTarget):
             exe = provider.resolve_exe()
             if not exe:
                 return
-            thumb_data, meta = await provider.fetch_thumbnail(exe, url)
+            proxy_url = self._state.proxy_address.strip() if self._state.proxy_enabled else None
+            thumb_data, meta = await provider.fetch_thumbnail(exe, url, proxy_url=proxy_url)
             if self._db is not None:
                 if thumb_data:
                     self._db.save_thumbnail(task_id, thumb_data)

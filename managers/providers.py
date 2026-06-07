@@ -181,18 +181,18 @@ class YtDlpProvider:
     def post_processing_tags(cls) -> list[str]:
         return cls._POST_TAGS
 
-    async def fetch_thumbnail(self, exe: str, url: str) -> tuple:
+    async def fetch_thumbnail(self, exe: str, url: str, proxy_url: str | None = None) -> tuple:
         """
         Получить thumbnail как JPEG-байты и метаданные из yt-dlp:
           1. --dump-single-json --flat-playlist → метаданные верхнего уровня.
              Для плейлиста: _type="playlist", entries — плоский список без деталей.
              Для видео:     _type="video", thumbnails есть сразу.
           2. Thumbnail берём из самого объекта (видео) или первого entries (плейлист).
-          3. urllib скачивает байты превью.
+          3. httpx скачивает байты превью через proxy_url (если задан).
         Возвращает (bytes, meta_dict).
         """
         import json as _json
-        import urllib.request
+        import httpx
 
         try:
             startup = None
@@ -230,19 +230,17 @@ class YtDlpProvider:
             if not thumb_url:
                 return b"", data
 
-            # Скачиваем байты в потоке — не блокируем event loop
-            def _download() -> bytes:
-                req = urllib.request.Request(
-                    thumb_url,
-                    headers={"User-Agent": "Mozilla/5.0"},
-                )
-                with urllib.request.urlopen(req, timeout=THUMBNAIL_SOCK_TIMEOUT) as resp:
-                    return resp.read()
+            timeout = httpx.Timeout(connect=THUMBNAIL_SOCK_TIMEOUT, read=THUMBNAIL_TIMEOUT,
+                                    write=5.0, pool=5.0)
+            async with httpx.AsyncClient(
+                proxy=proxy_url,
+                timeout=timeout,
+                headers={"User-Agent": "Mozilla/5.0"},
+                follow_redirects=True,
+            ) as client:
+                resp = await client.get(thumb_url)
+                raw = resp.content
 
-            raw = await asyncio.wait_for(
-                asyncio.to_thread(_download),
-                timeout=THUMBNAIL_TIMEOUT,
-            )
             return (raw if raw else b""), data
 
         except Exception:
