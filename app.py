@@ -50,8 +50,13 @@ class SaveMediaApp:
             settings_screen.sync_to_state()
             svc.config_mgr.save(svc.state)
 
+        def teardown():
+            main_screen.dispose()
+            settings_screen.dispose()
+            svc.db.dispose()
+
         # ── Контроллеры ───────────────────────────────────────────────────────
-        window_ctrl = WindowController(page, svc, on_save=save_config)
+        window_ctrl = WindowController(page, svc, on_save=save_config, on_close=teardown)
 
         theme_ctrl = ThemeController(
             page, svc,
