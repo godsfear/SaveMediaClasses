@@ -22,7 +22,7 @@ exe = EXE(
     a.binaries,
     a.datas,
     [],
-    name='main',
+    name='SaveMedia',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -35,6 +35,6 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    version='C:\\Users\\DRDMIT~1\\AppData\\Local\\Temp\\a31eb9ee-e36f-478d-9885-6006b6a6c064',
-    icon=['SaveMedia.png'],
+    version='C:\\Users\\DRDMIT~1\\AppData\\Local\\Temp\\32583c17-aab4-490b-abe9-07da0ae4f4e5',
+    icon=['SaveMedia.ico'],
 )

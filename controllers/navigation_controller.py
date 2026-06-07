@@ -22,6 +22,7 @@ import flet as ft
 from app_logging import get_logger
 from config import hex_to_flet
 from i18l import Locale
+from paths import AppPaths
 
 if TYPE_CHECKING:
     from controllers.theme_controller import ThemeController
@@ -135,6 +136,8 @@ class NavigationController:
         self._page.appbar = ft.AppBar(
             title=ft.Text(s.appbar_main, size=18, weight=ft.FontWeight.W_600),
             bgcolor=hex_to_flet(self._svc.state.theme.appbar_color),
+            leading=self._logo(),
+            leading_width=44,
             actions=[
                 self.settings_btn, self.history_btn,
                 self.proxy_btn, self.folder_btn, self.exit_btn,
@@ -179,6 +182,89 @@ class NavigationController:
         self._svc.safe_update()
 
     # ── Приватное ─────────────────────────────────────────────────────────────
+
+    def _logo(self) -> ft.Container:
+        return ft.Container(
+            content=ft.Image(
+                src=str(AppPaths.app_dir() / "SaveMedia.png"),
+                width=28,
+                height=28,
+                fit="contain",
+            ),
+            padding=ft.Padding(left=8, top=0, right=0, bottom=0),
+            on_click=self._show_about,
+            tooltip="About",
+        )
+
+    @staticmethod
+    def _app_version() -> str:
+        try:
+            from importlib.metadata import version
+            return version("savemediaclasses")
+        except Exception:
+            pass
+        try:
+            import tomllib
+            with open(AppPaths.app_dir() / "pyproject.toml", "rb") as f:
+                return tomllib.load(f)["project"]["version"]
+        except Exception:
+            return ""
+
+    def _show_about(self, _) -> None:
+        features = [
+            "Тысячи сайтов — YouTube, VK, Rutube, Telegram и др.",
+            "Видео, аудио, плейлисты, субтитры",
+            "Автообновление yt-dlp и ffmpeg",
+            "Прокси, cookies, кастомные аргументы",
+            "История загрузок · Thumbnail-превью",
+            "Локализация: RU / EN",
+        ]
+        dlg = ft.AlertDialog(
+            modal=False,
+            title=ft.Row(
+                [
+                    ft.Image(
+                        src=str(AppPaths.app_dir() / "SaveMedia.png"),
+                        width=32, height=32, fit="contain",
+                    ),
+                    ft.Text("SaveMedia", size=20, weight=ft.FontWeight.BOLD),
+                    ft.Text(
+                        f"v{ver}" if (ver := self._app_version()) else "",
+                        size=12, color=ft.Colors.GREY_500,
+                    ),
+                ],
+                spacing=10,
+            ),
+            content=ft.Column(
+                [
+                    ft.Text(
+                        "Графический интерфейс для yt-dlp + ffmpeg",
+                        size=13, color=ft.Colors.GREY_400,
+                    ),
+                    ft.Divider(height=10),
+                    *[ft.Text(f"• {f}", size=12) for f in features],
+                    ft.Divider(height=10),
+                    ft.TextButton(
+                        "github.com/godsfear/SaveMediaClasses",
+                        url="https://github.com/godsfear/SaveMediaClasses",
+                    ),
+                ],
+                tight=True,
+                spacing=5,
+                width=360,
+            ),
+            actions=[
+                ft.TextButton("OK", on_click=lambda e: self._close_dlg(dlg)),
+            ],
+        )
+        self._page.overlay.append(dlg)
+        dlg.open = True
+        self._page.update()
+
+    def _close_dlg(self, dlg: ft.AlertDialog) -> None:
+        dlg.open = False
+        self._page.update()
+        self._page.overlay.remove(dlg)
 
     def _bind_toolbar(self) -> None:
         self.folder_btn.on_click   = self._open_folder_picker

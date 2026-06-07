@@ -123,6 +123,8 @@ class SaveMediaApp:
         page.appbar = ft.AppBar(
             title=ft.Text("SaveMedia [yt-dlp GUI]", size=18, weight=ft.FontWeight.W_600),
             bgcolor="#1c1c1c",
+            leading=nav_ctrl._logo(),
+            leading_width=44,
             actions=[
                 nav_ctrl.settings_btn, nav_ctrl.history_btn,
                 nav_ctrl.proxy_btn, nav_ctrl.folder_btn, nav_ctrl.exit_btn,
