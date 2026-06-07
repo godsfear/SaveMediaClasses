@@ -430,13 +430,12 @@ class SettingsScreen(ThemeTarget):
         }
         for name, widget in tool_widgets.items():
             tv = e.tool_versions.get(name)
-            if tv and isinstance(tv, tuple) and len(tv) == 3:
-                loc, rem, status_key = tv
+            if tv:
                 widget.value = s.fmt("tool_versions",
                                      name=name,
-                                     loc=_resolve_version(loc, s),
-                                     rem=_resolve_version(rem, s))
-                widget.color = color_map.get(status_key, ft.Colors.GREY_600)
+                                     loc=_resolve_version(tv.current, s),
+                                     rem=_resolve_version(tv.latest, s))
+                widget.color = color_map.get(tv.status, ft.Colors.GREY_600)
             else:
                 widget.value = s.fmt("tool_dash", name=name)
                 widget.color = ft.Colors.GREY_600

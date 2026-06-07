@@ -22,12 +22,11 @@ from i18l import Locale
 class ToolVersionInfo(NamedTuple):
     """Типизированный результат проверки версии одного инструмента.
 
-    Sentinel-значения local/remote берутся из managers.tools_manager.
-    Поддерживает распаковку как обычный tuple: local, remote, status = tv
+    Sentinel-значения current/latest берутся из managers.tools_manager.
     """
-    local:  str   # локальная версия или TOOL_VERSION_* sentinel
-    remote: str   # удалённая версия или TOOL_VERSION_* sentinel
-    status: str   # "ok" | "outdated" | "missing" | "error"
+    current: str  # локальная версия или TOOL_VERSION_* sentinel
+    latest:  str  # удалённая версия или TOOL_VERSION_* sentinel
+    status:  str  # "ok" | "outdated" | "missing" | "error"
 
 
 @dataclass
@@ -54,8 +53,7 @@ class AppState:
     # ── Мета-состояние ────────────────────────────────────────────────────────
     last_check_time:   float = 0.0
     last_needs_update: bool  = False
-    # Результаты последней проверки: {"yt-dlp": (local, remote, status_key), ...}
-    # status_key: "ok" | "outdated" | "missing" | "error"
+    # Результаты последней проверки: {"yt-dlp": ToolVersionInfo(current, latest, status), ...}
     tool_versions: Dict[str, ToolVersionInfo] = field(default_factory=dict)
 
     # ── Тема и геометрия — типизированные dataclass вместо Dict ──────────────

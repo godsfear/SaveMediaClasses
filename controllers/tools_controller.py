@@ -61,7 +61,7 @@ class ToolsController:
 
         def on_remote_done(name: str, loc: str, rem: str) -> None:
             status = _classify_version(loc, rem)
-            self._state.tool_versions[name] = ToolVersionInfo(local=loc, remote=rem, status=status)
+            self._state.tool_versions[name] = ToolVersionInfo(current=loc, latest=rem, status=status)
             self._bus.emit(ToolVersionRemoteEvent(name, loc, rem, status))
 
         proxy_url = self._state.proxy_address.strip() if self._state.proxy_enabled else None
