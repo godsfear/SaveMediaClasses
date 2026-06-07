@@ -4,7 +4,7 @@ from typing import Any, Dict
 
 # ── Константы приложения ──────────────────────────────────────────────────────
 
-CHECK_INTERVAL_HOURS = 6
+CHECK_INTERVAL_SECONDS = 6 * 3600
 
 # ── Сетевые константы (chunk / timeout) ──────────────────────────────────────
 YT_DLP_CHUNK_SIZE      = 8_192   # байт/итерацию при скачивании yt-dlp
