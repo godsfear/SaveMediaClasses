@@ -8,7 +8,22 @@ from config import (
     safe_str, safe_int, get_fallback_bool,
 )
 from i18l import Locale
-from state import AppState
+from state import AppState, ToolVersionInfo
+
+
+def _load_tool_versions(raw: dict) -> dict:
+    result = {}
+    for k, v in raw.items():
+        if isinstance(v, dict):
+            result[k] = ToolVersionInfo(
+                current=v.get("current", ""),
+                latest=v.get("latest", ""),
+                status=v.get("status", ""),
+            )
+        elif isinstance(v, (list, tuple)) and len(v) == 3:
+            # backward-compat: старый формат ["current", "latest", "status"]
+            result[k] = ToolVersionInfo(current=v[0], latest=v[1], status=v[2])
+    return result
 
 
 class ConfigManager:
@@ -59,10 +74,7 @@ class ConfigManager:
             url_ffmpeg_download   = fb_str(urls, "ffmpeg_download", defaults.url_ffmpeg_download),
             last_check_time       = float(cfg.get("last_check_time",  defaults.last_check_time)),
             last_needs_update     = bool(cfg.get("last_needs_update", defaults.last_needs_update)),
-            tool_versions         = {
-                k: tuple(v) for k, v in cfg.get("tool_versions", {}).items()
-                if isinstance(v, (list, tuple)) and len(v) == 3
-            },
+            tool_versions         = _load_tool_versions(cfg.get("tool_versions", {})),
             theme    = ThemeConfig.from_dict(raw.get("theme", {})),
             window   = WindowConfig.from_dict(raw.get("window", {})),
             language = Locale.resolve_language(raw.get("language") or defaults.language),
@@ -94,7 +106,10 @@ class ConfigManager:
                 "save_to_source_folder": state.save_to_source_folder,
                 "last_check_time":       state.last_check_time,
                 "last_needs_update":     state.last_needs_update,
-                "tool_versions":         state.tool_versions,
+                "tool_versions":         {
+                    k: {"current": v.current, "latest": v.latest, "status": v.status}
+                    for k, v in state.tool_versions.items()
+                },
                 "urls": {
                     "yt_api":          state.url_yt_api,
                     "yt_download":     state.url_yt_download,
