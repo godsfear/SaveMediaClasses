@@ -123,4 +123,7 @@ class WindowController:
                 self._on_close()
             except Exception:
                 self._log.exception("Teardown failed on window close")
-        self._page.update()
+        try:
+            self._page.update()
+        except Exception as exc:
+            self._log.debug("page.update on close skipped: %s", exc)
