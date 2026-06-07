@@ -13,6 +13,13 @@ from services import Services
 from paths import AppPaths
 
 
+_SESSION_CLOSED_MARKERS = ("session", "disconnect", "closed", "connection reset", "pipe")
+
+def _is_session_closed(exc: Exception) -> bool:
+    msg = str(exc).lower()
+    return any(marker in msg for marker in _SESSION_CLOSED_MARKERS)
+
+
 class SaveMediaApp:
 
     async def main(self, page: ft.Page) -> None:
@@ -29,8 +36,11 @@ class SaveMediaApp:
         def safe_update():
             try:
                 page.update()
-            except Exception:
-                log.exception("Failed to page.update")
+            except Exception as exc:
+                if _is_session_closed(exc):
+                    log.debug("page.update skipped: session closed (%s)", exc)
+                else:
+                    log.exception("Failed to page.update")
 
         # ── DI ────────────────────────────────────────────────────────────────
         svc = Services.create(safe_update, page.run_task)
