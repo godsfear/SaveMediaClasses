@@ -13,11 +13,12 @@ WindowController — управление окном приложения.
 from __future__ import annotations
 
 import os
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING
 
 import flet as ft
 
 from app_logging import get_logger
+from events import SettingsChangedEvent, AppClosingEvent
 
 if TYPE_CHECKING:
     from services import Services
@@ -29,20 +30,14 @@ class WindowController:
         self,
         page: ft.Page,
         svc: "Services",
-        on_save: Callable[[], None],
-        on_close: Callable[[], None] | None = None,
     ) -> None:
         """
-        page      — Flet Page.
-        svc       — DI-контейнер.
-        on_save   — коллбэк синхронизации экранов → state → диск.
-        on_close  — коллбэк teardown (dispose подписок) перед уничтожением окна.
+        page — Flet Page.
+        svc  — DI-контейнер (через svc.bus публикуются SettingsChangedEvent/AppClosingEvent).
         """
-        self._page     = page
-        self._svc      = svc
-        self._on_save  = on_save
-        self._on_close = on_close
-        self._log      = get_logger("app")
+        self._page = page
+        self._svc  = svc
+        self._log  = get_logger("app")
 
     # ── Публичный API ─────────────────────────────────────────────────────────
 
@@ -89,7 +84,7 @@ class WindowController:
         if h and h > 10:    state.window.height = int(h)
         if l is not None:   state.window.left   = int(l)
         if t is not None:   state.window.top    = int(t)
-        self._on_save()
+        self._svc.bus.emit(SettingsChangedEvent())
 
     # ── Обработчики ───────────────────────────────────────────────────────────
 
@@ -114,14 +109,13 @@ class WindowController:
             await self._page.window.destroy()
 
     def _close(self) -> None:
-        """Снять блокировку закрытия и вызвать teardown подписок."""
+        """Снять блокировку закрытия и уведомить подписчиков (teardown через AppClosingEvent)."""
         self._page.window.prevent_close = False
         self._page.window.on_event      = None
-        if self._on_close:
-            try:
-                self._on_close()
-            except Exception:
-                self._log.exception("Teardown failed on window close")
+        try:
+            self._svc.bus.emit(AppClosingEvent())
+        except Exception:
+            self._log.exception("Teardown failed on window close")
         try:
             self._page.update()
         except Exception as exc:

@@ -31,6 +31,7 @@ from events import (
     DownloadStartedEvent,
     DownloadCompletedEvent,
     DownloadCancelledEvent,
+    AppClosingEvent,
 )
 
 
@@ -149,6 +150,7 @@ class DownloadRepository:
             self._bus.on(DownloadStartedEvent,   self._on_started),
             self._bus.on(DownloadCompletedEvent, self._on_completed),
             self._bus.on(DownloadCancelledEvent, self._on_cancelled),
+            self._bus.on(AppClosingEvent,        lambda e: self.dispose()),
         ]
 
     def dispose(self) -> None:

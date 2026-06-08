@@ -1,4 +1,3 @@
-from typing import Callable
 
 import flet as ft
 
@@ -19,6 +18,8 @@ from events import (
     ToolButtonStateEvent,
     ToolProgressEvent, ToolProgressMessageEvent,
     ToolInstallStatusEvent,
+    SettingsChangedEvent, ThemeChangedEvent, LanguageChangedEvent,
+    AppClosingEvent,
 )
 from i18l import Locale, Strings
 from services import Services
@@ -55,10 +56,6 @@ class SettingsScreen(ThemeTarget):
         self._state       = svc.state
         self._bus         = svc.bus
 
-        self._on_theme_changed:    Callable = lambda: None
-        self._on_settings_changed: Callable = lambda: None
-        self._on_language_changed: Callable = lambda: None
-
         self._tools_ctrl: ToolsController | None = None
         self._s: Strings = Locale.load(self._state.language)
 
@@ -73,6 +70,7 @@ class SettingsScreen(ThemeTarget):
             self._bus.on(ToolProgressEvent,        self._on_progress),
             self._bus.on(ToolProgressMessageEvent, self._on_progress_msg),
             self._bus.on(ToolInstallStatusEvent,   self._on_install_status),
+            self._bus.on(AppClosingEvent,          lambda e: self.dispose()),
         ]
 
     def set_tools_controller(self, ctrl: ToolsController) -> None:
@@ -228,13 +226,13 @@ class SettingsScreen(ThemeTarget):
 
     def _on_browser_dropdown_change(self, _):
         self.sync_to_state()
-        self._on_settings_changed()
+        self._bus.emit(SettingsChangedEvent())
         self._page.update()
 
     def _on_language_change(self, _) -> None:
         self.sync_to_state()
-        self._on_settings_changed()
-        self._on_language_changed()
+        self._bus.emit(SettingsChangedEvent())
+        self._bus.emit(LanguageChangedEvent())
 
     # ── Секция темы ───────────────────────────────────────────────────────────
 
@@ -268,9 +266,8 @@ class SettingsScreen(ThemeTarget):
                 field.border_color = None
                 preview.bgcolor    = hex_to_flet(hex_val)
                 palette_container.visible = False
-                self._on_theme_changed()
-                self._on_settings_changed()
-                self._safe_update()
+                self._bus.emit(ThemeChangedEvent())
+                self._bus.emit(SettingsChangedEvent())
 
             for c in PALETTE:
                 palette_grid.controls.append(
@@ -292,8 +289,7 @@ class SettingsScreen(ThemeTarget):
                     setattr(self._state.theme, field_key, val)
                     preview.bgcolor    = hex_to_flet(val)
                     field.border_color = None
-                    self._on_theme_changed()
-                    self._safe_update()
+                    self._bus.emit(ThemeChangedEvent())
                 else:
                     field.border_color = ft.Colors.RED_400
                     self._safe_update()
@@ -342,9 +338,8 @@ class SettingsScreen(ThemeTarget):
         for key in vars(defaults):
             setattr(self._state.theme, key, getattr(defaults, key))
         self.refresh_theme_fields()
-        self._on_theme_changed()
-        self._on_settings_changed()
-        self._safe_update()
+        self._bus.emit(ThemeChangedEvent())
+        self._bus.emit(SettingsChangedEvent())
 
     def refresh_theme_fields(self):
         for group_col in self.theme_fields_column.controls:
@@ -553,12 +548,6 @@ class SettingsScreen(ThemeTarget):
     async def _handle_update_button_click(self, _) -> None:
         if self._tools_ctrl is not None:
             await self._tools_ctrl.handle_button_click()
-
-    # ── Колбэки из App ────────────────────────────────────────────────────────
-
-    def set_on_theme_changed(self, cb) -> None:    self._on_theme_changed    = cb
-    def set_on_settings_changed(self, cb) -> None: self._on_settings_changed = cb
-    def set_on_language_changed(self, cb) -> None: self._on_language_changed = cb
 
     # ── Лэйаут ────────────────────────────────────────────────────────────────
 

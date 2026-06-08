@@ -16,7 +16,8 @@ from events import (
     DownloadCompletedEvent,
     DownloadCancelledEvent,
     ToolsCheckedEvent,
-    ToolsStatusMessageEvent,
+    StatusMessageEvent,
+    AppClosingEvent,
 )
 from i18l import Locale, Strings
 from managers.download_manager import DownloadManager, DownloadSnapshot, MAX_PARALLEL
@@ -131,6 +132,7 @@ class MainScreen(ThemeTarget):
             self._bus.on(DownloadCompletedEvent,      self._on_completed),
             self._bus.on(DownloadCancelledEvent,      self._on_cancelled),
             self._bus.on(ToolsCheckedEvent,           self._on_tools_checked),
+            self._bus.on(AppClosingEvent,             lambda e: self.dispose()),
         ]
 
     def dispose(self) -> None:
@@ -422,7 +424,7 @@ class MainScreen(ThemeTarget):
             self._log.warning("Failed to fetch thumbnail for %s", url, exc_info=True)
 
     def _show_status(self, message: str, color) -> None:
-        self._bus.emit(ToolsStatusMessageEvent(message=message, color=color))
+        self._bus.emit(StatusMessageEvent(message=message, color=color))
 
     @staticmethod
     def _open_log(path: str) -> None:
