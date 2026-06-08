@@ -22,7 +22,6 @@ from typing import Callable, Protocol, runtime_checkable
 from app_logging import get_logger
 from config import safe_str, THUMBNAIL_TIMEOUT, THUMBNAIL_SOCK_TIMEOUT
 from managers.download_manager import DownloadSnapshot
-from paths import AppPaths
 
 
 # ── Протокол ──────────────────────────────────────────────────────────────────
@@ -77,14 +76,15 @@ class YtDlpProvider:
     SOURCE_NAME = "yt-dlp"
     _POST_TAGS = ["[Merger]", "[Metadata]", "[Thumbnails]", "[ExtractAudio]", "[Modify]"]
 
-    def __init__(self) -> None:
+    def __init__(self, paths) -> None:
+        self._paths     = paths   # AppPaths — единый источник путей
         self._ext       = ".exe" if os.name == "nt" else ""
         self._proc      = None
 
     # ── DownloadProvider protocol ─────────────────────────────────────────────
 
     def resolve_exe(self) -> str:
-        path = os.path.join(AppPaths.tools_dir(), f"yt-dlp{self._ext}")
+        path = os.path.join(self._paths.tools_dir, f"yt-dlp{self._ext}")
         return path if os.path.exists(path) and os.path.getsize(path) > 0 else ""
 
     def build_command(self, exe: str, snapshot: DownloadSnapshot) -> list[str]:
@@ -153,7 +153,7 @@ class YtDlpProvider:
 
         env = os.environ.copy()
         sep = ";" if os.name == "nt" else ":"
-        env["PATH"] = f"{AppPaths.tools_dir()}{sep}{AppPaths.app_dir()}{sep}{env.get('PATH', '')}"
+        env["PATH"] = f"{self._paths.tools_dir}{sep}{self._paths.app_dir}{sep}{env.get('PATH', '')}"
 
         self._proc = await asyncio.create_subprocess_exec(
             *cmd_args,

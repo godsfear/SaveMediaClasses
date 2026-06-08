@@ -183,6 +183,19 @@ class Locale:
     DEFAULT_LANG = "en"
     _cache: dict = {}
     _available_cache: list | None = None  # кэш списка доступных языков
+    _paths = None  # AppPaths, внедряется через configure() в композиционном корне
+
+    @classmethod
+    def configure(cls, paths) -> None:
+        """Внедрить единый источник путей (вызывается один раз в Services.create)."""
+        cls._paths = paths
+
+    @classmethod
+    def _locale_dir(cls):
+        """Папка с locale/*.json. Внедрённый paths, иначе — автоопределение (для тестов/изоляции)."""
+        if cls._paths is not None:
+            return cls._paths.locale_dir
+        return AppPaths.detect().locale_dir
 
     @classmethod
     def load(cls, lang: str | None = None) -> Strings:
@@ -196,7 +209,7 @@ class Locale:
         if lang in cls._cache:
             return cls._cache[lang]
 
-        locale_dir = AppPaths.locale_dir()
+        locale_dir = cls._locale_dir()
         path = os.path.join(locale_dir, f"{lang}.json")
 
         if not os.path.exists(path):
@@ -305,7 +318,7 @@ class Locale:
         """
         if cls._available_cache is not None:
             return cls._available_cache
-        locale_dir = AppPaths.locale_dir()
+        locale_dir = cls._locale_dir()
         result = []
         try:
             for fname in sorted(os.listdir(locale_dir)):

@@ -7,7 +7,7 @@ Services создаётся один раз в app.py и передаётся в
 Что входит:
   Инфраструктура  — bus, config_mgr, tools, dm
   Состояние       — state (изменяемый dataclass, это нормально)
-  Окружение       — base_dir, tools_dir, safe_update
+  Окружение       — paths (единый источник путей), safe_update
 
 Что НЕ входит:
   page            — Flet-специфика, остаётся параметром экранов
@@ -17,12 +17,12 @@ Services создаётся один раз в app.py и передаётся в
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass, field
-from pathlib import Path
+from dataclasses import dataclass
 from typing import Any, Callable
 
 from app_logging import configure_logging
 from events import EventBus
+from i18l import Locale
 from managers.config_manager import ConfigManager
 from managers.download_manager import DownloadManager
 from managers.download_repository import DownloadRepository
@@ -34,8 +34,7 @@ from state import AppState
 @dataclass
 class Services:
     # ── Окружение ─────────────────────────────────────────────────────────────
-    base_dir:    str
-    tools_dir:   str
+    paths:       AppPaths
     safe_update: Callable[[], None]
 
     # ── Инфраструктура ────────────────────────────────────────────────────────
@@ -61,26 +60,28 @@ class Services:
         task_runner — планировщик coroutine (в app.py: page.run_task)."""
         from managers.providers import YtDlpProvider
 
-        os.makedirs(AppPaths.tools_dir(), exist_ok=True)
-        configure_logging(AppPaths.log_file())
+        # Единый источник путей — создаётся первым и раздаётся всем остальным.
+        paths = AppPaths.detect()
+        Locale.configure(paths)
+
+        os.makedirs(paths.tools_dir, exist_ok=True)
+        configure_logging(paths.log_file)
 
         bus        = EventBus()
-        config_mgr = ConfigManager(AppPaths.config_file())
-        tools      = ToolsManager(AppPaths.app_dir(), AppPaths.tools_dir())
-        state = config_mgr.load()
-        db_path = AppPaths.db_file()
-        db      = DownloadRepository(db_path=db_path, bus=bus)
-        dm      = DownloadManager(
-            provider_factory=lambda: YtDlpProvider(),
-            log_path=AppPaths.log_file(),
+        config_mgr = ConfigManager(paths.config_file)
+        tools      = ToolsManager(paths)
+        state      = config_mgr.load()
+        db         = DownloadRepository(db_path=paths.db_file, bus=bus)
+        dm         = DownloadManager(
+            provider_factory=lambda: YtDlpProvider(paths),
+            log_path=paths.log_file,
             bus=bus,
             task_runner=task_runner,
             db=db,
         )
 
         return Services(
-            base_dir=AppPaths.app_dir(),
-            tools_dir=AppPaths.tools_dir(),
+            paths=paths,
             safe_update=safe_update,
             bus=bus,
             config_mgr=config_mgr,
