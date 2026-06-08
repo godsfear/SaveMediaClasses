@@ -105,8 +105,7 @@ class MainScreen(ThemeTarget):
     def __init__(self, page: ft.Page, svc: Services) -> None:
         super().__init__()
         self._page        = page
-        self._base_dir    = svc.base_dir
-        self._tools_dir   = svc.tools_dir
+        self._paths       = svc.paths
         self._safe_update = svc.safe_update
         self._state       = svc.state
         self._dm          = svc.dm
@@ -229,7 +228,7 @@ class MainScreen(ThemeTarget):
         self._log_btn = ft.IconButton(
             icon=ft.Icons.RECEIPT_LONG_ROUNDED, icon_color=ft.Colors.GREY_500,
             icon_size=18, tooltip=s.btn_open_log,
-            on_click=lambda _: self._open_log(os.path.join(self._base_dir, "savemedia.log"))
+            on_click=lambda _: self._open_log(str(self._paths.log_file))
         )
 
     def _build_layout(self) -> None:
@@ -403,7 +402,7 @@ class MainScreen(ThemeTarget):
     async def _fetch_and_show_thumbnail(self, task_id: str, url: str) -> None:
         try:
             from managers.providers import YtDlpProvider
-            provider = YtDlpProvider()
+            provider = YtDlpProvider(self._paths)
             exe = provider.resolve_exe()
             if not exe:
                 return

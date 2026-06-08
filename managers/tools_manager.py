@@ -46,9 +46,8 @@ OnDone       = Callable[..., None]                       # (had_errors: bool, cr
 
 class ToolsManager:
 
-    def __init__(self, base_dir: str, tools_dir: str) -> None:
-        self.base_dir  = base_dir
-        self.tools_dir = tools_dir
+    def __init__(self, paths) -> None:
+        self._paths    = paths   # AppPaths — единый источник путей
         self._ext      = ".exe" if os.name == "nt" else ""
         self._log      = get_logger("tools")
 
@@ -76,7 +75,7 @@ class ToolsManager:
     # ── Пути ──────────────────────────────────────────────────────────────────
 
     def _binary_path(self, binary: ToolBinary) -> str:
-        path = os.path.join(self.tools_dir, f"{binary.filename}{self._ext}")
+        path = os.path.join(self._paths.tools_dir, f"{binary.filename}{self._ext}")
         return path if os.path.exists(path) else ""
 
     # ── Проверка версий ───────────────────────────────────────────────────────
@@ -177,7 +176,7 @@ class ToolsManager:
                     on_status(spec.name, "downloading", "")
                     ctx = InstallContext(
                         client=client,
-                        tools_dir=self.tools_dir,
+                        tools_dir=str(self._paths.tools_dir),
                         ext=self._ext,
                         download_url=spec.download_url(state),
                         on_progress=on_progress,

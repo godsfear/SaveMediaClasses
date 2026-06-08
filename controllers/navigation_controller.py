@@ -22,7 +22,6 @@ import flet as ft
 from app_logging import get_logger
 from config import hex_to_flet
 from i18l import Locale
-from paths import AppPaths
 
 if TYPE_CHECKING:
     from controllers.theme_controller import ThemeController
@@ -186,7 +185,7 @@ class NavigationController:
     def _logo(self) -> ft.Container:
         return ft.Container(
             content=ft.Image(
-                src=str(AppPaths.app_dir() / "SaveMedia.png"),
+                src=str(self._svc.paths.app_icon),
                 width=28,
                 height=28,
                 fit="contain",
@@ -196,8 +195,7 @@ class NavigationController:
             tooltip="About",
         )
 
-    @staticmethod
-    def _app_version() -> str:
+    def _app_version(self) -> str:
         try:
             from importlib.metadata import version
             return version("savemediaclasses")
@@ -205,7 +203,7 @@ class NavigationController:
             pass
         try:
             import tomllib
-            with open(AppPaths.app_dir() / "pyproject.toml", "rb") as f:
+            with open(self._svc.paths.pyproject, "rb") as f:
                 return tomllib.load(f)["project"]["version"]
         except Exception:
             return ""
@@ -224,7 +222,7 @@ class NavigationController:
             title=ft.Row(
                 [
                     ft.Image(
-                        src=str(AppPaths.app_dir() / "SaveMedia.png"),
+                        src=str(self._svc.paths.app_icon),
                         width=32, height=32, fit="contain",
                     ),
                     ft.Text("SaveMedia", size=20, weight=ft.FontWeight.BOLD),
