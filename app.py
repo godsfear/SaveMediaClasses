@@ -5,7 +5,10 @@ import flet as ft
 from app_logging import get_logger
 from config import CHECK_INTERVAL_SECONDS
 from controllers import NavigationController, ThemeController, ToolsController, WindowController
-from events import ToolsCheckedEvent, ToolsRestoredEvent, ToolsStatusMessageEvent
+from events import (
+    ToolsCheckedEvent, ToolsRestoredEvent,
+    SettingsChangedEvent, LanguageChangedEvent, ThemeChangedEvent,
+)
 from screens.history_screen import HistoryScreen
 from screens.main_screen import MainScreen
 from screens.settings_screen import SettingsScreen
@@ -53,19 +56,15 @@ class SaveMediaApp:
         settings_screen.sync_from_state()
         settings_screen.refresh_theme_fields()
 
-        # ── Сохранение (экраны → state → диск) ───────────────────────────────
-        def save_config():
+        # ── Сохранение: единый обработчик SettingsChangedEvent ───────────────
+        # Источники (settings/nav/window) лишь публикуют событие — оркестрация здесь.
+        def persist(_=None) -> None:
             main_screen.sync_to_state()
             settings_screen.sync_to_state()
             svc.config_mgr.save(svc.state)
 
-        def teardown():
-            main_screen.dispose()
-            settings_screen.dispose()
-            svc.db.dispose()
-
         # ── Контроллеры ───────────────────────────────────────────────────────
-        window_ctrl = WindowController(page, svc, on_save=save_config, on_close=teardown)
+        window_ctrl = WindowController(page, svc)
 
         theme_ctrl = ThemeController(
             page, svc,
@@ -82,39 +81,34 @@ class SaveMediaApp:
             history_screen=history_screen,
             theme_ctrl=theme_ctrl,
             window_ctrl=window_ctrl,
-            on_save=save_config,
         )
 
-        # ── Подписки Settings → контроллеры ──────────────────────────────────
-        def _on_lang_changed():
+        # ── Обработчики событий приложения ───────────────────────────────────
+        def _on_language_changed(_e: LanguageChangedEvent) -> None:
             settings_screen.rebuild_for_language()
             main_screen.rebuild_for_language()
             history_screen.rebuild_for_language()
             nav_ctrl.on_language_changed()
             safe_update()
 
-        settings_screen.set_on_language_changed(_on_lang_changed)
-        settings_screen.set_on_theme_changed(theme_ctrl.apply)
-        settings_screen.set_on_settings_changed(save_config)
+        def _on_theme_changed(_e: ThemeChangedEvent) -> None:
+            theme_ctrl.apply()
+            safe_update()
 
-        # ── Подписки на шину ──────────────────────────────────────────────────
         def _on_tools_checked(e: ToolsCheckedEvent) -> None:
             svc.state.last_check_time   = time.time()
             svc.state.last_needs_update = e.needs_update
-            save_config()
-
-        def _on_status_message(e: ToolsStatusMessageEvent) -> None:
-            nav_ctrl.status_bar_text.value = e.message
-            nav_ctrl.status_bar_text.color = e.color
-            safe_update()
+            svc.bus.emit(SettingsChangedEvent())
 
         def _on_tools_restored(e: ToolsRestoredEvent) -> None:
             settings_screen.on_tools_restored(e)
             nav_ctrl.on_tools_restored_pending(e)
 
-        svc.bus.on(ToolsCheckedEvent,       _on_tools_checked)
-        svc.bus.on(ToolsStatusMessageEvent, _on_status_message)
-        svc.bus.on(ToolsRestoredEvent,      _on_tools_restored)
+        svc.bus.on(SettingsChangedEvent, persist)
+        svc.bus.on(LanguageChangedEvent, _on_language_changed)
+        svc.bus.on(ThemeChangedEvent,    _on_theme_changed)
+        svc.bus.on(ToolsCheckedEvent,    _on_tools_checked)
+        svc.bus.on(ToolsRestoredEvent,   _on_tools_restored)
 
         # ── Инициализация окна и AppBar ───────────────────────────────────────
         window_ctrl.apply_geometry()

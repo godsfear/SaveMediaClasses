@@ -65,8 +65,9 @@ class ToolsCheckedEvent:
     needs_update: bool
 
 @dataclass(frozen=True)
-class ToolsStatusMessageEvent:
-    """Промежуточное сообщение во время проверки/обновления — для статус-бара."""
+class StatusMessageEvent:
+    """Сообщение для нижнего статус-бара главного экрана (нейтральный канал:
+    статус инструментов, ошибки валидации URL, лимит параллельных загрузок и т.п.)."""
     message: str
     color:   str   # hex или ft.Colors.*
 
@@ -119,6 +120,32 @@ class ToolInstallStatusEvent:
     tool_name: str    # "yt-dlp" | "ffmpeg"
     code:      str    # "downloading" | "ok" | "error" | "manual"
     detail:    str = ""
+
+
+# ── Жизненный цикл приложения / настройки ────────────────────────────────────
+# Заменяют ранее внедрявшиеся колбэки (set_on_*, on_save, on_close).
+# Источник лишь сообщает о намерении; оркестрация — в обработчиках app.py.
+
+@dataclass(frozen=True)
+class SettingsChangedEvent:
+    """Что-то в состоянии изменилось и должно быть сохранено на диск.
+    Эмитируется при смене настроек, выборе папки, переключении прокси, изменении окна."""
+    pass
+
+@dataclass(frozen=True)
+class ThemeChangedEvent:
+    """Изменён цвет темы — нужно переприменить тему ко всем экранам."""
+    pass
+
+@dataclass(frozen=True)
+class LanguageChangedEvent:
+    """Сменён язык — нужно перестроить все текстовые метки UI."""
+    pass
+
+@dataclass(frozen=True)
+class AppClosingEvent:
+    """Окно закрывается — подписчикам пора освободить ресурсы (dispose)."""
+    pass
 
 
 # ── Шина ──────────────────────────────────────────────────────────────────────
