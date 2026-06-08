@@ -48,6 +48,17 @@ class DownloadSnapshot:
     yt_dlp_args:      str
     clean_titles:     bool
     save_to_source:   bool
+    # Параметры инструмента из конфига (флаги CLI и шаблоны путей)
+    cookies_flag:          str = "--cookies-from-browser"
+    playlist_flag_on:      str = "--yes-playlist"
+    playlist_flag_off:     str = "--no-playlist"
+    metadata_flags:        str = "--embed-metadata --embed-thumbnail"
+    audio_flags:           str = "-x --audio-format mp3 --audio-quality 0"
+    clean_title_template:  str = "%(title)s.%(ext)s"
+    title_id_template:     str = "%(title)s [%(id)s].%(ext)s"
+    playlist_dir_template: str = "%(playlist_title)s"
+    playlist_idx_prefix:   str = "%(playlist_index)s - "
+    source_dir_template:   str = "%(extractor_key)s"
 
 
 # ── Внутреннее состояние одной задачи ────────────────────────────────────────

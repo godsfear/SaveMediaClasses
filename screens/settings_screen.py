@@ -100,13 +100,14 @@ class SettingsScreen(ThemeTarget):
 
     def sync_from_state(self) -> None:
         s = self._state
+        p = s.tools["yt-dlp"].parameters
         self.proxy_input.value                 = s.proxy_address
-        self.yt_args_input.value               = s.yt_dlp_args
-        self.clean_titles_switch.value         = s.clean_titles
-        self.playlist_switch.value             = s.playlist_enabled
-        self.embed_metadata_switch.value       = s.embed_metadata
-        self.save_to_source_switch.value       = s.save_to_source_folder
-        self.cookies_browser_dropdown.value    = s.cookies_browser
+        self.yt_args_input.value               = p.extra_args.value
+        self.clean_titles_switch.value         = p.clean_titles.state
+        self.playlist_switch.value             = p.playlist.state
+        self.embed_metadata_switch.value       = p.embed_metadata.state
+        self.save_to_source_switch.value       = p.save_to_source.state
+        self.cookies_browser_dropdown.value    = p.cookies.browser
         ytdlp_cfg  = s.tools.get("yt-dlp",  ToolConfig())
         ffmpeg_cfg = s.tools.get("ffmpeg",  ToolConfig())
         self.yt_api_input.value          = ytdlp_cfg.version_url
@@ -117,13 +118,14 @@ class SettingsScreen(ThemeTarget):
 
     def sync_to_state(self) -> None:
         s = self._state
-        s.proxy_address         = safe_str(self.proxy_input.value)
-        s.yt_dlp_args           = safe_str(self.yt_args_input.value)
-        s.clean_titles          = bool(self.clean_titles_switch.value)
-        s.playlist_enabled      = bool(self.playlist_switch.value)
-        s.embed_metadata        = bool(self.embed_metadata_switch.value)
-        s.save_to_source_folder = bool(self.save_to_source_switch.value)
-        s.cookies_browser       = safe_str(self.cookies_browser_dropdown.value)
+        p = s.tools["yt-dlp"].parameters
+        s.proxy_address              = safe_str(self.proxy_input.value)
+        p.extra_args.value           = safe_str(self.yt_args_input.value)
+        p.clean_titles.state         = bool(self.clean_titles_switch.value)
+        p.playlist.state             = bool(self.playlist_switch.value)
+        p.embed_metadata.state       = bool(self.embed_metadata_switch.value)
+        p.save_to_source.state       = bool(self.save_to_source_switch.value)
+        p.cookies.browser            = safe_str(self.cookies_browser_dropdown.value)
         if "yt-dlp" in s.tools:
             s.tools["yt-dlp"].version_url  = safe_str(self.yt_api_input.value)
             s.tools["yt-dlp"].download_url = safe_str(self.yt_download_input.value)
@@ -190,7 +192,7 @@ class SettingsScreen(ThemeTarget):
         # нового инструмента автоматически добавляет его строку, без правок здесь.
         self._tool_status: dict[str, ft.Text] = {}
         for spec in DEFAULT_TOOLS:
-            for b in spec.binaries():
+            for b in spec.binaries(self._state):
                 self._tool_status[b.name] = ft.Text(
                     s.fmt("tool_dash", name=b.name),
                     color=ft.Colors.GREY_600, size=13, weight=ft.FontWeight.BOLD,

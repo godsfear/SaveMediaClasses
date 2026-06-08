@@ -40,7 +40,7 @@ class ToolsController:
         self._binary_to_tool: dict[str, str] = {
             b.name: spec.name
             for spec in self._specs
-            for b in spec.binaries()
+            for b in spec.binaries(self._state)
         }
 
     @property
@@ -76,7 +76,11 @@ class ToolsController:
                     tool_cfg.latest  = rem
                     tool_cfg.status  = status
                 else:
-                    tool_cfg.binaries[binary] = BinaryInfo(current=loc, latest=rem, status=status)
+                    # Обновляем только версионные поля, сохраняя metadata (filename, version_flag).
+                    bi = tool_cfg.binaries.setdefault(binary, BinaryInfo())
+                    bi.current = loc
+                    bi.latest  = rem
+                    bi.status  = status
             self._bus.emit(ToolVersionRemoteEvent(binary, loc, rem, status))
 
         proxy_url = self._proxy_url()

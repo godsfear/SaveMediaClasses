@@ -276,15 +276,17 @@ class MainScreen(ThemeTarget):
 
     def sync_from_state(self) -> None:
         s = self._state
-        self.audio_only_switch.value      = s.audio_only
-        self.cookies_enabled_switch.value = s.cookies_enabled
+        p = s.tools["yt-dlp"].parameters
+        self.audio_only_switch.value      = p.audio_only.state
+        self.cookies_enabled_switch.value = p.cookies.state
         if s.download_path:
             self.folder_label.value = s.download_path
             self.folder_label.color = ft.Colors.GREEN_400
 
     def sync_to_state(self) -> None:
-        self._state.audio_only      = bool(self.audio_only_switch.value)
-        self._state.cookies_enabled = bool(self.cookies_enabled_switch.value)
+        p = self._state.tools["yt-dlp"].parameters
+        p.audio_only.state = bool(self.audio_only_switch.value)
+        p.cookies.state    = bool(self.cookies_enabled_switch.value)
 
     # ── Тема ─────────────────────────────────────────────────────────────────
 
@@ -345,19 +347,31 @@ class MainScreen(ThemeTarget):
             return
 
         self.sync_to_state()
+        st = self._state
+        p  = st.tools["yt-dlp"].parameters
         snapshot = DownloadSnapshot(
             url=url,
-            download_path=self._state.download_path,
-            proxy_enabled=self._state.proxy_enabled,
-            proxy_address=self._state.proxy_address,
-            cookies_enabled=self._state.cookies_enabled,
-            cookies_browser=self._state.cookies_browser,
-            playlist_enabled=self._state.playlist_enabled,
-            embed_metadata=self._state.embed_metadata,
-            audio_only=self._state.audio_only,
-            yt_dlp_args=self._state.yt_dlp_args,
-            clean_titles=self._state.clean_titles,
-            save_to_source=self._state.save_to_source_folder,
+            download_path=st.download_path,
+            proxy_enabled=st.proxy_enabled,
+            proxy_address=st.proxy_address,
+            cookies_enabled=p.cookies.state,
+            cookies_browser=p.cookies.browser,
+            playlist_enabled=p.playlist.state,
+            embed_metadata=p.embed_metadata.state,
+            audio_only=p.audio_only.state,
+            yt_dlp_args=p.extra_args.value,
+            clean_titles=p.clean_titles.state,
+            save_to_source=p.save_to_source.state,
+            cookies_flag=p.cookies.flag,
+            playlist_flag_on=p.playlist.flag_on,
+            playlist_flag_off=p.playlist.flag_off,
+            metadata_flags=p.embed_metadata.args,
+            audio_flags=p.audio_only.args,
+            clean_title_template=p.clean_titles.template_on,
+            title_id_template=p.clean_titles.template_off,
+            playlist_dir_template=p.playlist.dir_template,
+            playlist_idx_prefix=p.playlist.idx_prefix,
+            source_dir_template=p.save_to_source.dir_template,
         )
 
         task_id = self._dm.add(snapshot)

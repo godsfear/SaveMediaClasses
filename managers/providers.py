@@ -95,15 +95,22 @@ class YtDlpProvider:
             args.extend(["--proxy", safe_str(s.proxy_address).strip()])
 
         if s.cookies_enabled and s.cookies_browser != "none":
-            args.extend(["--cookies-from-browser", safe_str(s.cookies_browser)])
+            args.extend([s.cookies_flag, safe_str(s.cookies_browser)])
 
-        args.append("--yes-playlist" if s.playlist_enabled else "--no-playlist")
+        args.append(s.playlist_flag_on if s.playlist_enabled else s.playlist_flag_off)
 
-        if s.embed_metadata:
-            args.extend(["--embed-metadata", "--embed-thumbnail"])
+        if s.embed_metadata and s.metadata_flags:
+            try:
+                args.extend(shlex.split(s.metadata_flags))
+            except ValueError:
+                args.extend(s.metadata_flags.split())
 
         if s.audio_only:
-            args.extend(["-x", "--audio-format", "mp3", "--audio-quality", "0"])
+            if s.audio_flags:
+                try:
+                    args.extend(shlex.split(s.audio_flags))
+                except ValueError:
+                    args.extend(s.audio_flags.split())
         else:
             raw = safe_str(s.yt_dlp_args).strip()
             if raw:
@@ -113,12 +120,12 @@ class YtDlpProvider:
                     args.extend(raw.split())
 
         is_pl  = "list=" in s.url.lower() or "playlist" in s.url.lower()
-        t_name = "%(title)s.%(ext)s" if s.clean_titles else "%(title)s [%(id)s].%(ext)s"
+        t_name = s.clean_title_template if s.clean_titles else s.title_id_template
         t_path = (
-            os.path.join("%(playlist_title)s", "%(playlist_index)s - " + t_name)
+            os.path.join(s.playlist_dir_template, s.playlist_idx_prefix + t_name)
             if s.playlist_enabled and is_pl else t_name
         )
-        if s.save_to_source:  t_path = os.path.join("%(extractor_key)s", t_path)
+        if s.save_to_source:  t_path = os.path.join(s.source_dir_template, t_path)
         if s.download_path:   t_path = os.path.join(s.download_path, t_path)
 
         args.extend(["-o", t_path, "--newline", s.url])

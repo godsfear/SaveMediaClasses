@@ -101,7 +101,7 @@ class ToolsManager:
             # 1. Локальные версии — по каждому бинарнику каждого инструмента.
             local: dict[str, str] = {}
             for spec in specs:
-                for b in spec.binaries():
+                for b in spec.binaries(state):
                     ver = await self._probe_local_version(spec, b)
                     local[b.name] = ver
                     on_local_version(b.name, ver)
@@ -114,7 +114,7 @@ class ToolsManager:
 
                     # 3. Классификация — по каждому бинарнику; needs_update — агрегат по инструменту.
                     tool_needs = False
-                    for b in spec.binaries():
+                    for b in spec.binaries(state):
                         loc    = local.get(b.name, TOOL_VERSION_MISSING)
                         status = classify_version(loc, remote)
                         on_remote_done(b.name, loc, remote, status)
@@ -180,6 +180,7 @@ class ToolsManager:
                         ext=self._ext,
                         download_url=spec.download_url(state),
                         on_progress=on_progress,
+                        state=state,
                         chunk_size=spec.chunk_size(state),
                     )
                     try:
