@@ -10,6 +10,7 @@ from managers.tools_manager import (
     TOOL_VERSION_MISSING, TOOL_VERSION_CALL_ERROR,
     TOOL_VERSION_REMOTE_ERR, TOOL_VERSION_UNKNOWN,
 )
+from managers.tool_registry import DEFAULT_TOOLS
 from controllers.theme_target import ThemeTarget
 from controllers.tools_controller import ToolsController
 from events import (
@@ -34,6 +35,15 @@ def _resolve_version(version: str, s) -> str:
     if version in (TOOL_VERSION_REMOTE_ERR, TOOL_VERSION_UNKNOWN):
         return s.tool_status_error
     return version
+
+
+# Единая карта статус → цвет (используется и при проверке, и при восстановлении).
+_STATUS_COLOR = {
+    "ok":       ft.Colors.GREEN_400,
+    "outdated": ft.Colors.ORANGE_400,
+    "missing":  ft.Colors.RED_400,
+    "error":    ft.Colors.AMBER,
+}
 
 
 class SettingsScreen(ThemeTarget):
@@ -160,10 +170,15 @@ class SettingsScreen(ThemeTarget):
             on_select=self._on_language_change,
         )
 
-        self.yt_status      = ft.Text(s.fmt("tool_dash", name="yt-dlp"),  color=ft.Colors.GREY_600, size=13, weight=ft.FontWeight.BOLD)
-        self.ffmpeg_status  = ft.Text(s.fmt("tool_dash", name="ffmpeg"),  color=ft.Colors.GREY_600, size=13, weight=ft.FontWeight.BOLD)
-        self.ffplay_status  = ft.Text(s.fmt("tool_dash", name="ffplay"),  color=ft.Colors.GREY_600, size=13, weight=ft.FontWeight.BOLD)
-        self.ffprobe_status = ft.Text(s.fmt("tool_dash", name="ffprobe"), color=ft.Colors.GREY_600, size=13, weight=ft.FontWeight.BOLD)
+        # Статусные строки инструментов строятся из реестра — добавление
+        # нового инструмента автоматически добавляет его строку, без правок здесь.
+        self._tool_status: dict[str, ft.Text] = {}
+        for spec in DEFAULT_TOOLS:
+            for b in spec.binaries():
+                self._tool_status[b.name] = ft.Text(
+                    s.fmt("tool_dash", name=b.name),
+                    color=ft.Colors.GREY_600, size=13, weight=ft.FontWeight.BOLD,
+                )
 
         self.progress_text = ft.Text(s.status_waiting, size=12, color=ft.Colors.GREEN_400)
         self.progress_bar  = ft.ProgressBar(
@@ -418,24 +433,14 @@ class SettingsScreen(ThemeTarget):
 
     def on_tools_restored(self, e: ToolsRestoredEvent) -> None:
         s = self._s
-        color_map = {
-            "ok":       ft.Colors.GREEN_400,
-            "outdated": ft.Colors.ORANGE_400,
-            "missing":  ft.Colors.RED_400,
-            "error":    ft.Colors.AMBER,
-        }
-        tool_widgets = {
-            "yt-dlp": self.yt_status, "ffmpeg": self.ffmpeg_status,
-            "ffplay": self.ffplay_status, "ffprobe": self.ffprobe_status,
-        }
-        for name, widget in tool_widgets.items():
+        for name, widget in self._tool_status.items():
             tv = e.tool_versions.get(name)
             if tv:
                 widget.value = s.fmt("tool_versions",
                                      name=name,
                                      loc=_resolve_version(tv.current, s),
                                      rem=_resolve_version(tv.latest, s))
-                widget.color = color_map.get(tv.status, ft.Colors.GREY_600)
+                widget.color = _STATUS_COLOR.get(tv.status, ft.Colors.GREY_600)
             else:
                 widget.value = s.fmt("tool_dash", name=name)
                 widget.color = ft.Colors.GREY_600
@@ -465,19 +470,13 @@ class SettingsScreen(ThemeTarget):
 
     def _on_tool_remote(self, e: ToolVersionRemoteEvent) -> None:
         s = self._s
-        color_map = {
-            "ok":       ft.Colors.GREEN_400,
-            "outdated": ft.Colors.ORANGE_400,
-            "missing":  ft.Colors.RED_400,
-            "error":    ft.Colors.AMBER,
-        }
         widget = self._tool_widget(e.tool_name)
         if widget is None:
             return
         widget.value = s.fmt("tool_versions", name=e.tool_name,
                              loc=_resolve_version(e.local_version, s),
                              rem=_resolve_version(e.remote_version, s))
-        widget.color = color_map.get(e.status, ft.Colors.GREY_600)
+        widget.color = _STATUS_COLOR.get(e.status, ft.Colors.GREY_600)
         widget.update()
 
     def _on_btn_state(self, e: ToolButtonStateEvent) -> None:
@@ -547,12 +546,7 @@ class SettingsScreen(ThemeTarget):
         self._safe_update()
 
     def _tool_widget(self, name: str) -> ft.Text | None:
-        return {
-            "yt-dlp":  self.yt_status,
-            "ffmpeg":  self.ffmpeg_status,
-            "ffplay":  self.ffplay_status,
-            "ffprobe": self.ffprobe_status,
-        }.get(name)
+        return self._tool_status.get(name)
 
     # ── Обработчик кнопки — делегирует в контроллер ───────────────────────────
 
@@ -610,8 +604,7 @@ class SettingsScreen(ThemeTarget):
         self._card_deps = ft.Container(
             content=ft.Column([
                 self.header_deps,
-                ft.Column([self.yt_status, self.ffmpeg_status,
-                           self.ffplay_status, self.ffprobe_status], spacing=6),
+                ft.Column(list(self._tool_status.values()), spacing=6),
                 ft.Row([self.update_btn], alignment=ft.MainAxisAlignment.END),
                 self.progress_bar,
                 self.progress_text,
