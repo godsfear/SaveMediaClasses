@@ -1,31 +1,47 @@
+"""
+managers/tools_manager.py — generic-движок проверки и обновления инструментов.
+
+Движок НЕ знает про конкретные инструменты. Он итерирует список ToolSpec
+(из tool_registry) и единообразно выполняет три операции:
+
+    check_all()  — локальные версии бинарников + удалённые версии инструментов
+    update_all() — установка/обновление тех инструментов, что помечены needs_update
+
+Вся специфика yt-dlp/ffmpeg вынесена в managers/tool_registry.py.
+Сравнение версий — в managers/tool_specs.classify_version() (единый источник).
+
+Добавление нового инструмента не требует правок в этом файле.
+"""
+
+from __future__ import annotations
+
 import asyncio
 import os
-import re
 import subprocess
-import zipfile
-from typing import Callable, Optional
-
-# ── Sentinel-константы статусов версий (не для отображения) ──────────────────
-# Используются в бизнес-логике; перевод на язык UI происходит в settings_screen.
-TOOL_VERSION_MISSING    = ""         # бинарник не найден (falsy → UI подставит перевод)
-TOOL_VERSION_CALL_ERROR = "\x00CALL"  # ошибка вызова --version
-TOOL_VERSION_REMOTE_ERR = "\x00NET"   # сетевая ошибка при запросе удалённой версии
-TOOL_VERSION_UNKNOWN    = "\x00UNK"   # ответ API не содержит поля с версией
+from typing import TYPE_CHECKING, Callable, Optional
 
 import httpx
 
 from app_logging import get_logger
-from config import safe_str, safe_int, YT_DLP_CHUNK_SIZE, FFMPEG_CHUNK_SIZE
+from managers.tool_specs import (
+    ToolBinary, ToolSpec, InstallContext, ManualInstallRequired,
+    TOOL_VERSION_MISSING, TOOL_VERSION_CALL_ERROR, TOOL_VERSION_REMOTE_ERR,
+    TOOL_VERSION_UNKNOWN,
+    classify_version, status_needs_update,
+)
+
+if TYPE_CHECKING:
+    from state import AppState
 
 # ── Типизированные алиасы коллбэков ──────────────────────────────────────────
 # check_all
-OnLocalVersion = Callable[[str, str], None]        # (tool_name, local_version)
-OnRemoteDone   = Callable[[str, str, str], None]   # (tool_name, local, remote)
+OnLocalVersion = Callable[[str, str], None]              # (binary_name, local_version)
+OnRemoteDone   = Callable[[str, str, str, str], None]    # (binary_name, local, remote, status)
 
 # update_all
-OnToolStatus = Callable[[str, str], None]          # (status_code, detail)  code: "downloading"|"ok"|"error"
-OnProgress   = Callable[[Optional[float]], None]   # pct 0.0–1.0, или None = индетерминированный
-OnDone       = Callable[..., None]                 # (had_errors: bool, critical_err: str = "")
+OnToolStatus = Callable[[str, str, str], None]           # (tool_name, code, detail)
+OnProgress   = Callable[[Optional[float]], None]         # pct 0..1, или None = индетерминированный
+OnDone       = Callable[..., None]                       # (had_errors: bool, critical_err: str = "")
 
 
 class ToolsManager:
@@ -33,246 +49,161 @@ class ToolsManager:
     def __init__(self, base_dir: str, tools_dir: str) -> None:
         self.base_dir  = base_dir
         self.tools_dir = tools_dir
-        self.yt_needs_update     = False
-        self.ffmpeg_needs_update = False
-        # Lock предотвращает параллельные вызовы check_all() при двойном клике
-        self._check_lock = asyncio.Lock()
-        self._ext = ".exe" if os.name == "nt" else ""
-        self._log = get_logger("tools")
+        self._ext      = ".exe" if os.name == "nt" else ""
+        self._log      = get_logger("tools")
 
-    def resolve_tool_path(self, filename: str) -> str:
-        p_tools = os.path.join(self.tools_dir, filename)
-        return p_tools if os.path.exists(p_tools) else ""
+        # Гард повторного запуска. Устанавливается СИНХРОННО в начале check_all()
+        # до первого await — поэтому два конкурентных вызова не могут оба пройти.
+        self._checking = False
+        # Карта результата последней проверки: {tool_name: needs_update}
+        self._needs_update: dict[str, bool] = {}
 
-    # Оригинальная get_local_tool_version
-    async def get_local_tool_version(self, tool_path: str, tool_name: str) -> str:
-        if not tool_path or not os.path.exists(tool_path):
+    # ── Состояние ─────────────────────────────────────────────────────────────
+
+    @property
+    def is_checking(self) -> bool:
+        """True пока выполняется check_all() — для блокировки повторного запуска."""
+        return self._checking
+
+    @property
+    def needs_update(self) -> bool:
+        """True если хотя бы один инструмент по итогам проверки подлежит обновлению."""
+        return any(self._needs_update.values())
+
+    def tool_needs_update(self, tool_name: str) -> bool:
+        return self._needs_update.get(tool_name, False)
+
+    # ── Пути ──────────────────────────────────────────────────────────────────
+
+    def _binary_path(self, binary: ToolBinary) -> str:
+        path = os.path.join(self.tools_dir, f"{binary.filename}{self._ext}")
+        return path if os.path.exists(path) else ""
+
+    # ── Проверка версий ───────────────────────────────────────────────────────
+
+    async def check_all(
+        self,
+        specs: list[ToolSpec],
+        state: "AppState",
+        proxy_url: str | None,
+        on_local_version: OnLocalVersion,
+        on_remote_done:   OnRemoteDone,
+    ) -> None:
+        """
+        Проверить локальные версии всех бинарников и удалённые версии всех инструментов.
+        Гард _checking защищает от двойного запуска (раньше lock покрывал лишь сброс флагов).
+        """
+        if self._checking:
+            return
+        self._checking = True
+        try:
+            self._needs_update = {}
+
+            # 1. Локальные версии — по каждому бинарнику каждого инструмента.
+            local: dict[str, str] = {}
+            for spec in specs:
+                for b in spec.binaries():
+                    ver = await self._probe_local_version(spec, b)
+                    local[b.name] = ver
+                    on_local_version(b.name, ver)
+
+            # 2. Удалённые версии — один сетевой запрос на инструмент.
+            timeout = httpx.Timeout(connect=5.0, read=8.0, write=5.0, pool=5.0)
+            async with httpx.AsyncClient(proxy=proxy_url, timeout=timeout) as client:
+                for spec in specs:
+                    remote = await self._fetch_remote(spec, state, client)
+
+                    # 3. Классификация — по каждому бинарнику; needs_update — агрегат по инструменту.
+                    tool_needs = False
+                    for b in spec.binaries():
+                        loc    = local.get(b.name, TOOL_VERSION_MISSING)
+                        status = classify_version(loc, remote)
+                        on_remote_done(b.name, loc, remote, status)
+                        if status_needs_update(status, remote):
+                            tool_needs = True
+                    self._needs_update[spec.name] = tool_needs
+        finally:
+            self._checking = False
+
+    async def _probe_local_version(self, spec: ToolSpec, binary: ToolBinary) -> str:
+        path = self._binary_path(binary)
+        if not path:
             return TOOL_VERSION_MISSING
         try:
-            proc_startup = None
-            if os.name == "nt":
-                proc_startup = subprocess.STARTUPINFO()
-                proc_startup.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-
+            startup = self._win_startupinfo()
             proc = await asyncio.create_subprocess_exec(
-                tool_path,
-                "--version" if tool_name == "yt-dlp" else "-version",
+                path, binary.version_flag,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 stdin=subprocess.DEVNULL,
-                startupinfo=proc_startup
+                startupinfo=startup,
             )
-            stdout_bytes, _ = await asyncio.wait_for(proc.communicate(), timeout=5)
-            output = stdout_bytes.decode('utf-8', errors='replace').strip()
-
-            if tool_name == "yt-dlp":
-                lines = output.splitlines()
-                if lines:
-                    fw = safe_str(lines[0].split()[0])
-                    if re.match(r"^\d{4}\.\d{2}\.\d{2}", fw):
-                        return fw
-                    return safe_str(lines[0])
-            else:
-                lines = output.splitlines()
-                if lines:
-                    fl = safe_str(lines[0])
-                    match = re.search(r"version\s+([0-9.]+)", fl, re.IGNORECASE) or re.search(r"([0-9.]+)", fl)
-                    if match:
-                        return safe_str(match.group(1))
-                    return safe_str(fl.split()[0])
-            return TOOL_VERSION_CALL_ERROR
+            out, _ = await asyncio.wait_for(proc.communicate(), timeout=5)
+            text = out.decode("utf-8", errors="replace").strip()
+            return spec.parse_version(binary, text) or TOOL_VERSION_CALL_ERROR
         except Exception:
-            self._log.exception("Failed to get local version for %s", tool_name)
+            self._log.exception("Failed to get local version for %s", binary.name)
             return TOOL_VERSION_CALL_ERROR
 
-    # Оригинальная check_tools
-    @property
-    def is_checking(self) -> bool:
-        """True пока check_all() выполняется — для блокировки повторного вызова."""
-        return self._check_lock.locked()
-
-    async def check_all(self, yt_api_url: str, ffmpeg_version_url: str, proxy_url: str | None,
-                        on_local_version: OnLocalVersion,
-                        on_remote_done:   OnRemoteDone) -> None:
-        async with self._check_lock:
-            self.yt_needs_update     = False
-            self.ffmpeg_needs_update = False
-
-        tools_map = {
-            f"yt-dlp{self._ext}":  ("yt-dlp",  ),
-            f"ffmpeg{self._ext}":  ("ffmpeg",   ),
-            f"ffplay{self._ext}":  ("ffplay",   ),
-            f"ffprobe{self._ext}": ("ffprobe",  ),
-        }
-
-        local_versions = {}
-        for filename, (name,) in tools_map.items():
-            path = self.resolve_tool_path(filename)
-            ver  = await self.get_local_tool_version(path, name)
-            local_versions[name] = ver
-            on_local_version(name, ver)
-
-        timeout = httpx.Timeout(connect=5.0, read=8.0, write=5.0, pool=5.0)
-        async with httpx.AsyncClient(proxy=proxy_url, timeout=timeout) as client:
-            try:
-                res = await asyncio.wait_for(
-                    client.get(yt_api_url, headers={"User-Agent": "Mozilla/5.0"}),
-                    timeout=8.0
-                )
-                remote_yt = safe_str(res.json().get("tag_name", TOOL_VERSION_UNKNOWN)).lstrip('v')
-            except Exception:
-                self._log.warning("Failed to get remote yt-dlp version", exc_info=True)
-                remote_yt = TOOL_VERSION_REMOTE_ERR
-            try:
-                res = await asyncio.wait_for(
-                    client.get(ffmpeg_version_url, headers={"User-Agent": "Mozilla/5.0"}),
-                    timeout=8.0
-                )
-                remote_ff = res.text.strip()
-            except Exception:
-                self._log.warning("Failed to get remote FFmpeg version", exc_info=True)
-                remote_ff = TOOL_VERSION_REMOTE_ERR
-
-        for filename, (name,) in tools_map.items():
-            loc = local_versions.get(name, TOOL_VERSION_MISSING)
-            rem = remote_yt if name == "yt-dlp" else remote_ff
-            on_remote_done(name, loc, rem)
-
-            is_equal = (loc == rem) or (
-                loc not in (TOOL_VERSION_CALL_ERROR, TOOL_VERSION_MISSING)
-                and rem not in (TOOL_VERSION_REMOTE_ERR, TOOL_VERSION_UNKNOWN)
-                and (rem in loc or loc in rem)
-            )
-
-            if loc == TOOL_VERSION_MISSING:
-                if rem not in (TOOL_VERSION_REMOTE_ERR, TOOL_VERSION_UNKNOWN):
-                    if name == "yt-dlp":   self.yt_needs_update     = True
-                    elif name == "ffmpeg": self.ffmpeg_needs_update = True
-            elif loc == TOOL_VERSION_CALL_ERROR or rem in (TOOL_VERSION_REMOTE_ERR, TOOL_VERSION_UNKNOWN):
-                pass  # AMBER — не обновляем
-            elif not is_equal:
-                if name == "yt-dlp":   self.yt_needs_update     = True
-                elif name == "ffmpeg": self.ffmpeg_needs_update = True
-
-    # Оригинальная update_tools — единый клиент на весь блок
-    async def update_all(self, proxy_url: str | None, yt_download_url: str, ffmpeg_download_url: str,
-                         on_yt_status: OnToolStatus,
-                         on_ff_status: OnToolStatus,
-                         on_progress:  OnProgress,
-                         on_done:      OnDone) -> None:
-        ext = self._ext
-        had_errors = False
-
+    async def _fetch_remote(self, spec: ToolSpec, state: "AppState",
+                            client: httpx.AsyncClient) -> str:
         try:
-            async with httpx.AsyncClient(proxy=proxy_url, timeout=30.0, follow_redirects=True) as client:
+            url = spec.version_url(state)
+            return await asyncio.wait_for(spec.fetch_remote_version(client, url), timeout=8.0)
+        except Exception:
+            self._log.warning("Failed to get remote version for %s", spec.name, exc_info=True)
+            return TOOL_VERSION_REMOTE_ERR
 
-                # ── yt-dlp ────────────────────────────────────────────────────
-                if self.yt_needs_update:
-                    on_yt_status("downloading", "")
-                    final_path = os.path.join(self.tools_dir, f"yt-dlp{ext}")
-                    temp_path  = final_path + ".part"
+    # ── Установка / обновление ────────────────────────────────────────────────
+
+    async def update_all(
+        self,
+        specs: list[ToolSpec],
+        state: "AppState",
+        proxy_url: str | None,
+        on_status:   OnToolStatus,
+        on_progress: OnProgress,
+        on_done:     OnDone,
+    ) -> None:
+        """Установить/обновить инструменты, помеченные needs_update в последней check_all()."""
+        had_errors = False
+        try:
+            async with httpx.AsyncClient(proxy=proxy_url, timeout=30.0,
+                                         follow_redirects=True) as client:
+                for spec in specs:
+                    if not self._needs_update.get(spec.name):
+                        continue
+
+                    on_status(spec.name, "downloading", "")
+                    ctx = InstallContext(
+                        client=client,
+                        tools_dir=self.tools_dir,
+                        ext=self._ext,
+                        download_url=spec.download_url(state),
+                        on_progress=on_progress,
+                    )
                     try:
-                        if os.path.exists(temp_path):
-                            os.remove(temp_path)
-                        downloaded = 0
-                        async with client.stream("GET", yt_download_url) as res:
-                            res.raise_for_status()
-                            total_size = safe_int(res.headers.get("content-length", "0"))
-                            with open(temp_path, "wb") as f:
-                                async for chunk in res.aiter_bytes(chunk_size=YT_DLP_CHUNK_SIZE):
-                                    if not chunk:
-                                        continue
-                                    f.write(chunk)
-                                    downloaded += len(chunk)
-                                    if total_size > 0:
-                                        pct = min(int(downloaded * 100 / total_size), 100)
-                                        on_progress(pct / 100)
-
-                        if not os.path.exists(temp_path) or os.path.getsize(temp_path) == 0:
-                            raise RuntimeError("yt-dlp downloaded as empty file")
-
-                        os.replace(temp_path, final_path)
-                        if os.name != "nt":
-                            os.chmod(final_path, 0o755)
-                        on_yt_status("ok", "")
+                        await spec.install(ctx)
+                        on_status(spec.name, "ok", "")
+                    except ManualInstallRequired as manual:
+                        on_status(spec.name, "manual", manual.hint)
                     except Exception as err:
                         had_errors = True
-                        self._log.exception("Failed to update yt-dlp")
-                        on_yt_status("error", str(err))
-                        try:
-                            if os.path.exists(temp_path):
-                                os.remove(temp_path)
-                        except Exception:
-                            self._log.exception("Failed to remove temporary yt-dlp file")
-
-                # ── ffmpeg ────────────────────────────────────────────────────
-                if self.ffmpeg_needs_update and os.name != "nt":
-                    # Не-Windows: автоматическая установка ffmpeg невозможна.
-                    # Сообщаем пользователю команду для его пакетного менеджера.
-                    import sys
-                    if sys.platform == "darwin":
-                        hint = "brew install ffmpeg"
-                    else:
-                        hint = ("apt: sudo apt install ffmpeg  "
-                                "•  dnf: sudo dnf install ffmpeg  "
-                                "•  pacman: sudo pacman -S ffmpeg")
-                    on_ff_status("manual", hint)
-                elif self.ffmpeg_needs_update and os.name == "nt":
-                    on_ff_status("downloading", "")
-                    zip_path = os.path.join(self.tools_dir, "ffmpeg_temp.zip")
-                    temp_zip = zip_path + ".part"
-                    try:
-                        if os.path.exists(temp_zip):
-                            os.remove(temp_zip)
-                        downloaded = 0
-                        async with client.stream("GET", ffmpeg_download_url) as res:
-                            res.raise_for_status()
-                            total_size = safe_int(res.headers.get("content-length", "0"))
-                            with open(temp_zip, "wb") as f:
-                                async for chunk in res.aiter_bytes(chunk_size=FFMPEG_CHUNK_SIZE):
-                                    if not chunk:
-                                        continue
-                                    f.write(chunk)
-                                    downloaded += len(chunk)
-                                    if total_size > 0:
-                                        pct = min(int(downloaded * 100 / total_size), 100)
-                                        on_progress(pct / 100)
-
-                        if not os.path.exists(temp_zip) or os.path.getsize(temp_zip) == 0:
-                            raise RuntimeError("FFmpeg archive is empty")
-
-                        os.replace(temp_zip, zip_path)
-                        on_progress(None)  # индетерминированный — идёт распаковка
-
-                        def extract_zip():
-                            found_files = 0
-                            with zipfile.ZipFile(zip_path, "r") as zf:
-                                for member in zf.namelist():
-                                    name = os.path.basename(member).lower()
-                                    if name in ["ffmpeg.exe", "ffplay.exe", "ffprobe.exe"]:
-                                        target = os.path.join(self.tools_dir, name)
-                                        with zf.open(member) as src, open(target, "wb") as dst:
-                                            dst.write(src.read())
-                                        found_files += 1
-                            if os.path.exists(zip_path):
-                                os.remove(zip_path)
-                            if found_files == 0:
-                                raise RuntimeError("FFmpeg EXE files not found in archive")
-
-                        await asyncio.to_thread(extract_zip)
-                        on_ff_status("ok", "")
-                    except Exception as err:
-                        had_errors = True
-                        self._log.exception("Failed to update FFmpeg")
-                        on_ff_status("error", str(err))
-                        try:
-                            if os.path.exists(temp_zip): os.remove(temp_zip)
-                            if os.path.exists(zip_path): os.remove(zip_path)
-                        except Exception:
-                            self._log.exception("Failed to remove temporary FFmpeg files")
+                        self._log.exception("Failed to update %s", spec.name)
+                        on_status(spec.name, "error", str(err))
 
             on_done(had_errors)
 
         except Exception as err:
             self._log.exception("Critical tools update failure")
             on_done(had_errors=True, critical_err=str(err))
+
+    # ── Утилиты ───────────────────────────────────────────────────────────────
+
+    @staticmethod
+    def _win_startupinfo():
+        if os.name != "nt":
+            return None
+        startup = subprocess.STARTUPINFO()
+        startup.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+        return startup
