@@ -11,42 +11,44 @@
         "playlist_enabled": true,
         "clean_titles": true,
         "save_to_source_folder": true,
-        "last_check_time": 1780935022.183734,
-        "last_needs_update": false,
-        "tool_versions": {
-            "yt-dlp": {
-                "current": "2026.03.17",
-                "latest": "2026.03.17",
-                "status": "ok"
-            },
-            "ffmpeg": {
-                "current": "8.1.1",
-                "latest": "8.1.1",
-                "status": "ok"
-            },
-            "ffplay": {
-                "current": "8.1.1",
-                "latest": "8.1.1",
-                "status": "ok"
-            },
-            "ffprobe": {
-                "current": "8.1.1",
-                "latest": "8.1.1",
-                "status": "ok"
-            }
+        "last_check_time": 1780954187.1047711,
+        "last_needs_update": false
+    },
+    "tools": {
+        "yt-dlp": {
+            "version_url": "https://api.github.com/repos/yt-dlp/yt-dlp/releases/latest",
+            "download_url": "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe",
+            "chunk_size": 8192,
+            "current": "2026.03.17",
+            "latest": "2026.03.17",
+            "status": "ok"
         },
-        "urls": {
-            "yt_api": "https://api.github.com/repos/yt-dlp/yt-dlp/releases/latest",
-            "yt_download": "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe",
-            "ffmpeg_version": "https://www.gyan.dev/ffmpeg/builds/release-version",
-            "ffmpeg_download": "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip"
+        "ffmpeg": {
+            "version_url": "https://www.gyan.dev/ffmpeg/builds/release-version",
+            "download_url": "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-full.zip",
+            "chunk_size": 16384,
+            "current": "8.1.1",
+            "latest": "8.1.1",
+            "status": "ok",
+            "binaries": {
+                "ffplay": {
+                    "current": "8.1.1",
+                    "latest": "8.1.1",
+                    "status": "ok"
+                },
+                "ffprobe": {
+                    "current": "8.1.1",
+                    "latest": "8.1.1",
+                    "status": "ok"
+                }
+            }
         }
     },
     "window": {
         "width": 688,
         "height": 991,
-        "left": 3861,
-        "top": 269
+        "left": 2931,
+        "top": 209
     },
     "theme": {
         "accent_color": "00B4D8",

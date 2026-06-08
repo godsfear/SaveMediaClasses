@@ -12,14 +12,13 @@ URL можно вернуть константой из version_url()/download_u
 from __future__ import annotations
 
 import asyncio
-import json
 import os
 import re
 import zipfile
 from typing import TYPE_CHECKING
 
 from app_logging import get_logger
-from config import safe_str, YT_DLP_CHUNK_SIZE, FFMPEG_CHUNK_SIZE
+from config import safe_str, YT_DLP_CHUNK_SIZE, FFMPEG_CHUNK_SIZE, ToolConfig
 from managers.tool_specs import (
     InstallContext, ManualInstallRequired, ToolBinary,
     TOOL_VERSION_UNKNOWN, stream_to_file,
@@ -39,7 +38,6 @@ class YtDlpTool:
     """Один self-contained бинарник, скачиваемый напрямую с GitHub Releases."""
 
     name = "yt-dlp"
-    _CHUNK = YT_DLP_CHUNK_SIZE
     _DATE_RE = re.compile(r"^\d{4}\.\d{2}\.\d{2}")
 
     def binaries(self) -> list[ToolBinary]:
@@ -56,10 +54,13 @@ class YtDlpTool:
         return safe_str(lines[0])
 
     def version_url(self, state: "AppState") -> str:
-        return state.url_yt_api
+        return state.tools.get("yt-dlp", ToolConfig()).version_url
 
     def download_url(self, state: "AppState") -> str:
-        return state.url_yt_download
+        return state.tools.get("yt-dlp", ToolConfig()).download_url
+
+    def chunk_size(self, state: "AppState") -> int:
+        return state.tools.get("yt-dlp", ToolConfig(chunk_size=YT_DLP_CHUNK_SIZE)).chunk_size
 
     async def fetch_remote_version(self, client: "httpx.AsyncClient", url: str) -> str:
         res = await client.get(url, headers=_UA)
@@ -70,7 +71,7 @@ class YtDlpTool:
 
     async def install(self, ctx: InstallContext) -> None:
         dest = os.path.join(ctx.tools_dir, f"yt-dlp{ctx.ext}")
-        await stream_to_file(ctx.client, ctx.download_url, dest, ctx.on_progress, self._CHUNK)
+        await stream_to_file(ctx.client, ctx.download_url, dest, ctx.on_progress, ctx.chunk_size)
         if os.name != "nt":
             os.chmod(dest, 0o755)
 
@@ -84,7 +85,6 @@ class FfmpegTool:
     """
 
     name = "ffmpeg"
-    _CHUNK = FFMPEG_CHUNK_SIZE
     _ARCHIVE_MEMBERS = {"ffmpeg.exe", "ffplay.exe", "ffprobe.exe"}
     _VERSION_RE = re.compile(r"version\s+([0-9.]+)", re.IGNORECASE)
     _FALLBACK_RE = re.compile(r"([0-9.]+)")
@@ -108,10 +108,13 @@ class FfmpegTool:
         return safe_str(parts[0]) if parts else ""
 
     def version_url(self, state: "AppState") -> str:
-        return state.url_ffmpeg_version
+        return state.tools.get("ffmpeg", ToolConfig()).version_url
 
     def download_url(self, state: "AppState") -> str:
-        return state.url_ffmpeg_download
+        return state.tools.get("ffmpeg", ToolConfig()).download_url
+
+    def chunk_size(self, state: "AppState") -> int:
+        return state.tools.get("ffmpeg", ToolConfig(chunk_size=FFMPEG_CHUNK_SIZE)).chunk_size
 
     async def fetch_remote_version(self, client: "httpx.AsyncClient", url: str) -> str:
         res = await client.get(url, headers=_UA)
@@ -123,7 +126,7 @@ class FfmpegTool:
 
         zip_path = os.path.join(ctx.tools_dir, "ffmpeg_temp.zip")
         try:
-            await stream_to_file(ctx.client, ctx.download_url, zip_path, ctx.on_progress, self._CHUNK)
+            await stream_to_file(ctx.client, ctx.download_url, zip_path, ctx.on_progress, ctx.chunk_size)
             ctx.on_progress(None)  # индетерминированный — идёт распаковка
             await asyncio.to_thread(self._extract, zip_path, ctx.tools_dir)
         finally:

@@ -180,6 +180,7 @@ class ToolsManager:
                         ext=self._ext,
                         download_url=spec.download_url(state),
                         on_progress=on_progress,
+                        chunk_size=spec.chunk_size(state),
                     )
                     try:
                         await spec.install(ctx)

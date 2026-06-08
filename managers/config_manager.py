@@ -4,26 +4,11 @@ from typing import Any, Dict
 
 from app_logging import get_logger
 from config import (
-    ThemeConfig, WindowConfig,
+    ThemeConfig, WindowConfig, ToolConfig,
     safe_str, safe_int, get_fallback_bool,
 )
 from i18l import Locale
-from state import AppState, ToolVersionInfo
-
-
-def _load_tool_versions(raw: dict) -> dict:
-    result = {}
-    for k, v in raw.items():
-        if isinstance(v, dict):
-            result[k] = ToolVersionInfo(
-                current=v.get("current", ""),
-                latest=v.get("latest", ""),
-                status=v.get("status", ""),
-            )
-        elif isinstance(v, (list, tuple)) and len(v) == 3:
-            # backward-compat: старый формат ["current", "latest", "status"]
-            result[k] = ToolVersionInfo(current=v[0], latest=v[1], status=v[2])
-    return result
+from state import AppState
 
 
 class ConfigManager:
@@ -42,8 +27,7 @@ class ConfigManager:
         if raw is None:
             return defaults
 
-        cfg  = raw.get("settings", {}) if isinstance(raw.get("settings"), dict) else {}
-        urls = cfg.get("urls", {})     if isinstance(cfg.get("urls"), dict)      else {}
+        cfg = raw.get("settings", {}) if isinstance(raw.get("settings"), dict) else {}
 
         def fb_str(d: dict, k: str, default: str) -> str:
             v = d.get(k)
@@ -56,25 +40,30 @@ class ConfigManager:
         if not dp:
             dp = defaults.download_path
 
+        tools_raw = raw.get("tools", {})
+        tools = {}
+        for tool_name, tool_default in defaults.tools.items():
+            raw_tool = tools_raw.get(tool_name, {}) if isinstance(tools_raw, dict) else {}
+            if isinstance(raw_tool, dict):
+                tools[tool_name] = ToolConfig.from_dict(raw_tool, tool_default)
+            else:
+                tools[tool_name] = tool_default
+
         return AppState(
             download_path         = dp,
-            proxy_enabled         = fb_bool(cfg, "proxy_enabled",       defaults.proxy_enabled),
-            proxy_address         = fb_str(cfg,  "proxy_address",        defaults.proxy_address),
-            audio_only            = fb_bool(cfg, "audio_only",           defaults.audio_only),
-            cookies_enabled       = fb_bool(cfg, "cookies_enabled",      defaults.cookies_enabled),
-            cookies_browser       = fb_str(cfg,  "cookies_browser",      defaults.cookies_browser),
-            playlist_enabled      = fb_bool(cfg, "playlist_enabled",     defaults.playlist_enabled),
-            embed_metadata        = fb_bool(cfg, "embed_metadata",       defaults.embed_metadata),
-            yt_dlp_args           = fb_str(cfg,  "yt_dlp_args",          defaults.yt_dlp_args),
-            clean_titles          = fb_bool(cfg, "clean_titles",         defaults.clean_titles),
+            proxy_enabled         = fb_bool(cfg, "proxy_enabled",        defaults.proxy_enabled),
+            proxy_address         = fb_str(cfg,  "proxy_address",         defaults.proxy_address),
+            audio_only            = fb_bool(cfg, "audio_only",            defaults.audio_only),
+            cookies_enabled       = fb_bool(cfg, "cookies_enabled",       defaults.cookies_enabled),
+            cookies_browser       = fb_str(cfg,  "cookies_browser",       defaults.cookies_browser),
+            playlist_enabled      = fb_bool(cfg, "playlist_enabled",      defaults.playlist_enabled),
+            embed_metadata        = fb_bool(cfg, "embed_metadata",        defaults.embed_metadata),
+            yt_dlp_args           = fb_str(cfg,  "yt_dlp_args",           defaults.yt_dlp_args),
+            clean_titles          = fb_bool(cfg, "clean_titles",          defaults.clean_titles),
             save_to_source_folder = fb_bool(cfg, "save_to_source_folder", defaults.save_to_source_folder),
-            url_yt_api            = fb_str(urls, "yt_api",          defaults.url_yt_api),
-            url_yt_download       = fb_str(urls, "yt_download",     defaults.url_yt_download),
-            url_ffmpeg_version    = fb_str(urls, "ffmpeg_version",  defaults.url_ffmpeg_version),
-            url_ffmpeg_download   = fb_str(urls, "ffmpeg_download", defaults.url_ffmpeg_download),
             last_check_time       = float(cfg.get("last_check_time",  defaults.last_check_time)),
-            last_needs_update     = bool(cfg.get("last_needs_update", defaults.last_needs_update)),
-            tool_versions         = _load_tool_versions(cfg.get("tool_versions", {})),
+            last_needs_update     = bool(cfg.get("last_needs_update",  defaults.last_needs_update)),
+            tools    = tools,
             theme    = ThemeConfig.from_dict(raw.get("theme", {})),
             window   = WindowConfig.from_dict(raw.get("window", {})),
             language = Locale.resolve_language(raw.get("language") or defaults.language),
@@ -106,17 +95,8 @@ class ConfigManager:
                 "save_to_source_folder": state.save_to_source_folder,
                 "last_check_time":       state.last_check_time,
                 "last_needs_update":     state.last_needs_update,
-                "tool_versions":         {
-                    k: {"current": v.current, "latest": v.latest, "status": v.status}
-                    for k, v in state.tool_versions.items()
-                },
-                "urls": {
-                    "yt_api":          state.url_yt_api,
-                    "yt_download":     state.url_yt_download,
-                    "ffmpeg_version":  state.url_ffmpeg_version,
-                    "ffmpeg_download": state.url_ffmpeg_download,
-                },
             },
+            "tools":    {k: v.to_dict() for k, v in state.tools.items()},
             "window":   state.window.to_dict(),
             "theme":    state.theme.to_dict(),
             "language": state.language,

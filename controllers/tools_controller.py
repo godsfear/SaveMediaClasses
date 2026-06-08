@@ -16,6 +16,7 @@ from typing import Literal
 
 import flet as ft
 
+from config import BinaryInfo
 from events import (
     ToolsCheckedEvent,
     ToolVersionLocalEvent, ToolVersionRemoteEvent,
@@ -23,7 +24,6 @@ from events import (
     ToolProgressEvent, ToolProgressMessageEvent,
     ToolInstallStatusEvent,
 )
-from state import ToolVersionInfo
 from managers.tool_registry import DEFAULT_TOOLS
 from services import Services
 
@@ -36,6 +36,12 @@ class ToolsController:
         self._bus   = svc.bus
         self._specs = DEFAULT_TOOLS
         self._btn_mode: Literal["check", "update"] = "check"
+        # Карта: binary_name → tool_name (для записи версий в правильное место state)
+        self._binary_to_tool: dict[str, str] = {
+            b.name: spec.name
+            for spec in self._specs
+            for b in spec.binaries()
+        }
 
     @property
     def btn_mode(self) -> Literal["check", "update"]:
@@ -62,7 +68,15 @@ class ToolsController:
             self._bus.emit(ToolVersionLocalEvent(binary, local))
 
         def on_remote(binary: str, loc: str, rem: str, status: str) -> None:
-            self._state.tool_versions[binary] = ToolVersionInfo(current=loc, latest=rem, status=status)
+            tool_name = self._binary_to_tool.get(binary, binary)
+            tool_cfg  = self._state.tools.get(tool_name)
+            if tool_cfg is not None:
+                if binary == tool_name:
+                    tool_cfg.current = loc
+                    tool_cfg.latest  = rem
+                    tool_cfg.status  = status
+                else:
+                    tool_cfg.binaries[binary] = BinaryInfo(current=loc, latest=rem, status=status)
             self._bus.emit(ToolVersionRemoteEvent(binary, loc, rem, status))
 
         proxy_url = self._proxy_url()
