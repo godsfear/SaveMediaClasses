@@ -100,6 +100,7 @@ class InstallContext:
     ext:          str                          # ".exe" на Windows, "" иначе
     download_url: str
     on_progress:  Callable[[Optional[float]], None]  # pct 0..1, или None = индетерминированно
+    chunk_size:   int = 8_192
 
 
 class ManualInstallRequired(Exception):
@@ -134,6 +135,10 @@ class ToolSpec(Protocol):
 
     def download_url(self, state: "AppState") -> str:
         """URL для скачивания при установке/обновлении."""
+        ...
+
+    def chunk_size(self, state: "AppState") -> int:
+        """Размер чанка при потоковой загрузке."""
         ...
 
     async def fetch_remote_version(self, client: "httpx.AsyncClient", url: str) -> str:

@@ -1,5 +1,5 @@
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Dict
 
 # ── Константы приложения ──────────────────────────────────────────────────────
@@ -116,6 +116,87 @@ class WindowConfig:
             left   = max(0, left),
             top    = max(0, top),
         )
+
+# ── Конфигурация инструментов ────────────────────────────────────────────────
+
+@dataclass
+class BinaryInfo:
+    """Версионная информация одного бинарника (вторичного, без собственных URL)."""
+    current: str = ""
+    latest:  str = ""
+    status:  str = ""
+
+    def to_dict(self) -> Dict[str, str]:
+        return {"current": self.current, "latest": self.latest, "status": self.status}
+
+    @staticmethod
+    def from_dict(d: Dict[str, Any]) -> "BinaryInfo":
+        return BinaryInfo(
+            current=safe_str(d.get("current")),
+            latest =safe_str(d.get("latest")),
+            status =safe_str(d.get("status")),
+        )
+
+
+@dataclass
+class ToolConfig:
+    """Конфигурация и версионное состояние одного инструмента."""
+    version_url:  str = ""
+    download_url: str = ""
+    chunk_size:   int = 8_192
+    current:      str = ""
+    latest:       str = ""
+    status:       str = ""
+    # Вторичные бинарники инструмента (например, ffplay/ffprobe у ffmpeg).
+    binaries: Dict[str, BinaryInfo] = field(default_factory=dict)
+
+    def to_dict(self) -> Dict[str, Any]:
+        d: Dict[str, Any] = {
+            "version_url":  self.version_url,
+            "download_url": self.download_url,
+            "chunk_size":   self.chunk_size,
+            "current":      self.current,
+            "latest":       self.latest,
+            "status":       self.status,
+        }
+        if self.binaries:
+            d["binaries"] = {k: v.to_dict() for k, v in self.binaries.items()}
+        return d
+
+    @staticmethod
+    def from_dict(d: Dict[str, Any], defaults: "ToolConfig") -> "ToolConfig":
+        binaries: Dict[str, BinaryInfo] = {}
+        raw_bins = d.get("binaries", {})
+        if isinstance(raw_bins, dict):
+            for bin_name, bin_data in raw_bins.items():
+                if isinstance(bin_data, dict):
+                    binaries[bin_name] = BinaryInfo.from_dict(bin_data)
+        return ToolConfig(
+            version_url  = safe_str(d.get("version_url"))  or defaults.version_url,
+            download_url = safe_str(d.get("download_url")) or defaults.download_url,
+            chunk_size   = safe_int(d.get("chunk_size"), defaults.chunk_size),
+            current      = safe_str(d.get("current")),
+            latest       = safe_str(d.get("latest")),
+            status       = safe_str(d.get("status")),
+            binaries     = binaries,
+        )
+
+
+def default_tools_config() -> Dict[str, ToolConfig]:
+    """Дефолтная конфигурация всех инструментов приложения."""
+    return {
+        "yt-dlp": ToolConfig(
+            version_url  = DEFAULT_YT_API_URL,
+            download_url = DEFAULT_YT_DOWNLOAD_URL,
+            chunk_size   = YT_DLP_CHUNK_SIZE,
+        ),
+        "ffmpeg": ToolConfig(
+            version_url  = DEFAULT_FFMPEG_VERSION_URL,
+            download_url = DEFAULT_FFMPEG_DOWNLOAD_URL,
+            chunk_size   = FFMPEG_CHUNK_SIZE,
+        ),
+    }
+
 
 # ── UI-метаданные темы (порядок полей для Settings) ──────────────────────────
 

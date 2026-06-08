@@ -77,7 +77,7 @@ class ToolsRestoredEvent:
     """Эмитируется при старте если проверка была недавно.
     Восстанавливает виджеты из сохранённого state без обращения к сети."""
     needs_update:     bool
-    tool_versions:    dict   # {"yt-dlp": ToolVersionInfo(current, latest, status), ...}
+    tools:            dict   # Dict[str, ToolConfig]
     mins_until_check: int
 
 

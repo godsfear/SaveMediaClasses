@@ -2,7 +2,7 @@
 import flet as ft
 
 from config import (
-    THEME_FIELDS, THEME_GROUPS, PALETTE, ThemeConfig,
+    THEME_FIELDS, THEME_GROUPS, PALETTE, ThemeConfig, ToolConfig,
     hex_to_flet, is_valid_hex, safe_str
 )
 from managers.tools_manager import (
@@ -36,6 +36,20 @@ def _resolve_version(version: str, s) -> str:
     if version in (TOOL_VERSION_REMOTE_ERR, TOOL_VERSION_UNKNOWN):
         return s.tool_status_error
     return version
+
+
+def _lookup_binary_info(tools: dict, binary_name: str):
+    """Найти версионную информацию бинарника в иерархии tools.
+
+    Возвращает ToolConfig (для основного бинарника инструмента) или BinaryInfo
+    (для вторичного). Оба имеют атрибуты current/latest/status.
+    """
+    if binary_name in tools:
+        return tools[binary_name]
+    for tc in tools.values():
+        if binary_name in tc.binaries:
+            return tc.binaries[binary_name]
+    return None
 
 
 # Единая карта статус → цвет (используется и при проверке, и при восстановлении).
@@ -93,10 +107,12 @@ class SettingsScreen(ThemeTarget):
         self.embed_metadata_switch.value       = s.embed_metadata
         self.save_to_source_switch.value       = s.save_to_source_folder
         self.cookies_browser_dropdown.value    = s.cookies_browser
-        self.yt_api_input.value                = s.url_yt_api
-        self.yt_download_input.value           = s.url_yt_download
-        self.ffmpeg_version_input.value        = s.url_ffmpeg_version
-        self.ffmpeg_download_input.value       = s.url_ffmpeg_download
+        ytdlp_cfg  = s.tools.get("yt-dlp",  ToolConfig())
+        ffmpeg_cfg = s.tools.get("ffmpeg",  ToolConfig())
+        self.yt_api_input.value          = ytdlp_cfg.version_url
+        self.yt_download_input.value     = ytdlp_cfg.download_url
+        self.ffmpeg_version_input.value  = ffmpeg_cfg.version_url
+        self.ffmpeg_download_input.value = ffmpeg_cfg.download_url
         self.language_dropdown.value           = s.language
 
     def sync_to_state(self) -> None:
@@ -108,10 +124,12 @@ class SettingsScreen(ThemeTarget):
         s.embed_metadata        = bool(self.embed_metadata_switch.value)
         s.save_to_source_folder = bool(self.save_to_source_switch.value)
         s.cookies_browser       = safe_str(self.cookies_browser_dropdown.value)
-        s.url_yt_api            = safe_str(self.yt_api_input.value)
-        s.url_yt_download       = safe_str(self.yt_download_input.value)
-        s.url_ffmpeg_version    = safe_str(self.ffmpeg_version_input.value)
-        s.url_ffmpeg_download   = safe_str(self.ffmpeg_download_input.value)
+        if "yt-dlp" in s.tools:
+            s.tools["yt-dlp"].version_url  = safe_str(self.yt_api_input.value)
+            s.tools["yt-dlp"].download_url = safe_str(self.yt_download_input.value)
+        if "ffmpeg" in s.tools:
+            s.tools["ffmpeg"].version_url  = safe_str(self.ffmpeg_version_input.value)
+            s.tools["ffmpeg"].download_url = safe_str(self.ffmpeg_download_input.value)
         s.language              = Locale.resolve_language(
             safe_str(self.language_dropdown.value) or Locale.default_language()
         )
@@ -429,13 +447,13 @@ class SettingsScreen(ThemeTarget):
     def on_tools_restored(self, e: ToolsRestoredEvent) -> None:
         s = self._s
         for name, widget in self._tool_status.items():
-            tv = e.tool_versions.get(name)
-            if tv:
+            info = _lookup_binary_info(e.tools, name)
+            if info:
                 widget.value = s.fmt("tool_versions",
                                      name=name,
-                                     loc=_resolve_version(tv.current, s),
-                                     rem=_resolve_version(tv.latest, s))
-                widget.color = _STATUS_COLOR.get(tv.status, ft.Colors.GREY_600)
+                                     loc=_resolve_version(info.current, s),
+                                     rem=_resolve_version(info.latest, s))
+                widget.color = _STATUS_COLOR.get(info.status, ft.Colors.GREY_600)
             else:
                 widget.value = s.fmt("tool_dash", name=name)
                 widget.color = ft.Colors.GREY_600
