@@ -100,6 +100,7 @@ class InstallContext:
     ext:          str                          # ".exe" на Windows, "" иначе
     download_url: str
     on_progress:  Callable[[Optional[float]], None]  # pct 0..1, или None = индетерминированно
+    state:        "AppState" = None            # type: ignore[assignment]
     chunk_size:   int = 8_192
 
 
@@ -121,7 +122,7 @@ class ToolSpec(Protocol):
 
     name: str
 
-    def binaries(self) -> list[ToolBinary]:
+    def binaries(self, state: "AppState") -> list[ToolBinary]:
         """Список бинарников инструмента (первый/помеченный is_primary — главный)."""
         ...
 

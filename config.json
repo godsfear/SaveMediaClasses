@@ -3,15 +3,7 @@
         "download_path": "d:\\Downloads",
         "proxy_address": "socks5://127.0.0.1:9050",
         "proxy_enabled": false,
-        "yt_dlp_args": "-f bestvideo+bestaudio/best --merge-output-format mp4",
-        "audio_only": false,
-        "cookies_browser": "yandex",
-        "cookies_enabled": false,
-        "embed_metadata": true,
-        "playlist_enabled": true,
-        "clean_titles": true,
-        "save_to_source_folder": true,
-        "last_check_time": 1780954187.1047711,
+        "last_check_time": 1780960477.8444576,
         "last_needs_update": false
     },
     "tools": {
@@ -19,24 +11,66 @@
             "version_url": "https://api.github.com/repos/yt-dlp/yt-dlp/releases/latest",
             "download_url": "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe",
             "chunk_size": 8192,
+            "filename": "yt-dlp",
+            "version_flag": "--version",
             "current": "2026.03.17",
             "latest": "2026.03.17",
-            "status": "ok"
+            "status": "ok",
+            "parameters": {
+                "audio_only": {
+                    "state": false,
+                    "args": "-x --audio-format mp3 --audio-quality 0"
+                },
+                "cookies": {
+                    "state": false,
+                    "browser": "yandex",
+                    "flag": "--cookies-from-browser"
+                },
+                "playlist": {
+                    "state": true,
+                    "flag_on": "--yes-playlist",
+                    "flag_off": "--no-playlist",
+                    "dir_template": "%(playlist_title)s",
+                    "idx_prefix": "%(playlist_index)s - "
+                },
+                "embed_metadata": {
+                    "state": true,
+                    "args": "--embed-metadata --embed-thumbnail"
+                },
+                "extra_args": {
+                    "value": "-f bestvideo+bestaudio/best --merge-output-format mp4"
+                },
+                "clean_titles": {
+                    "state": true,
+                    "template_on": "%(title)s.%(ext)s",
+                    "template_off": "%(title)s [%(id)s].%(ext)s"
+                },
+                "save_to_source": {
+                    "state": true,
+                    "dir_template": "%(extractor_key)s"
+                }
+            }
         },
         "ffmpeg": {
             "version_url": "https://www.gyan.dev/ffmpeg/builds/release-version",
             "download_url": "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-full.zip",
             "chunk_size": 16384,
+            "filename": "ffmpeg",
+            "version_flag": "-version",
             "current": "8.1.1",
             "latest": "8.1.1",
             "status": "ok",
             "binaries": {
                 "ffplay": {
+                    "filename": "ffplay",
+                    "version_flag": "-version",
                     "current": "8.1.1",
                     "latest": "8.1.1",
                     "status": "ok"
                 },
                 "ffprobe": {
+                    "filename": "ffprobe",
+                    "version_flag": "-version",
                     "current": "8.1.1",
                     "latest": "8.1.1",
                     "status": "ok"
@@ -47,8 +81,8 @@
     "window": {
         "width": 688,
         "height": 991,
-        "left": 2931,
-        "top": 209
+        "left": 3081,
+        "top": 283
     },
     "theme": {
         "accent_color": "00B4D8",
