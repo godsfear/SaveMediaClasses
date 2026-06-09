@@ -276,7 +276,7 @@ class MainScreen(ThemeTarget):
 
     def sync_from_state(self) -> None:
         s = self._state
-        p = s.tools["yt-dlp"].parameters
+        p = s.ytdlp.parameters
         self.audio_only_switch.value      = p.audio_only.state
         self.cookies_enabled_switch.value = p.cookies.state
         if s.download_path:
@@ -284,7 +284,7 @@ class MainScreen(ThemeTarget):
             self.folder_label.color = ft.Colors.GREEN_400
 
     def sync_to_state(self) -> None:
-        p = self._state.tools["yt-dlp"].parameters
+        p = self._state.ytdlp.parameters
         p.audio_only.state = bool(self.audio_only_switch.value)
         p.cookies.state    = bool(self.cookies_enabled_switch.value)
 
@@ -348,7 +348,7 @@ class MainScreen(ThemeTarget):
 
         self.sync_to_state()
         st = self._state
-        p  = st.tools["yt-dlp"].parameters
+        p  = st.ytdlp.parameters
         snapshot = DownloadSnapshot(
             url=url,
             download_path=st.download_path,

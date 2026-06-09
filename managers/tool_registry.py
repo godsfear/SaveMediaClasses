@@ -4,11 +4,12 @@ managers/tool_registry.py — конкретные инструменты и р�
 Здесь — вся специфика yt-dlp и ffmpeg. Движок (ToolsManager) её не знает.
 
 Чтобы добавить инструмент:
-  1. Реализовать ToolSpec в этом файле.
-  2. Добавить дефолтный ToolConfig в config.default_tools_config().
-  3. Дописать в DEFAULT_TOOLS.
-Параметры нового инструмента (URL, chunk_size, filename, version_flag)
-задаются в конфиге и доступны через state.tools[name].
+  1. Реализовать подкласс BaseTool в этом файле (binaries / parse_version /
+     fetch_remote_version / install + default_config).
+  2. Дописать его в DEFAULT_TOOLS.
+  Больше ничего. Дефолтный конфиг объявляется прямо в инструменте
+  (default_config) и автоматически попадает в default_tools_config() —
+  отдельной правки в config.py не требуется.
 """
 
 from __future__ import annotations
@@ -17,12 +18,18 @@ import asyncio
 import os
 import re
 import zipfile
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Dict
 
 from app_logging import get_logger
-from config import safe_str, YT_DLP_CHUNK_SIZE, FFMPEG_CHUNK_SIZE, ToolConfig
+from config import (
+    safe_str,
+    YT_DLP_CHUNK_SIZE, FFMPEG_CHUNK_SIZE,
+    DEFAULT_YT_API_URL, DEFAULT_YT_DOWNLOAD_URL,
+    DEFAULT_FFMPEG_VERSION_URL, DEFAULT_FFMPEG_DOWNLOAD_URL,
+    ToolConfig, YtDlpConfig, FfmpegConfig, BinaryDef, YtDlpParameters,
+)
 from managers.tool_specs import (
-    InstallContext, ManualInstallRequired, ToolBinary,
+    BaseTool, InstallContext, ManualInstallRequired, ToolBinary,
     TOOL_VERSION_UNKNOWN, stream_to_file,
 )
 
@@ -36,14 +43,24 @@ _UA = {"User-Agent": "Mozilla/5.0"}
 
 # ── yt-dlp ────────────────────────────────────────────────────────────────────
 
-class YtDlpTool:
+class YtDlpTool(BaseTool):
     """Один self-contained бинарник, скачиваемый напрямую с GitHub Releases."""
 
     name = "yt-dlp"
     _DATE_RE = re.compile(r"^\d{4}\.\d{2}\.\d{2}")
 
+    def default_config(self) -> ToolConfig:
+        return YtDlpConfig(
+            version_url  = DEFAULT_YT_API_URL,
+            download_url = DEFAULT_YT_DOWNLOAD_URL,
+            chunk_size   = YT_DLP_CHUNK_SIZE,
+            filename     = "yt-dlp",
+            version_flag = "--version",
+            parameters   = YtDlpParameters(),
+        )
+
     def binaries(self, state: "AppState") -> list[ToolBinary]:
-        tc = state.tools.get(self.name, ToolConfig())
+        tc = self.cfg(state)
         return [ToolBinary(name=self.name,
                            filename=tc.filename or self.name,
                            version_flag=tc.version_flag or "--version",
@@ -58,15 +75,6 @@ class YtDlpTool:
             return first_token
         return safe_str(lines[0])
 
-    def version_url(self, state: "AppState") -> str:
-        return state.tools.get("yt-dlp", ToolConfig()).version_url
-
-    def download_url(self, state: "AppState") -> str:
-        return state.tools.get("yt-dlp", ToolConfig()).download_url
-
-    def chunk_size(self, state: "AppState") -> int:
-        return state.tools.get("yt-dlp", ToolConfig(chunk_size=YT_DLP_CHUNK_SIZE)).chunk_size
-
     async def fetch_remote_version(self, client: "httpx.AsyncClient", url: str) -> str:
         res = await client.get(url, headers=_UA)
         tag = res.json().get("tag_name")
@@ -75,7 +83,7 @@ class YtDlpTool:
         return safe_str(tag).lstrip("v")
 
     async def install(self, ctx: InstallContext) -> None:
-        tc = ctx.state.tools.get(self.name, ToolConfig()) if ctx.state else ToolConfig()
+        tc = self.cfg(ctx.state)
         filename = tc.filename or self.name
         dest = os.path.join(ctx.tools_dir, f"{filename}{ctx.ext}")
         await stream_to_file(ctx.client, ctx.download_url, dest, ctx.on_progress, ctx.chunk_size)
@@ -85,7 +93,7 @@ class YtDlpTool:
 
 # ── ffmpeg-комплект (ffmpeg + ffplay + ffprobe) ──────────────────────────────
 
-class FfmpegTool:
+class FfmpegTool(BaseTool):
     """
     Один логический инструмент, поставляющий три бинарника одним zip-архивом.
     Авто-установка только на Windows; на остальных ОС — подсказка пакетного менеджера.
@@ -95,16 +103,30 @@ class FfmpegTool:
     _VERSION_RE = re.compile(r"version\s+([0-9.]+)", re.IGNORECASE)
     _FALLBACK_RE = re.compile(r"([0-9.]+)")
 
+    def default_config(self) -> ToolConfig:
+        return FfmpegConfig(
+            version_url  = DEFAULT_FFMPEG_VERSION_URL,
+            download_url = DEFAULT_FFMPEG_DOWNLOAD_URL,
+            chunk_size   = FFMPEG_CHUNK_SIZE,
+            filename     = "ffmpeg",
+            version_flag = "-version",
+            binaries     = {
+                "ffplay":  BinaryDef(filename="ffplay",  version_flag="-version"),
+                "ffprobe": BinaryDef(filename="ffprobe", version_flag="-version"),
+            },
+        )
+
     def binaries(self, state: "AppState") -> list[ToolBinary]:
-        tc = state.tools.get(self.name, ToolConfig())
+        tc = self.cfg(state)
         result = [ToolBinary(name=self.name,
                              filename=tc.filename or self.name,
                              version_flag=tc.version_flag or "-version",
                              is_primary=True)]
-        for bin_name, bi in tc.binaries.items():
+        secondary: Dict[str, BinaryDef] = getattr(tc, "binaries", {})
+        for bin_name, bd in secondary.items():
             result.append(ToolBinary(name=bin_name,
-                                     filename=bi.filename or bin_name,
-                                     version_flag=bi.version_flag or "-version"))
+                                     filename=bd.filename or bin_name,
+                                     version_flag=bd.version_flag or "-version"))
         return result
 
     def parse_version(self, binary: ToolBinary, output: str) -> str:
@@ -118,15 +140,6 @@ class FfmpegTool:
         parts = first.split()
         return safe_str(parts[0]) if parts else ""
 
-    def version_url(self, state: "AppState") -> str:
-        return state.tools.get("ffmpeg", ToolConfig()).version_url
-
-    def download_url(self, state: "AppState") -> str:
-        return state.tools.get("ffmpeg", ToolConfig()).download_url
-
-    def chunk_size(self, state: "AppState") -> int:
-        return state.tools.get("ffmpeg", ToolConfig(chunk_size=FFMPEG_CHUNK_SIZE)).chunk_size
-
     async def fetch_remote_version(self, client: "httpx.AsyncClient", url: str) -> str:
         res = await client.get(url, headers=_UA)
         return res.text.strip()
@@ -135,10 +148,11 @@ class FfmpegTool:
         if os.name != "nt":
             raise ManualInstallRequired(self._manual_hint())
 
-        tc = ctx.state.tools.get(self.name, ToolConfig()) if ctx.state else ToolConfig()
+        tc = self.cfg(ctx.state)
+        secondary: Dict[str, BinaryDef] = getattr(tc, "binaries", {})
         archive_members = (
             {f"{tc.filename or self.name}.exe"} |
-            {f"{bi.filename or name}.exe" for name, bi in tc.binaries.items()}
+            {f"{bd.filename or name}.exe" for name, bd in secondary.items()}
         )
 
         zip_path = os.path.join(ctx.tools_dir, "ffmpeg_temp.zip")
@@ -178,9 +192,17 @@ class FfmpegTool:
 
 # ── Реестр по умолчанию ───────────────────────────────────────────────────────
 
-def build_default_tools() -> list:
+def build_default_tools() -> list[BaseTool]:
     """Список инструментов приложения. Порядок = порядок отображения в настройках."""
     return [YtDlpTool(), FfmpegTool()]
 
 
-DEFAULT_TOOLS = build_default_tools()
+DEFAULT_TOOLS: list[BaseTool] = build_default_tools()
+
+
+def default_tools_config() -> Dict[str, ToolConfig]:
+    """
+    Дефолтная конфигурация всех инструментов — собирается из самих инструментов.
+    Единый источник истины: правится только default_config() конкретного инструмента.
+    """
+    return {tool.name: tool.default_config() for tool in DEFAULT_TOOLS}

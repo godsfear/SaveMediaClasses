@@ -20,11 +20,12 @@ managers/tool_specs.py — единая абстракция внешнего и
 
 from __future__ import annotations
 
+import abc
 import os
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Callable, Optional, Protocol, runtime_checkable
 
-from config import safe_int
+from config import safe_int, ToolConfig
 
 if TYPE_CHECKING:
     import httpx
@@ -155,6 +156,62 @@ class ToolSpec(Protocol):
         Скачать и установить инструмент. При невозможности авто-установки —
         поднять ManualInstallRequired(hint).
         """
+        ...
+
+
+# ── Базовый класс инструмента ─────────────────────────────────────────────────
+
+class BaseTool(abc.ABC):
+    """
+    Общая база для всех инструментов (реализует ToolSpec).
+
+    Главное, что она даёт, — СВЯЗЬ инструмента с его конфигом в одном месте
+    (cfg). Раньше каждый метод каждого инструмента делал
+    `state.tools.get(self.name, ToolConfig())`, местами с хардкодом строк-имён.
+    Теперь lookup один — через self.cfg(state) — и типобезопасен через
+    default_config(). Дефолтная конфигурация объявляется тут же: из неё
+    автоматически собирается весь реестр (tool_registry.default_tools_config),
+    так что добавление инструмента больше не требует правок в config.py.
+    """
+    name: str
+
+    @abc.abstractmethod
+    def default_config(self) -> ToolConfig:
+        """Дефолтная статическая конфигурация инструмента (единый источник истины)."""
+        ...
+
+    def cfg(self, state: "AppState | None") -> ToolConfig:
+        """Конфиг инструмента из state; дефолт, если state или ключа нет."""
+        cfg = state.tools.get(self.name) if state is not None else None
+        return cfg if cfg is not None else self.default_config()
+
+    # ── Общие геттеры (раньше дублировались в каждом инструменте) ──────────────
+
+    def version_url(self, state: "AppState") -> str:
+        return self.cfg(state).version_url
+
+    def download_url(self, state: "AppState") -> str:
+        return self.cfg(state).download_url
+
+    def chunk_size(self, state: "AppState") -> int:
+        return self.cfg(state).chunk_size
+
+    # ── Инструмент-специфика — реализуют подклассы ─────────────────────────────
+
+    @abc.abstractmethod
+    def binaries(self, state: "AppState") -> list[ToolBinary]:
+        ...
+
+    @abc.abstractmethod
+    def parse_version(self, binary: ToolBinary, output: str) -> str:
+        ...
+
+    @abc.abstractmethod
+    async def fetch_remote_version(self, client: "httpx.AsyncClient", url: str) -> str:
+        ...
+
+    @abc.abstractmethod
+    async def install(self, ctx: InstallContext) -> None:
         ...
 
 

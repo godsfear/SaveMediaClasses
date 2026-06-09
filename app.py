@@ -143,7 +143,7 @@ class SaveMediaApp:
 
         # ── Фоновая проверка версий ───────────────────────────────────────────
         now         = time.time()
-        force_check = not any(tc.current for tc in svc.state.tools.values())
+        force_check = not any(vs.current for vs in svc.state.tool_versions.values())
         if force_check or now - svc.state.last_check_time >= CHECK_INTERVAL_SECONDS:
             page.run_task(tools_ctrl.check_tools)
         else:
@@ -152,7 +152,7 @@ class SaveMediaApp:
             )
             svc.bus.emit(ToolsRestoredEvent(
                 needs_update=svc.state.last_needs_update,
-                tools=svc.state.tools,
+                versions=svc.state.tool_versions,
                 mins_until_check=mins_left,
             ))
             svc.bus.emit(ToolsCheckedEvent(needs_update=svc.state.last_needs_update))

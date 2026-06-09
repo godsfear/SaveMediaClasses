@@ -4,7 +4,7 @@ from typing import Any, Dict
 
 from app_logging import get_logger
 from config import (
-    ThemeConfig, WindowConfig, ToolConfig,
+    ThemeConfig, WindowConfig, ToolConfig, VersionState,
     safe_str, safe_int, get_fallback_bool,
 )
 from i18l import Locale
@@ -45,9 +45,12 @@ class ConfigManager:
         for tool_name, tool_default in defaults.tools.items():
             raw_tool = tools_raw.get(tool_name, {}) if isinstance(tools_raw, dict) else {}
             if isinstance(raw_tool, dict):
-                tools[tool_name] = ToolConfig.from_dict(raw_tool, tool_default)
+                # Полиморфно: подкласс выбирается по типу дефолта (YtDlpConfig/FfmpegConfig).
+                tools[tool_name] = type(tool_default).from_dict(raw_tool, tool_default)
             else:
                 tools[tool_name] = tool_default
+
+        tool_versions = self._load_tool_versions(raw, tools_raw)
 
         return AppState(
             download_path     = dp,
@@ -55,11 +58,43 @@ class ConfigManager:
             proxy_address     = fb_str(cfg,  "proxy_address",  defaults.proxy_address),
             last_check_time   = float(cfg.get("last_check_time",  defaults.last_check_time)),
             last_needs_update = bool(cfg.get("last_needs_update",  defaults.last_needs_update)),
-            tools    = tools,
+            tools         = tools,
+            tool_versions = tool_versions,
             theme    = ThemeConfig.from_dict(raw.get("theme", {})),
             window   = WindowConfig.from_dict(raw.get("window", {})),
             language = Locale.resolve_language(raw.get("language") or defaults.language),
         )
+
+    @staticmethod
+    def _load_tool_versions(raw: Dict[str, Any], tools_raw: Any) -> Dict[str, VersionState]:
+        """Загрузить runtime-версии из секции "tool_versions".
+
+        Мягкая миграция: если секции нет (старый формат), собрать версии из
+        legacy-полей tools.*.current/latest/status и tools.*.binaries.*.* —
+        чтобы при первом запуске не терять отображение и не форсить пере-проверку.
+        """
+        tv_raw = raw.get("tool_versions")
+        if isinstance(tv_raw, dict):
+            return {
+                name: VersionState.from_dict(d)
+                for name, d in tv_raw.items() if isinstance(d, dict)
+            }
+
+        versions: Dict[str, VersionState] = {}
+        if isinstance(tools_raw, dict):
+            for tool_name, raw_tool in tools_raw.items():
+                if not isinstance(raw_tool, dict):
+                    continue
+                if any(k in raw_tool for k in ("current", "latest", "status")):
+                    versions[tool_name] = VersionState.from_dict(raw_tool)
+                legacy_bins = raw_tool.get("binaries", {})
+                if isinstance(legacy_bins, dict):
+                    for bin_name, bin_data in legacy_bins.items():
+                        if isinstance(bin_data, dict) and any(
+                            k in bin_data for k in ("current", "latest", "status")
+                        ):
+                            versions[bin_name] = VersionState.from_dict(bin_data)
+        return versions
 
     def load_window_geometry(self) -> WindowConfig:
         """Быстрое чтение только геометрии окна до полной загрузки."""
@@ -80,7 +115,8 @@ class ConfigManager:
                 "last_check_time":   state.last_check_time,
                 "last_needs_update": state.last_needs_update,
             },
-            "tools":    {k: v.to_dict() for k, v in state.tools.items()},
+            "tools":         {k: v.to_dict() for k, v in state.tools.items()},
+            "tool_versions": {k: v.to_dict() for k, v in state.tool_versions.items()},
             "window":   state.window.to_dict(),
             "theme":    state.theme.to_dict(),
             "language": state.language,
