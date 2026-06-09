@@ -45,7 +45,7 @@ class ConfigManager:
         for tool_name, tool_default in defaults.tools.items():
             raw_tool = tools_raw.get(tool_name, {}) if isinstance(tools_raw, dict) else {}
             if isinstance(raw_tool, dict):
-                # Полиморфно: подкласс выбирается по типу дефолта (YtDlpConfig/FfmpegConfig).
+                # Полиморфно: подкласс выбирается по типу дефолта (YtDlpConfig / базовый ToolConfig).
                 tools[tool_name] = type(tool_default).from_dict(raw_tool, tool_default)
             else:
                 tools[tool_name] = tool_default

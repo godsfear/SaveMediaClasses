@@ -196,11 +196,28 @@ class BaseTool(abc.ABC):
     def chunk_size(self, state: "AppState") -> int:
         return self.cfg(state).chunk_size
 
-    # ── Инструмент-специфика — реализуют подклассы ─────────────────────────────
+    # ── Бинарники: единообразно для всех инструментов из cfg.binaries ──────────
 
-    @abc.abstractmethod
     def binaries(self, state: "AppState") -> list[ToolBinary]:
-        ...
+        """
+        Список бинарников инструмента — прямое отображение cfg.binaries.
+        Реализация общая: и yt-dlp (один бинарник), и ffmpeg (три) описаны
+        одинаково в конфиге, поэтому переопределять в подклассах не нужно.
+        """
+        return [
+            ToolBinary(name=name,
+                       filename=bd.filename or name,
+                       version_flag=bd.version_flag or "--version",
+                       is_primary=bd.is_primary)
+            for name, bd in self.cfg(state).binaries.items()
+        ]
+
+    def primary_binary(self, state: "AppState") -> ToolBinary:
+        """Главный бинарник инструмента (по is_primary; иначе — первый)."""
+        bins = self.binaries(state)
+        return next((b for b in bins if b.is_primary), bins[0])
+
+    # ── Инструмент-специфика — реализуют подклассы ─────────────────────────────
 
     @abc.abstractmethod
     def parse_version(self, binary: ToolBinary, output: str) -> str:

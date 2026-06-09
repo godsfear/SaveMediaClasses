@@ -11,21 +11,29 @@ from dataclasses import dataclass, field
 from typing import Dict
 
 from config import (
-    ThemeConfig, WindowConfig, ToolConfig, YtDlpConfig, FfmpegConfig, VersionState,
+    ThemeConfig, WindowConfig, ToolConfig, YtDlpConfig, VersionState,
     DEFAULT_DOWNLOAD_PATH, DEFAULT_PROXY_ADDRESS,
 )
 from i18l import Locale
 
 
-def _default_tools() -> Dict[str, ToolConfig]:
-    """Дефолтные конфиги инструментов.
+# Импорты реестра ленивые: он живёт в пакете managers, чей __init__ тянет
+# config_manager → state. Импорт на верхнем уровне state.py замкнул бы цикл;
+# на момент вызова (создание AppState / доступ к property) всё уже загружено.
 
-    Импорт ленивый: реестр живёт в пакете managers, чей __init__ тянет
-    config_manager → state. Тянуть его на верхнем уровне state.py замкнуло бы
-    цикл импорта; на момент создания AppState() все модули уже загружены.
-    """
+def _default_tools() -> Dict[str, ToolConfig]:
+    """Дефолтные конфиги всех инструментов (фабрика поля tools)."""
     from managers.tool_registry import default_tools_config
     return default_tools_config()
+
+
+def _tool_default(name: str) -> ToolConfig:
+    """Дефолтный конфиг конкретного инструмента из реестра — fallback для аксессоров."""
+    from managers.tool_registry import DEFAULT_TOOLS
+    for tool in DEFAULT_TOOLS:
+        if tool.name == name:
+            return tool.default_config()
+    return ToolConfig()
 
 
 @dataclass
@@ -54,15 +62,17 @@ class AppState:
 
     # ── Типобезопасный доступ к конфигам инструментов ─────────────────────────
     # Имена инструментов локализованы здесь, а не разбросаны строками по UI.
-    # Возвращают конкретный подкласс (с .parameters / .binaries); при отсутствии
-    # ключа — пустой дефолт того же типа, чтобы UI не падал на KeyError.
+    # При отсутствии/неверном типе ключа — настоящий дефолт инструмента из
+    # реестра (с реальными URL), а не пустышка.
 
     @property
     def ytdlp(self) -> YtDlpConfig:
         cfg = self.tools.get("yt-dlp")
-        return cfg if isinstance(cfg, YtDlpConfig) else YtDlpConfig()
+        if isinstance(cfg, YtDlpConfig):
+            return cfg
+        return _tool_default("yt-dlp")  # type: ignore[return-value]
 
     @property
-    def ffmpeg(self) -> FfmpegConfig:
+    def ffmpeg(self) -> ToolConfig:
         cfg = self.tools.get("ffmpeg")
-        return cfg if isinstance(cfg, FfmpegConfig) else FfmpegConfig()
+        return cfg if isinstance(cfg, ToolConfig) else _tool_default("ffmpeg")

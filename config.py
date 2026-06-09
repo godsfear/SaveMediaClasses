@@ -120,12 +120,16 @@ class WindowConfig:
 # ── Конфигурация инструментов ────────────────────────────────────────────────
 #
 # Разделение ответственности:
-#   • *Config (ToolConfig, YtDlpConfig, FfmpegConfig, BinaryDef) — СТАТИЧЕСКАЯ
-#     конфигурация: URL, имена файлов, флаги. Редактируется пользователем,
-#     персистится в секции "tools" config.json.
+#   • ToolConfig / YtDlpConfig / BinaryDef — СТАТИЧЕСКАЯ конфигурация: URL,
+#     имена файлов, флаги. Редактируется пользователем, персистится в "tools".
 #   • VersionState — RUNTIME-состояние версий (current/latest/status), которое
 #     контроллер обновляет при проверке. Персистится отдельно, в секции
 #     "tool_versions", ключ — имя бинарника. Конфиг им не «загрязняется».
+#
+# Единообразие: КАЖДЫЙ инструмент описывает все свои бинарники одинаково — в
+# секции `binaries` (даже yt-dlp, у которого один бинарник). Ключ в `binaries`
+# == ключ в `tool_versions`; primary-бинарник помечен is_primary. Спец-полей
+# для «главного» бинарника на уровне инструмента больше нет.
 
 
 @dataclass
@@ -149,19 +153,30 @@ class VersionState:
 
 @dataclass
 class BinaryDef:
-    """Статическое описание вторичного бинарника инструмента (имя файла + флаг версии)."""
-    filename:     str = ""
-    version_flag: str = ""
+    """Статическое описание одного бинарника инструмента: имя файла + флаг версии.
 
-    def to_dict(self) -> Dict[str, str]:
-        return {"filename": self.filename, "version_flag": self.version_flag}
+    is_primary помечает бинарник, версия которого представляет инструмент целиком
+    (его имя совпадает с именем инструмента). У каждого инструмента ровно один primary.
+    """
+    filename:     str  = ""
+    version_flag: str  = "--version"
+    is_primary:   bool = False
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "filename":     self.filename,
+            "version_flag": self.version_flag,
+            "is_primary":   self.is_primary,
+        }
 
     @staticmethod
     def from_dict(d: Dict[str, Any], defaults: "BinaryDef | None" = None) -> "BinaryDef":
         def_ = defaults or BinaryDef()
+        raw_primary = d.get("is_primary")
         return BinaryDef(
             filename     = safe_str(d.get("filename"))     or def_.filename,
             version_flag = safe_str(d.get("version_flag")) or def_.version_flag,
+            is_primary   = def_.is_primary if raw_primary is None else bool(raw_primary),
         )
 
 
@@ -348,27 +363,41 @@ class ToolConfig:
     """
     Базовая СТАТИЧЕСКАЯ конфигурация одного инструмента — общая для всех.
 
-    Инструмент-специфичные поля живут в подклассах (YtDlpConfig.parameters,
-    FfmpegConfig.binaries). Runtime-версии (current/latest/status) здесь НЕ
-    хранятся — они в state.tool_versions (VersionState).
+    Все бинарники инструмента (включая primary) единообразно описаны в `binaries`.
+    Единственное инструмент-специфичное расширение — YtDlpConfig.parameters.
+    Runtime-версии (current/latest/status) тут НЕ хранятся — они в
+    state.tool_versions (VersionState), ключ совпадает с ключом в `binaries`.
 
-    Полиморфизм сериализации: каждый подкласс расширяет to_dict()/from_dict().
+    Полиморфизм сериализации: подкласс расширяет to_dict()/from_dict().
     Загрузчик диспетчеризует по типу дефолта: type(default).from_dict(raw, default).
     """
     version_url:  str = ""
     download_url: str = ""
     chunk_size:   int = 8_192
-    filename:     str = ""        # базовое имя основного бинарника (без расширения)
-    version_flag: str = ""        # флаг для получения версии
+    binaries:     Dict[str, BinaryDef] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
         return {
             "version_url":  self.version_url,
             "download_url": self.download_url,
             "chunk_size":   self.chunk_size,
-            "filename":     self.filename,
-            "version_flag": self.version_flag,
+            "binaries":     {k: v.to_dict() for k, v in self.binaries.items()},
         }
+
+    @staticmethod
+    def _merge_binaries(d: Dict[str, Any], def_: "ToolConfig") -> Dict[str, BinaryDef]:
+        """Бинарники = копия дефолтов, поверх — пользовательские правки из raw.
+
+        Дефолты гарантируют присутствие всех бинарников (в т.ч. primary), даже
+        если в сохранённом конфиге их нет — это и есть мягкая миграция формата.
+        """
+        binaries: Dict[str, BinaryDef] = {k: replace(v) for k, v in def_.binaries.items()}
+        raw_bins = d.get("binaries", {})
+        if isinstance(raw_bins, dict):
+            for name, bd in raw_bins.items():
+                if isinstance(bd, dict):
+                    binaries[name] = BinaryDef.from_dict(bd, def_.binaries.get(name))
+        return binaries
 
     @staticmethod
     def _base_kwargs(d: Dict[str, Any], def_: "ToolConfig") -> Dict[str, Any]:
@@ -377,8 +406,7 @@ class ToolConfig:
             version_url  = safe_str(d.get("version_url"))  or def_.version_url,
             download_url = safe_str(d.get("download_url")) or def_.download_url,
             chunk_size   = safe_int(d.get("chunk_size"), def_.chunk_size),
-            filename     = safe_str(d.get("filename"))     or def_.filename,
-            version_flag = safe_str(d.get("version_flag")) or def_.version_flag,
+            binaries     = ToolConfig._merge_binaries(d, def_),
         )
 
     @classmethod
@@ -405,31 +433,6 @@ class YtDlpConfig(ToolConfig):
             raw if isinstance(raw, dict) else {}, def_.parameters
         )
         return cls(**cls._base_kwargs(d, def_), parameters=params)
-
-
-@dataclass
-class FfmpegConfig(ToolConfig):
-    """Конфигурация ffmpeg-комплекта: добавляет описание вторичных бинарников."""
-    binaries: Dict[str, BinaryDef] = field(default_factory=dict)
-
-    def to_dict(self) -> Dict[str, Any]:
-        d = super().to_dict()
-        if self.binaries:
-            d["binaries"] = {k: v.to_dict() for k, v in self.binaries.items()}
-        return d
-
-    @classmethod
-    def from_dict(cls, d: Dict[str, Any], defaults: "ToolConfig | None" = None) -> "FfmpegConfig":
-        def_ = defaults if isinstance(defaults, FfmpegConfig) else cls()
-        binaries: Dict[str, BinaryDef] = {k: replace(v) for k, v in def_.binaries.items()}
-        raw_bins = d.get("binaries", {})
-        if isinstance(raw_bins, dict):
-            for bin_name, bin_data in raw_bins.items():
-                if isinstance(bin_data, dict):
-                    binaries[bin_name] = BinaryDef.from_dict(
-                        bin_data, def_.binaries.get(bin_name)
-                    )
-        return cls(**cls._base_kwargs(d, def_), binaries=binaries)
 
 
 # ── UI-метаданные темы (порядок полей для Settings) ──────────────────────────
