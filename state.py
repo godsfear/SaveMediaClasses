@@ -42,6 +42,8 @@ class AppState:
     download_path: str  = field(default_factory=lambda: DEFAULT_DOWNLOAD_PATH)
     proxy_enabled: bool = False
     proxy_address: str  = field(default_factory=lambda: DEFAULT_PROXY_ADDRESS)
+    # Выбранный загрузчик (ключ провайдера: "yt-dlp" | "aria2c"). Запоминается между сессиями.
+    download_tool: str  = "yt-dlp"
 
     # ── Мета-состояние ────────────────────────────────────────────────────────
     last_check_time:   float = 0.0
@@ -88,3 +90,8 @@ class AppState:
     def ffmpeg(self) -> ToolConfig:
         cfg = self.tools.get("ffmpeg")
         return cfg if isinstance(cfg, ToolConfig) else _tool_default("ffmpeg")
+
+    @property
+    def aria2c(self) -> ToolConfig:
+        cfg = self.tools.get("aria2c")
+        return cfg if isinstance(cfg, ToolConfig) else _tool_default("aria2c")

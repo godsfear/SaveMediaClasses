@@ -3,7 +3,8 @@
         "download_path": "d:\\Downloads",
         "proxy_address": "socks5://127.0.0.1:9050",
         "proxy_enabled": false,
-        "last_check_time": 1781032118.606715,
+        "download_tool": "aria2c",
+        "last_check_time": 1781046682.3311508,
         "last_needs_update": false
     },
     "tools": {
@@ -74,6 +75,18 @@
                     "is_primary": false
                 }
             }
+        },
+        "aria2c": {
+            "version_url": "https://api.github.com/repos/aria2/aria2/releases/latest",
+            "download_url": "https://api.github.com/repos/aria2/aria2/releases/latest",
+            "chunk_size": 16384,
+            "binaries": {
+                "aria2c": {
+                    "filename": "aria2c",
+                    "version_flag": "--version",
+                    "is_primary": true
+                }
+            }
         }
     },
     "tool_versions": {
@@ -96,13 +109,18 @@
             "current": "8.1.1",
             "latest": "8.1.1",
             "status": "ok"
+        },
+        "aria2c": {
+            "current": "1.37.0",
+            "latest": "1.37.0",
+            "status": "ok"
         }
     },
     "window": {
-        "width": 688,
+        "width": 778,
         "height": 991,
-        "left": 2870,
-        "top": 211
+        "left": 3624,
+        "top": 317
     },
     "theme": {
         "mode": "dark",
@@ -175,5 +193,5 @@
             }
         }
     },
-    "language": "en"
+    "language": "ru"
 }

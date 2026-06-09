@@ -141,6 +141,11 @@ class Strings:
     url_yt_download:     str = ""
     url_ffmpeg_version:  str = ""
     url_ffmpeg_download: str = ""
+    url_aria2_version:   str = ""
+    url_aria2_download:  str = ""
+
+    # Выбор загрузчика на главном экране (yt-dlp / aria2c)
+    downloader_label:    str = ""
 
     # main_screen
     header_folder:        str = ""

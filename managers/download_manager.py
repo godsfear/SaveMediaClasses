@@ -114,25 +114,34 @@ class DownloadTask:
 class DownloadManager:
 
     def __init__(self,
-                 provider_factory: Callable[[], "DownloadProvider"],
+                 provider_factories: Dict[str, Callable[[], "DownloadProvider"]],
+                 default_provider: str,
                  log_path: str,
                  bus: EventBus,
                  task_runner: TaskRunner,
                  db=None) -> None:
         """
-        provider_factory — callable без аргументов, возвращает новый DownloadProvider.
-        Пример: lambda: YtDlpProvider()
+        provider_factories — реестр {ключ: callable без аргументов → новый DownloadProvider}.
+            Пример: {"yt-dlp": lambda: YtDlpProvider(paths), "aria2c": lambda: Aria2cProvider(paths)}
+        default_provider — ключ провайдера по умолчанию (когда add() вызван без выбора).
         task_runner — планировщик async-задач (в app.py: page.run_task).
         db — DownloadRepository для сохранения thumbnail после загрузки (опционально).
         """
-        self._provider_factory = provider_factory
-        self._task_runner      = task_runner
-        self._bus              = bus
-        self._db               = db
-        self._log              = get_logger("app")
+        self._provider_factories = provider_factories
+        self._default_provider   = default_provider
+        self._task_runner        = task_runner
+        self._bus                = bus
+        self._db                 = db
+        self._log                = get_logger("app")
 
         self._semaphore = asyncio.Semaphore(MAX_PARALLEL)
         self._active: Dict[str, DownloadTask] = {}
+
+    def _make_provider(self, provider_key: Optional[str]) -> "DownloadProvider":
+        """Создать провайдер по ключу; неизвестный/пустой ключ → провайдер по умолчанию."""
+        factory = self._provider_factories.get(provider_key or self._default_provider) \
+            or self._provider_factories[self._default_provider]
+        return factory()
 
     # ── Публичный API ─────────────────────────────────────────────────────────
 
@@ -144,9 +153,9 @@ class DownloadManager:
     def at_capacity(self) -> bool:
         return self.active_count >= MAX_PARALLEL
 
-    def add(self, snapshot: DownloadSnapshot) -> Optional[str]:
-        """Запустить загрузку. Возвращает task_id или None если exe не найден."""
-        provider = self._provider_factory()
+    def add(self, snapshot: DownloadSnapshot, provider_key: Optional[str] = None) -> Optional[str]:
+        """Запустить загрузку выбранным провайдером. Возвращает task_id или None если exe не найден."""
+        provider = self._make_provider(provider_key)
         if not provider.resolve_exe():
             return None
 
@@ -202,9 +211,11 @@ class DownloadManager:
                 pct = provider.parse_progress(line)
                 if pct is None:
                     self._write_log(line, source)
-                if pct is not None and pct - task._last_pct >= 0.01:
+                # abs(): прогресс может и убывать (новый файл/поток у yt-dlp,
+                # смена фазы у торрента) — иначе бар застревает на прежнем максимуме.
+                if pct is not None and abs(pct - task._last_pct) >= 0.01:
                     task._last_pct = pct
-                    status = line.replace("[download]", "").strip()
+                    status = provider.format_status(line)
                     self._bus.emit(DownloadProgressEvent(
                         task_id=task.task_id, pct=pct, status=status[:80],
                         source=source,

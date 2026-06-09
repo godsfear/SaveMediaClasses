@@ -7,7 +7,7 @@ from typing import Dict
 import flet as ft
 
 from app_logging import get_logger
-from config import safe_str, hex_to_flet, ThemeConfig
+from config import safe_str, hex_to_flet, ThemeConfig, download_display_name
 from controllers.theme_target import ThemeTarget
 from events import (
     EventBus,
@@ -18,13 +18,21 @@ from events import (
     ToolsCheckedEvent,
     StatusMessageEvent,
     CookiesChangedEvent,
+    SettingsChangedEvent,
     AppClosingEvent,
 )
 from i18l import Locale, Strings
 from managers.download_manager import DownloadManager, DownloadSnapshot, MAX_PARALLEL
 from services import Services
-from managers.providers import YtDlpProvider as _DefaultProvider
+from managers.providers import YtDlpProvider, Aria2cProvider
 from state import AppState
+
+# Доступные загрузчики: ключ провайдера → класс (для is_valid_url и выпадающего списка).
+# Ключи совпадают с ключами реестра провайдеров в Services.create / DownloadManager.
+_PROVIDER_CLASSES = {
+    "yt-dlp": YtDlpProvider,
+    "aria2c": Aria2cProvider,
+}
 
 
 class DownloadCard:
@@ -33,7 +41,7 @@ class DownloadCard:
     Цвета берутся из активной ThemeConfig; apply_theme() позволяет перекрасить
     живую карточку при смене темы/режима."""
 
-    def __init__(self, task_id: str, url: str, on_cancel, s: Strings, t: ThemeConfig) -> None:
+    def __init__(self, task_id: str, title: str, on_cancel, s: Strings, t: ThemeConfig) -> None:
         self.task_id   = task_id
         self._s        = s
         self._t        = t
@@ -41,20 +49,26 @@ class DownloadCard:
                                  width=36, text_align=ft.TextAlign.RIGHT)
         self._bar      = ft.ProgressBar(value=0.0, color=hex_to_flet(t.progress_color),
                                         bgcolor=ft.Colors.SURFACE_CONTAINER_HIGHEST, expand=True)
-        self._status   = ft.Text(self._short(url), size=11,
-                                 color=hex_to_flet(t.text_secondary_color),
+        # Имя загрузки — фиксированная строка (не затирается прогрессом).
+        self._title    = ft.Text(self._short(title), size=12, weight=ft.FontWeight.W_500,
+                                 color=hex_to_flet(t.text_color),
                                  expand=True, no_wrap=True, overflow=ft.TextOverflow.ELLIPSIS)
+        # Детали (скорость/ETA, «готово», «отменено») — отдельная строка под баром.
+        self._status   = ft.Text("", size=11,
+                                 color=hex_to_flet(t.text_secondary_color),
+                                 no_wrap=True, overflow=ft.TextOverflow.ELLIPSIS)
         self._cancel_btn = ft.IconButton(
             icon=ft.Icons.CLOSE_ROUNDED, icon_color=hex_to_flet(t.status_error_color),
             icon_size=16, tooltip=s.btn_clear, on_click=on_cancel
         )
         self.container = ft.Container(
             content=ft.Column([
-                ft.Row([self._status, self._cancel_btn],
+                ft.Row([self._title, self._cancel_btn],
                        alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
                        vertical_alignment=ft.CrossAxisAlignment.CENTER),
                 ft.Row([self._bar, self._pct_text],
                        vertical_alignment=ft.CrossAxisAlignment.CENTER, spacing=8),
+                self._status,
             ], spacing=4, tight=True),
             bgcolor=hex_to_flet(t.surface_color),
             border=ft.Border.all(1, hex_to_flet(t.border_color)),
@@ -71,6 +85,7 @@ class DownloadCard:
         self._t = t
         self.container.bgcolor = hex_to_flet(t.surface_color)
         self.container.border  = ft.Border.all(1, hex_to_flet(t.border_color))
+        self._title.color      = hex_to_flet(t.text_color)
         self._status.color     = hex_to_flet(t.text_secondary_color)
         self._pct_text.color   = hex_to_flet(t.text_secondary_color)
         self._cancel_btn.icon_color = hex_to_flet(t.status_error_color)
@@ -262,6 +277,16 @@ class MainScreen(ThemeTarget):
             on_change=self._on_url_change,
             suffix=url_clear_btn,
         ))
+        # Выбор загрузчика для текущей ссылки: yt-dlp (медиа-сайты) или aria2c
+        # (прямые файловые ссылки). Стоит справа от поля URL; выбор запоминается.
+        self.downloader_dropdown = self.register_accents(ft.Dropdown(
+            label=s.downloader_label,
+            border_radius=8, width=130,
+            focused_border_color=ft.Colors.BLUE,
+            options=[ft.dropdown.Option(key) for key in _PROVIDER_CLASSES],
+            value=self._state.download_tool,
+            on_select=self._on_downloader_change,
+        ))
         self.audio_only_switch      = self.register_switches(ft.Switch(label=s.switch_audio_only, active_color=ft.Colors.GREEN))
         self.cookies_enabled_switch = self.register_switches(ft.Switch(label=s.switch_cookies,    active_color=ft.Colors.GREEN, value=False))
 
@@ -295,7 +320,7 @@ class MainScreen(ThemeTarget):
         self.main_card = self.register_cards(ft.Container(
             content=ft.Column([
                 self.header_main,
-                ft.Row([self.url_input, self.download_btn],
+                ft.Row([self.url_input, self.downloader_dropdown, self.download_btn],
                        vertical_alignment=ft.CrossAxisAlignment.CENTER, spacing=15),
                 ft.Column([self.audio_only_switch, self.cookies_enabled_switch], spacing=10)
             ], spacing=12, horizontal_alignment=ft.CrossAxisAlignment.STRETCH),
@@ -323,6 +348,7 @@ class MainScreen(ThemeTarget):
         p = s.ytdlp.parameters
         self.audio_only_switch.value      = p.audio_only.state
         self.cookies_enabled_switch.value = p.cookies.state
+        self.downloader_dropdown.value    = self._selected_tool()
         if s.download_path:
             self.folder_label.value = s.download_path
             self.folder_label.color = hex_to_flet(s.theme.status_ok_color)
@@ -331,6 +357,23 @@ class MainScreen(ThemeTarget):
         p = self._state.ytdlp.parameters
         p.audio_only.state = bool(self.audio_only_switch.value)
         p.cookies.state    = bool(self.cookies_enabled_switch.value)
+        self._state.download_tool = self._selected_tool()
+
+    # ── Выбор загрузчика ──────────────────────────────────────────────────────
+
+    def _selected_tool(self) -> str:
+        """Текущий ключ провайдера: значение дропдауна, иначе сохранённый в state.
+        Неизвестный ключ откатывается к yt-dlp."""
+        tool = safe_str(self.downloader_dropdown.value) or self._state.download_tool
+        return tool if tool in _PROVIDER_CLASSES else "yt-dlp"
+
+    def _selected_provider_cls(self):
+        return _PROVIDER_CLASSES[self._selected_tool()]
+
+    def _on_downloader_change(self, _) -> None:
+        self.sync_to_state()
+        self._on_url_change(None)          # перепроверить URL под новый загрузчик
+        self._bus.emit(SettingsChangedEvent())
 
     # ── Тема ─────────────────────────────────────────────────────────────────
 
@@ -354,6 +397,7 @@ class MainScreen(ThemeTarget):
         self.header_queue.value   = s.header_queue;    self.header_queue.update()
         self.url_input.label      = s.url_label;       self.url_input.update()
         self.url_input.hint_text  = s.url_hint
+        self.downloader_dropdown.label = s.downloader_label; self.downloader_dropdown.update()
         self.audio_only_switch.label      = s.switch_audio_only; self.audio_only_switch.update()
         self.update_cookies_ui();                                self.cookies_enabled_switch.update()
         self._btn_text.value      = s.btn_download;    self._btn_text.update()
@@ -369,7 +413,7 @@ class MainScreen(ThemeTarget):
         val = safe_str(self.url_input.value).strip()
         if not val:
             self.url_input.border_color = None
-        elif _DefaultProvider.is_valid_url(val):
+        elif self._selected_provider_cls().is_valid_url(val):
             self.url_input.border_color = ft.Colors.GREEN_400
         else:
             self.url_input.border_color = ft.Colors.RED_400
@@ -378,13 +422,14 @@ class MainScreen(ThemeTarget):
     # ── Нажатие «Скачать» ────────────────────────────────────────────────────
 
     def _on_download_click(self, _) -> None:
-        s   = self._s()
-        url = safe_str(self.url_input.value).strip()
+        s    = self._s()
+        url  = safe_str(self.url_input.value).strip()
+        tool = self._selected_tool()
 
         if not url:
             self._show_status(s.err_url_empty, ft.Colors.RED)
             return
-        if not _DefaultProvider.is_valid_url(url):
+        if not _PROVIDER_CLASSES[tool].is_valid_url(url):
             self._show_status(s.err_url_invalid, ft.Colors.RED)
             self.url_input.border_color = ft.Colors.RED_400
             self._safe_update()
@@ -396,7 +441,7 @@ class MainScreen(ThemeTarget):
         self.sync_to_state()
         snapshot = DownloadSnapshot.from_state(self._state, url)
 
-        task_id = self._dm.add(snapshot)
+        task_id = self._dm.add(snapshot, provider_key=tool)
         if task_id is None:
             self._show_status(s.status_ytdlp_missing, ft.Colors.ORANGE)
             return
@@ -406,13 +451,15 @@ class MainScreen(ThemeTarget):
         self.url_input.border_color = None
         self._update_download_btn()
         self._safe_update()
-        self._page.run_task(self._fetch_and_show_thumbnail, task_id, url)
+        # Превью/метаданные умеет получать только yt-dlp (по странице медиа).
+        if tool == "yt-dlp":
+            self._page.run_task(self._fetch_and_show_thumbnail, task_id, url)
 
     # ── Карточки ──────────────────────────────────────────────────────────────
 
     def _add_card(self, task_id: str, url: str) -> None:
         card = DownloadCard(
-            task_id=task_id, url=url,
+            task_id=task_id, title=download_display_name(url),
             on_cancel=lambda _: self._dm.cancel(task_id),
             s=self._s(), t=self._state.theme,
         )

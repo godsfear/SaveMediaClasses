@@ -14,7 +14,7 @@ from typing import Optional
 import flet as ft
 
 from app_logging import get_logger
-from config import hex_to_flet
+from config import hex_to_flet, download_display_name
 from controllers.theme_target import ThemeTarget
 from events import DownloadCompletedEvent, DownloadCancelledEvent, AppClosingEvent
 from i18l import Locale, Strings
@@ -228,10 +228,14 @@ class HistoryScreen(ThemeTarget):
         started  = _fmt_ts(rec.started_at)
         duration = _fmt_duration(rec.started_at, rec.finished_at)
 
-        # Метаданные из yt-dlp
+        # Метаданные из yt-dlp; для magnet имя берём из dn-параметра ссылки.
         meta = rec.meta or {}
-        rec_title     = meta.get("title") or meta.get("fulltitle") or ""
+        rec_title     = (meta.get("title") or meta.get("fulltitle")
+                         or download_display_name(rec.url))
         rec_extractor = meta.get("extractor_key") or meta.get("extractor") or ""
+        # Если имя совпало с самим URL (нет ни метаданных, ни dn) — заголовка нет.
+        if rec_title == rec.url:
+            rec_title = ""
 
         url_short = rec.url if len(rec.url) <= 58 else rec.url[:55] + "…"
 

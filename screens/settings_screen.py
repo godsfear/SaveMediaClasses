@@ -101,6 +101,8 @@ class SettingsScreen(ThemeTarget):
         self.yt_download_input.value     = s.ytdlp.download_url
         self.ffmpeg_version_input.value  = s.ffmpeg.version_url
         self.ffmpeg_download_input.value = s.ffmpeg.download_url
+        self.aria2_version_input.value   = s.aria2c.version_url
+        self.aria2_download_input.value  = s.aria2c.download_url
         self.language_dropdown.value           = s.language
 
     def sync_to_state(self) -> None:
@@ -117,6 +119,8 @@ class SettingsScreen(ThemeTarget):
         s.ytdlp.download_url  = safe_str(self.yt_download_input.value)
         s.ffmpeg.version_url  = safe_str(self.ffmpeg_version_input.value)
         s.ffmpeg.download_url = safe_str(self.ffmpeg_download_input.value)
+        s.aria2c.version_url  = safe_str(self.aria2_version_input.value)
+        s.aria2c.download_url = safe_str(self.aria2_download_input.value)
         s.language              = Locale.resolve_language(
             safe_str(self.language_dropdown.value) or Locale.default_language()
         )
@@ -193,6 +197,8 @@ class SettingsScreen(ThemeTarget):
         self.yt_download_input     = self.register_accents(ft.TextField(label=s.url_yt_download,     border_radius=8, focused_border_color=ft.Colors.BLUE))
         self.ffmpeg_version_input  = self.register_accents(ft.TextField(label=s.url_ffmpeg_version,  border_radius=8, focused_border_color=ft.Colors.BLUE))
         self.ffmpeg_download_input = self.register_accents(ft.TextField(label=s.url_ffmpeg_download, border_radius=8, focused_border_color=ft.Colors.BLUE))
+        self.aria2_version_input   = self.register_accents(ft.TextField(label=s.url_aria2_version,   border_radius=8, focused_border_color=ft.Colors.BLUE))
+        self.aria2_download_input  = self.register_accents(ft.TextField(label=s.url_aria2_download,  border_radius=8, focused_border_color=ft.Colors.BLUE))
 
         self.update_btn_icon = self.register_button_texts(ft.Icon(ft.Icons.REFRESH_ROUNDED, color=ft.Colors.WHITE))
         self.update_btn_text = self.register_button_texts(ft.Text(s.btn_check, color=ft.Colors.WHITE, weight=ft.FontWeight.BOLD))
@@ -457,6 +463,8 @@ class SettingsScreen(ThemeTarget):
         self.yt_download_input.label     = s.url_yt_download;     self.yt_download_input.update()
         self.ffmpeg_version_input.label  = s.url_ffmpeg_version;  self.ffmpeg_version_input.update()
         self.ffmpeg_download_input.label = s.url_ffmpeg_download;  self.ffmpeg_download_input.update()
+        self.aria2_version_input.label   = s.url_aria2_version;   self.aria2_version_input.update()
+        self.aria2_download_input.label  = s.url_aria2_download;  self.aria2_download_input.update()
 
         # Заголовки секций
         self.header_net.value           = s.section_network;     self.header_net.update()
@@ -668,6 +676,7 @@ class SettingsScreen(ThemeTarget):
                     controls=[ft.Container(
                         content=ft.Column([
                             self.ffmpeg_version_input, self.ffmpeg_download_input,
+                            self.aria2_version_input, self.aria2_download_input,
                         ], spacing=10, horizontal_alignment=ft.CrossAxisAlignment.STRETCH),
                         padding=ft.Padding.only(left=8, right=8, bottom=8),
                     )],
