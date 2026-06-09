@@ -268,12 +268,12 @@ class NavigationController:
         muted_c   = hex_to_flet(t.text_muted_color)
         secondary = hex_to_flet(t.text_secondary_color)
         features = [
-            "Тысячи сайтов — YouTube, VK, Rutube, Telegram и др.",
-            "Видео, аудио, плейлисты, субтитры",
-            "Автообновление yt-dlp и ffmpeg",
-            "Прокси, cookies, кастомные аргументы",
-            "История загрузок · Thumbnail-превью",
-            "Локализация: RU / EN",
+            "Thousands of sites — YouTube, VK, Rutube, Telegram and more",
+            "Video, audio, playlists, subtitles",
+            "Auto-update for yt-dlp and ffmpeg",
+            "Proxy, cookies, custom arguments",
+            "Download history · Thumbnail previews",
+            "Localization: RU / EN",
         ]
         dlg = ft.AlertDialog(
             modal=False,
@@ -294,7 +294,7 @@ class NavigationController:
             content=ft.Column(
                 [
                     ft.Text(
-                        "Графический интерфейс для yt-dlp + ffmpeg",
+                        "Graphical interface for yt-dlp + ffmpeg",
                         size=13, color=secondary,
                     ),
                     ft.Divider(height=10),
