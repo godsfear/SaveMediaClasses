@@ -134,6 +134,7 @@
     "tool_status_missing": "Отсутствует",
     "tool_status_error": "[Ошибка]",
     "tool_status_call_error": "[Ошибка вызова]",
+    "tool_status_needs_python": "[Нужен Python 3 — установите python3]",
     "download_completed": "Загрузка завершена!",
     "download_error_os": "Ошибка ОС: {detail}",
     "download_error_code": "Ошибка (код {code})",

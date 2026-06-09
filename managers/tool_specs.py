@@ -34,10 +34,11 @@ if TYPE_CHECKING:
 
 # ── Sentinel-константы статусов версий (языконезависимы, не для отображения) ──
 # Перевод в текст UI происходит в settings_screen._resolve_version().
-TOOL_VERSION_MISSING    = ""          # бинарник не найден (falsy)
-TOOL_VERSION_CALL_ERROR = "\x00CALL"  # ошибка вызова --version
-TOOL_VERSION_REMOTE_ERR = "\x00NET"   # сетевая ошибка при запросе удалённой версии
-TOOL_VERSION_UNKNOWN    = "\x00UNK"   # ответ API не содержит поля с версией
+TOOL_VERSION_MISSING       = ""          # бинарник не найден (falsy)
+TOOL_VERSION_CALL_ERROR    = "\x00CALL"  # ошибка вызова --version
+TOOL_VERSION_REMOTE_ERR    = "\x00NET"   # сетевая ошибка при запросе удалённой версии
+TOOL_VERSION_UNKNOWN       = "\x00UNK"   # ответ API не содержит поля с версией
+TOOL_VERSION_NEEDS_RUNTIME = "\x00RT"    # бинарник есть, но не хватает рантайма (Python для generic yt-dlp)
 
 _REMOTE_BAD = (TOOL_VERSION_REMOTE_ERR, TOOL_VERSION_UNKNOWN)
 
@@ -57,7 +58,7 @@ def classify_version(local: str, remote: str) -> str:
     """Определить статус по локальной и удалённой версии. Единый источник истины."""
     if local == TOOL_VERSION_MISSING:
         return STATUS_MISSING
-    if local == TOOL_VERSION_CALL_ERROR or remote in _REMOTE_BAD:
+    if local in (TOOL_VERSION_CALL_ERROR, TOOL_VERSION_NEEDS_RUNTIME) or remote in _REMOTE_BAD:
         return STATUS_ERROR
     if local == remote or remote in local or local in remote:
         return STATUS_OK
@@ -125,6 +126,14 @@ class ToolSpec(Protocol):
 
     def binaries(self, state: "AppState") -> list[ToolBinary]:
         """Список бинарников инструмента (первый/помеченный is_primary — главный)."""
+        ...
+
+    def missing_runtime(self) -> bool:
+        """
+        True, если для запуска инструмента не хватает внешнего рантайма
+        (например, generic-сборка yt-dlp требует системный Python 3). По умолчанию
+        False — большинство инструментов self-contained.
+        """
         ...
 
     def parse_version(self, binary: ToolBinary, output: str) -> str:
@@ -216,6 +225,12 @@ class BaseTool(abc.ABC):
         """Главный бинарник инструмента (по is_primary; иначе — первый)."""
         bins = self.binaries(state)
         return next((b for b in bins if b.is_primary), bins[0])
+
+    # ── Рантайм-предусловие (по умолчанию инструмент self-contained) ───────────
+
+    def missing_runtime(self) -> bool:
+        """Переопределяется инструментом, которому нужен внешний рантайм (см. ToolSpec)."""
+        return False
 
     # ── Инструмент-специфика — реализуют подклассы ─────────────────────────────
 

@@ -7,7 +7,7 @@ from config import (
 )
 from managers.tools_manager import (
     TOOL_VERSION_MISSING, TOOL_VERSION_CALL_ERROR,
-    TOOL_VERSION_REMOTE_ERR, TOOL_VERSION_UNKNOWN,
+    TOOL_VERSION_REMOTE_ERR, TOOL_VERSION_UNKNOWN, TOOL_VERSION_NEEDS_RUNTIME,
 )
 from managers.tool_registry import DEFAULT_TOOLS
 from controllers.theme_target import ThemeTarget
@@ -32,8 +32,9 @@ def _resolve_version(version: str, s) -> str:
     Sentinel-константы из tools_manager не содержат переведённого текста —
     они языконезависимы. Перевод происходит здесь, на уровне UI.
     """
-    if version == TOOL_VERSION_MISSING:    return s.tool_status_missing
-    if version == TOOL_VERSION_CALL_ERROR: return s.tool_status_call_error
+    if version == TOOL_VERSION_MISSING:       return s.tool_status_missing
+    if version == TOOL_VERSION_CALL_ERROR:    return s.tool_status_call_error
+    if version == TOOL_VERSION_NEEDS_RUNTIME: return s.tool_status_needs_python
     if version in (TOOL_VERSION_REMOTE_ERR, TOOL_VERSION_UNKNOWN):
         return s.tool_status_error
     return version
