@@ -1,24 +1,24 @@
 # SaveMedia
 
-**Удобный графический интерфейс для yt-dlp + ffmpeg**  
-Скачивай видео, плейлисты, Shorts, музыку и любой другой контент с YouTube, VK, Rutube, Telegram и десятков других сайтов — красиво, быстро и без рекламы.
+**A convenient graphical interface for yt-dlp + ffmpeg**  
+Download videos, playlists, Shorts, music and any other content from YouTube, VK, Rutube, Telegram and dozens of other sites — beautifully, quickly and ad-free.
 
 ![SaveMedia](SaveMedia.png)
 
-## ✨ Возможности
+## ✨ Features
 
-- **Современный и приятный интерфейс** на Flet (Python)
-- Поддержка **тысяч сайтов** через yt-dlp
-- Скачивание видео, аудио, плейлистов, субтитров
-- Автоматическое обновление yt-dlp и ffmpeg
-- Темная тема + сохранение настроек и позиции окна
-- История скачиваний
-- Работа в фоне + уведомления
-- Локализация (русский + английский)
-- Прокси, cookies, кастомные аргументы yt-dlp
-- Thumbnail-превью
+- **Modern, pleasant interface** built with Flet (Python)
+- Support for **thousands of sites** via yt-dlp
+- Download video, audio, playlists, subtitles
+- Automatic yt-dlp and ffmpeg updates
+- Dark theme + persistence of settings and window position
+- Download history
+- Background operation + notifications
+- Localization (Russian + English)
+- Proxy, cookies, custom yt-dlp arguments
+- Thumbnail previews
 
-## 📸 Скриншоты
+## 📸 Screenshots
 
 ![Main Screen](images/download.png)
 
@@ -26,46 +26,46 @@
 
 ![History Screen](images/history.png)
 
-## 🚀 Быстрый старт
+## 🚀 Quick start
 
-### Установка
+### Installation
 
-1. Скачай последнюю версию из [Releases](https://github.com/godsfear/SaveMediaClasses/releases)
-2. Распакуй архив
-3. Запусти `SaveMedia.exe` (Windows) или `python main.py` (все платформы)
+1. Download the latest version from [Releases](https://github.com/godsfear/SaveMediaClasses/releases)
+2. Extract the archive
+3. Run `SaveMedia.exe` (Windows) or `python main.py` (all platforms)
 
-### Или из исходников
+### Or from source
 
 ```bash
 git clone https://github.com/godsfear/SaveMediaClasses.git
 cd SaveMediaClasses
 
-# Рекомендуется uv
+# uv is recommended
 uv sync
 uv run python main.py
 ```
 
-## 🛠 Требования
+## 🛠 Requirements
 
 Python 3.11+
-yt-dlp и ffmpeg (устанавливаются автоматически)
+yt-dlp and ffmpeg (installed automatically)
 
-📖 Как использовать
+📖 How to use
 
-Вставь ссылку → выбери формат → нажми «Скачать»
-Можно добавлять сразу несколько ссылок
-В настройках: прокси, папка сохранения, язык, качество по умолчанию и т.д.
+Paste a link → choose a format → click "Download"
+You can add several links at once
+In settings: proxy, save folder, language, default quality, etc.
 
-## 🛣️ Планы на будущее
+## 🛣️ Roadmap
 
-Пресеты настроек (музыка / 4K / аудиокнига и т.д.)
-Загрузка с torrent, metalink, magnet
+Settings presets (music / 4K / audiobook, etc.)
+Downloads via torrent, metalink, magnet
 
-## 🙏 Благодарности
+## 🙏 Acknowledgements
 
-yt-dlp — основа проекта
+yt-dlp — the foundation of the project
 
-Flet — UI-фреймворк
+Flet — the UI framework
 
-## 📄 Лицензия
-MIT License. См. файл LICENSE.
+## 📄 License
+MIT License. See the LICENSE file.
