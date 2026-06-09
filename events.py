@@ -143,6 +143,13 @@ class LanguageChangedEvent:
     pass
 
 @dataclass(frozen=True)
+class CookiesChangedEvent:
+    """Изменён выбор браузера для cookies (в настройках).
+    MainScreen перевыводит состояние своего переключателя из state — без
+    прямого доступа одного экрана к виджетам другого."""
+    pass
+
+@dataclass(frozen=True)
 class AppClosingEvent:
     """Окно закрывается — подписчикам пора освободить ресурсы (dispose)."""
     pass

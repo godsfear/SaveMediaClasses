@@ -20,7 +20,7 @@ from events import (
     ToolProgressEvent, ToolProgressMessageEvent,
     ToolInstallStatusEvent,
     SettingsChangedEvent, ThemeChangedEvent, LanguageChangedEvent,
-    AppClosingEvent,
+    CookiesChangedEvent, AppClosingEvent,
 )
 from i18l import Locale, Strings
 from services import Services
@@ -216,24 +216,11 @@ class SettingsScreen(ThemeTarget):
 
     # ── Куки UI ───────────────────────────────────────────────────────────────
 
-    def update_cookies_ui(self, cookies_enabled_switch: ft.Switch) -> None:
-        s = self._s
-        val = self.cookies_browser_dropdown.value
-        if not val or val == "none":
-            cookies_enabled_switch.value    = False
-            cookies_enabled_switch.disabled = True
-            cookies_enabled_switch.label    = s.cookies_switch_off
-        else:
-            browser_name = next(
-                (opt.text for opt in self.cookies_browser_dropdown.options if opt.key == val), val
-            )
-            cookies_enabled_switch.disabled = False
-            cookies_enabled_switch.label    = s.cookies_switch_on.format(browser=browser_name)
-
     def _on_browser_dropdown_change(self, _):
         self.sync_to_state()
         self._bus.emit(SettingsChangedEvent())
-        self._page.update()
+        self._bus.emit(CookiesChangedEvent())
+        self._safe_update()
 
     def _on_language_change(self, _) -> None:
         self.sync_to_state()

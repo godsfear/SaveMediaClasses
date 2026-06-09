@@ -17,6 +17,7 @@ from events import (
     DownloadCancelledEvent,
     ToolsCheckedEvent,
     StatusMessageEvent,
+    CookiesChangedEvent,
     AppClosingEvent,
 )
 from i18l import Locale, Strings
@@ -147,6 +148,7 @@ class MainScreen(ThemeTarget):
             self._bus.on(DownloadCompletedEvent,      self._on_completed),
             self._bus.on(DownloadCancelledEvent,      self._on_cancelled),
             self._bus.on(ToolsCheckedEvent,           self._on_tools_checked),
+            self._bus.on(CookiesChangedEvent,         self._on_cookies_changed),
             self._bus.on(AppClosingEvent,             lambda e: self.dispose()),
         ]
 
@@ -161,13 +163,13 @@ class MainScreen(ThemeTarget):
         card = self._cards.get(e.task_id)
         if card:
             card.set_progress(e.pct, e.status)
-            self._page.update()
+            self._safe_update()
 
     def _on_postprocessing(self, e: DownloadPostprocessingEvent) -> None:
         card = self._cards.get(e.task_id)
         if card:
             card.set_postprocessing()
-            self._page.update()
+            self._safe_update()
 
     def _on_completed(self, e: DownloadCompletedEvent) -> None:
         card = self._cards.get(e.task_id)
@@ -197,6 +199,40 @@ class MainScreen(ThemeTarget):
         else:
             self._show_status(s.status_tools_ok, ft.Colors.GREEN_400)
 
+    def _on_cookies_changed(self, _e: CookiesChangedEvent) -> None:
+        self.update_cookies_ui()
+        self._safe_update()
+
+    # ── Cookies-переключатель: состояние выводится из state ────────────────────
+
+    # Ключ браузера → i18n-ключ его отображаемого имени (тот же набор, что в
+    # выпадающем списке настроек). Экран сам резолвит имя, не обращаясь к Settings.
+    _COOKIE_LABEL_KEYS = {
+        "none":    "cookies_none",
+        "chrome":  "cookies_chrome",
+        "yandex":  "cookies_yandex",
+        "firefox": "cookies_firefox",
+        "edge":    "cookies_edge",
+        "opera":   "cookies_opera",
+    }
+
+    def update_cookies_ui(self) -> None:
+        """Привести переключатель cookies в соответствие с выбранным браузером.
+
+        Источник истины — state (p.cookies.browser), а не виджет другого экрана.
+        Вызывается при инициализации, по CookiesChangedEvent и при смене языка."""
+        s       = self._s()
+        browser = self._state.ytdlp.parameters.cookies.browser
+        if not browser or browser == "none":
+            self.cookies_enabled_switch.value    = False
+            self.cookies_enabled_switch.disabled = True
+            self.cookies_enabled_switch.label    = s.cookies_switch_off
+        else:
+            name_key     = self._COOKIE_LABEL_KEYS.get(browser)
+            browser_name = getattr(s, name_key, browser) if name_key else browser
+            self.cookies_enabled_switch.disabled = False
+            self.cookies_enabled_switch.label    = s.cookies_switch_on.format(browser=browser_name)
+
     async def _remove_card_after_delay(self, task_id: str) -> None:
         await asyncio.sleep(3)
         self._remove_card(task_id)
@@ -216,7 +252,6 @@ class MainScreen(ThemeTarget):
             on_click=lambda _: [
                 setattr(self.url_input, "value", ""),
                 self._on_url_change(None),
-                self._page.update()
             ]
         ))
         self.url_input = self.register_accents(ft.TextField(
@@ -320,7 +355,7 @@ class MainScreen(ThemeTarget):
         self.url_input.label      = s.url_label;       self.url_input.update()
         self.url_input.hint_text  = s.url_hint
         self.audio_only_switch.label      = s.switch_audio_only; self.audio_only_switch.update()
-        self.cookies_enabled_switch.label = s.switch_cookies;    self.cookies_enabled_switch.update()
+        self.update_cookies_ui();                                self.cookies_enabled_switch.update()
         self._btn_text.value      = s.btn_download;    self._btn_text.update()
         self.download_btn.tooltip = s.btn_download_tooltip
         if self.folder_label.value == self.folder_label.value:  # всегда обновляем если нет пути

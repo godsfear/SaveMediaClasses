@@ -115,16 +115,7 @@ class SaveMediaApp:
         window_ctrl.apply_geometry()
         page.update()
 
-        page.appbar = ft.AppBar(
-            title=ft.Text("SaveMedia [yt-dlp GUI]", size=18, weight=ft.FontWeight.W_600),
-            bgcolor=hex_to_flet(svc.state.theme.appbar_color),
-            leading=nav_ctrl._logo(),
-            leading_width=44,
-            actions=[
-                nav_ctrl.theme_btn, nav_ctrl.settings_btn, nav_ctrl.history_btn,
-                nav_ctrl.proxy_btn, nav_ctrl.folder_btn, nav_ctrl.exit_btn,
-            ],
-        )
+        page.appbar = nav_ctrl.build_initial_appbar()
         page.bottom_appbar = ft.BottomAppBar(
             content=nav_ctrl.main_status_container,
             bgcolor=hex_to_flet(svc.state.theme.bottom_bar_color),
@@ -134,7 +125,7 @@ class SaveMediaApp:
 
         # ── Финальная инициализация ───────────────────────────────────────────
         nav_ctrl.update_proxy_ui()
-        nav_ctrl.update_cookies_ui()
+        main_screen.update_cookies_ui()
         nav_ctrl.apply_appbar_theme()
         theme_ctrl.apply()
         page.add(main_screen.layout, settings_screen.layout, history_screen.layout)
