@@ -46,14 +46,21 @@ class ThemeController:
     # ── Публичный API ─────────────────────────────────────────────────────────
 
     def apply(self) -> None:
-        """Применить текущую тему из state ко всем экранам и AppBar."""
+        """Применить текущую тему из state ко всем экранам, странице и барам."""
         t = self._svc.state.theme
+        self._page.theme_mode = (
+            ft.ThemeMode.LIGHT if self._svc.state.theme_mode == "light"
+            else ft.ThemeMode.DARK
+        )
+        self._page.bgcolor = hex_to_flet(t.bg_color)
         for screen in self._screens:
             screen.apply_theme(t)
-        self._update_appbar(t)
+        self._update_bars(t)
 
     # ── Приватное ─────────────────────────────────────────────────────────────
 
-    def _update_appbar(self, t: "ThemeConfig") -> None:
+    def _update_bars(self, t: "ThemeConfig") -> None:
         if self._page.appbar:
             self._page.appbar.bgcolor = hex_to_flet(t.appbar_color)
+        if self._page.bottom_appbar:
+            self._page.bottom_appbar.bgcolor = hex_to_flet(t.bottom_bar_color)

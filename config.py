@@ -1,5 +1,5 @@
 import os
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, field, fields, replace
 from typing import Any, Dict
 
 # ── Константы приложения ──────────────────────────────────────────────────────
@@ -30,39 +30,86 @@ DEFAULT_FFMPEG_DOWNLOAD_URL = "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release
 
 @dataclass
 class ThemeConfig:
-    accent_color:   str = "00B4D8"
-    switch_color:   str = "4CAF50"
-    header_color:   str = "00B4D8"
-    text_color:     str = "E0E0E0"
-    progress_color: str = "4CAF50"
-    button_color:   str = "4CAF50"
-    appbar_color:   str = "1c1c1c"
-    card_color:     str = "161616"
+    """Семантические токены оформления. Дефолты поля = тёмная палитра, поэтому
+    ThemeConfig() == dark_default() (важно для фолбэков from_dict).
+
+    Светлая палитра — отдельная фабрика light_default(). Режим (dark/light) живёт
+    в AppState.theme_mode и выбирает активную из двух палитр; цвета каждой палитры
+    редактируются независимо.
+    """
+    # ── Управляющие элементы ──────────────────────────────────────────────────
+    accent_color:      str = "00B4D8"
+    switch_color:      str = "4CAF50"
+    header_color:      str = "00B4D8"
+    progress_color:    str = "4CAF50"
+    button_color:      str = "4CAF50"
+    button_text_color: str = "FFFFFF"
+
+    # ── Текст ─────────────────────────────────────────────────────────────────
+    text_color:           str = "E0E0E0"
+    text_secondary_color: str = "BDBDBD"
+    text_muted_color:     str = "9E9E9E"
+
+    # ── Фоны и поверхности ────────────────────────────────────────────────────
+    bg_color:         str = "121212"
+    appbar_color:     str = "1c1c1c"
+    bottom_bar_color: str = "141414"
+    card_color:       str = "161616"
+    surface_color:    str = "1A1A1A"
+    border_color:     str = "2A2A2A"
+
+    # ── Статусы загрузок ──────────────────────────────────────────────────────
+    status_ok_color:      str = "66BB6A"
+    status_error_color:   str = "EF5350"
+    status_warning_color: str = "FFA726"
+    status_running_color: str = "42A5F5"
 
     def to_dict(self) -> Dict[str, str]:
-        return {
-            "accent_color":   self.accent_color,
-            "switch_color":   self.switch_color,
-            "header_color":   self.header_color,
-            "text_color":     self.text_color,
-            "progress_color": self.progress_color,
-            "button_color":   self.button_color,
-            "appbar_color":   self.appbar_color,
-            "card_color":     self.card_color,
-        }
+        return {f.name: getattr(self, f.name) for f in fields(self)}
 
     @staticmethod
     def from_dict(d: Dict[str, str]) -> "ThemeConfig":
+        """Мягкая миграция: отсутствующие/пустые ключи берутся из тёмных дефолтов."""
         defaults = ThemeConfig()
-        return ThemeConfig(
-            accent_color   = safe_str(d.get("accent_color"))   or defaults.accent_color,
-            switch_color   = safe_str(d.get("switch_color"))   or defaults.switch_color,
-            header_color   = safe_str(d.get("header_color"))   or defaults.header_color,
-            text_color     = safe_str(d.get("text_color"))     or defaults.text_color,
-            progress_color = safe_str(d.get("progress_color")) or defaults.progress_color,
-            button_color   = safe_str(d.get("button_color"))   or defaults.button_color,
-            appbar_color   = safe_str(d.get("appbar_color"))   or defaults.appbar_color,
-            card_color     = safe_str(d.get("card_color"))     or defaults.card_color,
+        d = d if isinstance(d, dict) else {}
+        return ThemeConfig(**{
+            f.name: (safe_str(d.get(f.name)) or getattr(defaults, f.name))
+            for f in fields(ThemeConfig)
+        })
+
+    @classmethod
+    def dark_default(cls) -> "ThemeConfig":
+        return cls()
+
+    @classmethod
+    def light_default(cls) -> "ThemeConfig":
+        return cls(
+            accent_color="0288D1", switch_color="43A047", header_color="0277BD",
+            progress_color="43A047", button_color="43A047", button_text_color="FFFFFF",
+            text_color="212121", text_secondary_color="616161", text_muted_color="9E9E9E",
+            bg_color="FAFAFA", appbar_color="ECEFF1", bottom_bar_color="ECEFF1",
+            card_color="FFFFFF", surface_color="F5F5F5", border_color="E0E0E0",
+            status_ok_color="2E7D32", status_error_color="C62828",
+            status_warning_color="EF6C00", status_running_color="1565C0",
+        )
+
+
+@dataclass
+class NamedTheme:
+    """Снимок палитры под именем + режим, для которого она задумана."""
+    mode:   str = "dark"
+    config: ThemeConfig = field(default_factory=ThemeConfig)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {"mode": self.mode, "colors": self.config.to_dict()}
+
+    @staticmethod
+    def from_dict(d: Dict[str, Any]) -> "NamedTheme":
+        d = d if isinstance(d, dict) else {}
+        mode = safe_str(d.get("mode")) or "dark"
+        return NamedTheme(
+            mode   = "light" if mode == "light" else "dark",
+            config = ThemeConfig.from_dict(d.get("colors", {})),
         )
 
 
@@ -440,20 +487,35 @@ class YtDlpConfig(ToolConfig):
 # THEME_FIELDS: список (field_key, i18n_key)
 # THEME_GROUPS: список (group_i18n_key, [field_key, ...])
 THEME_FIELDS = [
-    ("accent_color",   "color_accent"),
-    ("header_color",   "color_header"),
-    ("switch_color",   "color_switch"),
-    ("text_color",     "color_text"),
-    ("progress_color", "color_progress"),
-    ("button_color",   "color_button"),
-    ("appbar_color",   "color_appbar"),
-    ("card_color",     "color_card"),
+    ("accent_color",         "color_accent"),
+    ("header_color",         "color_header"),
+    ("switch_color",         "color_switch"),
+    ("progress_color",       "color_progress"),
+    ("button_color",         "color_button"),
+    ("button_text_color",    "color_button_text"),
+    ("text_color",           "color_text"),
+    ("text_secondary_color", "color_text_secondary"),
+    ("text_muted_color",     "color_text_muted"),
+    ("bg_color",             "color_bg"),
+    ("appbar_color",         "color_appbar"),
+    ("bottom_bar_color",     "color_bottom_bar"),
+    ("card_color",           "color_card"),
+    ("surface_color",        "color_surface"),
+    ("border_color",         "color_border"),
+    ("status_ok_color",      "color_status_ok"),
+    ("status_error_color",   "color_status_error"),
+    ("status_warning_color", "color_status_warning"),
+    ("status_running_color", "color_status_running"),
 ]
 
 THEME_GROUPS = [
     ("theme_group_controls", ["accent_color", "header_color", "switch_color",
-                               "text_color", "progress_color", "button_color"]),
-    ("theme_group_surfaces", ["appbar_color", "card_color"]),
+                               "progress_color", "button_color", "button_text_color"]),
+    ("theme_group_text",     ["text_color", "text_secondary_color", "text_muted_color"]),
+    ("theme_group_surfaces", ["bg_color", "appbar_color", "bottom_bar_color",
+                               "card_color", "surface_color", "border_color"]),
+    ("theme_group_status",   ["status_ok_color", "status_error_color",
+                               "status_warning_color", "status_running_color"]),
 ]
 
 PALETTE = [

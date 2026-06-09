@@ -7,7 +7,7 @@ from typing import Dict
 import flet as ft
 
 from app_logging import get_logger
-from config import safe_str, hex_to_flet
+from config import safe_str, hex_to_flet, ThemeConfig
 from controllers.theme_target import ThemeTarget
 from events import (
     EventBus,
@@ -27,19 +27,24 @@ from state import AppState
 
 
 class DownloadCard:
-    """Карточка одной загрузки. Только отрисовка — никакой логики."""
+    """Карточка одной загрузки. Только отрисовка — никакой логики.
 
-    def __init__(self, task_id: str, url: str, on_cancel, s: Strings) -> None:
+    Цвета берутся из активной ThemeConfig; apply_theme() позволяет перекрасить
+    живую карточку при смене темы/режима."""
+
+    def __init__(self, task_id: str, url: str, on_cancel, s: Strings, t: ThemeConfig) -> None:
         self.task_id   = task_id
         self._s        = s
-        self._pct_text = ft.Text("0%", size=11, color=ft.Colors.GREY_400, width=36,
-                                 text_align=ft.TextAlign.RIGHT)
-        self._bar      = ft.ProgressBar(value=0.0, color=ft.Colors.GREEN,
+        self._t        = t
+        self._pct_text = ft.Text("0%", size=11, color=hex_to_flet(t.text_secondary_color),
+                                 width=36, text_align=ft.TextAlign.RIGHT)
+        self._bar      = ft.ProgressBar(value=0.0, color=hex_to_flet(t.progress_color),
                                         bgcolor=ft.Colors.SURFACE_CONTAINER_HIGHEST, expand=True)
-        self._status   = ft.Text(self._short(url), size=11, color=ft.Colors.GREY_300,
+        self._status   = ft.Text(self._short(url), size=11,
+                                 color=hex_to_flet(t.text_secondary_color),
                                  expand=True, no_wrap=True, overflow=ft.TextOverflow.ELLIPSIS)
         self._cancel_btn = ft.IconButton(
-            icon=ft.Icons.CLOSE_ROUNDED, icon_color=ft.Colors.RED_300,
+            icon=ft.Icons.CLOSE_ROUNDED, icon_color=hex_to_flet(t.status_error_color),
             icon_size=16, tooltip=s.btn_clear, on_click=on_cancel
         )
         self.container = ft.Container(
@@ -50,8 +55,8 @@ class DownloadCard:
                 ft.Row([self._bar, self._pct_text],
                        vertical_alignment=ft.CrossAxisAlignment.CENTER, spacing=8),
             ], spacing=4, tight=True),
-            bgcolor="#1a1a1a",
-            border=ft.Border.all(1, "#2a2a2a"),
+            bgcolor=hex_to_flet(t.surface_color),
+            border=ft.Border.all(1, hex_to_flet(t.border_color)),
             border_radius=6,
             padding=ft.Padding(left=10, right=4, top=8, bottom=8),
         )
@@ -60,28 +65,38 @@ class DownloadCard:
     def _short(url: str) -> str:
         return url if len(url) <= 60 else url[:57] + "..."
 
+    def apply_theme(self, t: ThemeConfig) -> None:
+        """Перекрасить статичные элементы карточки под новую тему."""
+        self._t = t
+        self.container.bgcolor = hex_to_flet(t.surface_color)
+        self.container.border  = ft.Border.all(1, hex_to_flet(t.border_color))
+        self._status.color     = hex_to_flet(t.text_secondary_color)
+        self._pct_text.color   = hex_to_flet(t.text_secondary_color)
+        self._cancel_btn.icon_color = hex_to_flet(t.status_error_color)
+
     def set_progress(self, pct: float, status: str) -> None:
         self._bar.value      = pct
-        self._bar.color      = ft.Colors.GREEN
+        self._bar.color      = hex_to_flet(self._t.progress_color)
         self._pct_text.value = f"{int(pct * 100)}%"
         self._status.value   = status
 
     def set_postprocessing(self) -> None:
         self._bar.value      = None
-        self._bar.color      = ft.Colors.BLUE_400
+        self._bar.color      = hex_to_flet(self._t.status_running_color)
         self._pct_text.value = "..."
         self._status.value   = self._s.status_postprocessing
 
     def set_done(self, success: bool, message: str) -> None:
         self._bar.value          = 1.0 if success else 0.0
-        self._bar.color          = ft.Colors.GREEN if success else ft.Colors.RED_400
+        self._bar.color          = hex_to_flet(
+            self._t.status_ok_color if success else self._t.status_error_color)
         self._pct_text.value     = "100%" if success else "✗"
         self._status.value       = message
         self._cancel_btn.visible = False
 
     def set_cancelled(self) -> None:
         self._bar.value          = 0.0
-        self._bar.color          = ft.Colors.ORANGE
+        self._bar.color          = hex_to_flet(self._t.status_warning_color)
         self._pct_text.value     = "—"
         self._status.value       = self._s.status_cancelled
         self._cancel_btn.visible = False
@@ -281,7 +296,7 @@ class MainScreen(ThemeTarget):
         self.cookies_enabled_switch.value = p.cookies.state
         if s.download_path:
             self.folder_label.value = s.download_path
-            self.folder_label.color = ft.Colors.GREEN_400
+            self.folder_label.color = hex_to_flet(s.theme.status_ok_color)
 
     def sync_to_state(self) -> None:
         p = self._state.ytdlp.parameters
@@ -291,12 +306,15 @@ class MainScreen(ThemeTarget):
     # ── Тема ─────────────────────────────────────────────────────────────────
 
     def apply_theme(self, t) -> None:
-        """Применить ThemeConfig к виджетам экрана."""
+        """Применить ThemeConfig к виджетам экрана и живым карточкам загрузок."""
         super().apply_theme(t)
-        # folder_label получает text_color только если путь не выбран
-        # (при выбранном пути цвет GREEN_400 проставляется в sync_from_state)
-        if not self._state.download_path:
-            self.folder_label.color = hex_to_flet(t.text_color)
+        # folder_label: text_color если путь не выбран, иначе «успех» (статус ok)
+        self.folder_label.color = (
+            hex_to_flet(t.status_ok_color) if self._state.download_path
+            else hex_to_flet(t.text_color)
+        )
+        for card in self._cards.values():
+            card.apply_theme(t)
 
     # ── Смена языка ───────────────────────────────────────────────────────────
 
@@ -392,7 +410,7 @@ class MainScreen(ThemeTarget):
         card = DownloadCard(
             task_id=task_id, url=url,
             on_cancel=lambda _: self._dm.cancel(task_id),
-            s=self._s(),
+            s=self._s(), t=self._state.theme,
         )
         self._cards[task_id] = card
         self._cards_column.controls.append(card.container)

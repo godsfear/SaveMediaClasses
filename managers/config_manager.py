@@ -4,7 +4,7 @@ from typing import Any, Dict
 
 from app_logging import get_logger
 from config import (
-    ThemeConfig, WindowConfig, ToolConfig, VersionState,
+    ThemeConfig, NamedTheme, WindowConfig, ToolConfig, VersionState,
     safe_str, safe_int, get_fallback_bool,
 )
 from i18l import Locale
@@ -51,6 +51,7 @@ class ConfigManager:
                 tools[tool_name] = tool_default
 
         tool_versions = self._load_tool_versions(raw, tools_raw)
+        theme_mode, theme_dark, theme_light, saved_themes = self._load_themes(raw)
 
         return AppState(
             download_path     = dp,
@@ -60,10 +61,50 @@ class ConfigManager:
             last_needs_update = bool(cfg.get("last_needs_update",  defaults.last_needs_update)),
             tools         = tools,
             tool_versions = tool_versions,
-            theme    = ThemeConfig.from_dict(raw.get("theme", {})),
+            theme_mode   = theme_mode,
+            theme_dark   = theme_dark,
+            theme_light  = theme_light,
+            saved_themes = saved_themes,
             window   = WindowConfig.from_dict(raw.get("window", {})),
             language = Locale.resolve_language(raw.get("language") or defaults.language),
         )
+
+    @staticmethod
+    def _load_themes(raw: Dict[str, Any]):
+        """Загрузить режим + две палитры + именованные наборы из блока "theme".
+
+        Поддерживаются три формата (мягкая миграция):
+          • новый      — "theme": {mode, dark, light, saved};
+          • переходный — ключи theme_mode/theme_dark/theme_light/saved_themes в корне;
+          • старейший  — "theme" = одна палитра (становится тёмной)."""
+        block = raw.get("theme")
+        block = block if isinstance(block, dict) else {}
+        is_container = any(k in block for k in ("mode", "dark", "light", "saved"))
+
+        if is_container:
+            src_mode, src_dark = block.get("mode"), block.get("dark")
+            src_light, src_saved = block.get("light"), block.get("saved")
+            legacy_single: Dict[str, Any] = {}
+        else:
+            src_mode, src_dark = raw.get("theme_mode"), raw.get("theme_dark")
+            src_light, src_saved = raw.get("theme_light"), raw.get("saved_themes")
+            legacy_single = block   # старый одиночный "theme" → тёмная палитра
+
+        mode = safe_str(src_mode) or "dark"
+        mode = "light" if mode == "light" else "dark"
+
+        dark_raw = src_dark if isinstance(src_dark, dict) else legacy_single
+        theme_dark = ThemeConfig.from_dict(dark_raw)
+
+        theme_light = (ThemeConfig.from_dict(src_light)
+                       if isinstance(src_light, dict) else ThemeConfig.light_default())
+
+        saved: Dict[str, NamedTheme] = {}
+        if isinstance(src_saved, dict):
+            for name, entry in src_saved.items():
+                if isinstance(entry, dict):
+                    saved[name] = NamedTheme.from_dict(entry)
+        return mode, theme_dark, theme_light, saved
 
     @staticmethod
     def _load_tool_versions(raw: Dict[str, Any], tools_raw: Any) -> Dict[str, VersionState]:
@@ -117,8 +158,13 @@ class ConfigManager:
             },
             "tools":         {k: v.to_dict() for k, v in state.tools.items()},
             "tool_versions": {k: v.to_dict() for k, v in state.tool_versions.items()},
-            "window":   state.window.to_dict(),
-            "theme":    state.theme.to_dict(),
+            "window": state.window.to_dict(),
+            "theme": {
+                "mode":  state.theme_mode,
+                "dark":  state.theme_dark.to_dict(),
+                "light": state.theme_light.to_dict(),
+                "saved": {k: v.to_dict() for k, v in state.saved_themes.items()},
+            },
             "language": state.language,
         }
         try:

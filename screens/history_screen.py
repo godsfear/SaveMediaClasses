@@ -20,11 +20,11 @@ from i18l import Locale, Strings
 from managers.download_repository import DownloadRecord, DownloadRepository
 from services import Services
 
-_STATUS_COLOR = {
-    "completed": ft.Colors.GREEN_400,
-    "failed":    ft.Colors.RED_400,
-    "cancelled": ft.Colors.ORANGE_400,
-    "running":   ft.Colors.BLUE_400,
+_STATUS_TOKEN = {
+    "completed": "status_ok_color",
+    "failed":    "status_error_color",
+    "cancelled": "status_warning_color",
+    "running":   "status_running_color",
 }
 _STATUS_ICON = {
     "completed": ft.Icons.CHECK_CIRCLE_OUTLINE_ROUNDED,
@@ -32,6 +32,11 @@ _STATUS_ICON = {
     "cancelled": ft.Icons.CANCEL_OUTLINED,
     "running":   ft.Icons.DOWNLOADING_ROUNDED,
 }
+
+
+def _status_color(status: str, t) -> str:
+    """Цвет статуса из активной темы (фолбэк — приглушённый текст)."""
+    return hex_to_flet(getattr(t, _STATUS_TOKEN.get(status, "text_muted_color")))
 
 
 class HistoryScreen(ThemeTarget):
@@ -68,6 +73,10 @@ class HistoryScreen(ThemeTarget):
 
     def _rebuild_filter_buttons(self) -> None:
         s = self._s()
+        t = self._state.theme
+        active_bg   = hex_to_flet(t.accent_color)
+        active_fg   = hex_to_flet(t.button_text_color)
+        inactive_fg = hex_to_flet(t.text_secondary_color)
         filters = [
             (s.filter_all,       None),
             (s.filter_completed, "completed"),
@@ -78,12 +87,11 @@ class HistoryScreen(ThemeTarget):
             ft.TextButton(
                 content=ft.Text(
                     label,
-                    color=ft.Colors.WHITE if self._current_filter == status
-                          else ft.Colors.GREY_400,
+                    color=active_fg if self._current_filter == status else inactive_fg,
                     size=13,
                 ),
                 style=ft.ButtonStyle(
-                    bgcolor=ft.Colors.BLUE_700 if self._current_filter == status
+                    bgcolor=active_bg if self._current_filter == status
                             else ft.Colors.TRANSPARENT,
                     shape=ft.RoundedRectangleBorder(radius=6),
                     padding=ft.Padding.symmetric(horizontal=10, vertical=4),
@@ -112,7 +120,7 @@ class HistoryScreen(ThemeTarget):
                 self._filter_row,
                 self._stats_text,
             ], spacing=10, horizontal_alignment=ft.CrossAxisAlignment.STRETCH),
-            bgcolor="#161616", border_radius=8, padding=15,
+            border_radius=8, padding=15,
         )
         self._card_list = ft.Container(
             content=ft.Column(
@@ -121,7 +129,7 @@ class HistoryScreen(ThemeTarget):
                 scroll=ft.ScrollMode.AUTO,
                 horizontal_alignment=ft.CrossAxisAlignment.STRETCH,
             ),
-            bgcolor="#161616", border_radius=8, padding=15, expand=True,
+            border_radius=8, padding=15, expand=True,
         )
         self.layout = ft.Column(
             [self._card_header, self._card_list],
@@ -132,10 +140,18 @@ class HistoryScreen(ThemeTarget):
         # ── Регистрация виджетов для ThemeTarget ──────────────────────────────
         self.register_headers(self.header)
         self.register_cards(self._card_header, self._card_list)
+        self.register_muted_text(self._stats_text, self._empty)
 
     def apply_theme(self, t) -> None:
-        """Применить ThemeConfig к виджетам экрана."""
+        """Применить ThemeConfig к виджетам экрана.
+
+        Карточки записей и фильтры рендерятся динамически, поэтому фильтры
+        перестраиваются здесь, а список — через refresh(), если экран виден
+        (иначе он перерисуется при следующем show_history)."""
         super().apply_theme(t)
+        self._rebuild_filter_buttons()
+        if getattr(self, "layout", None) is not None and self.layout.visible:
+            self.refresh()
 
     # ── Публичный API ─────────────────────────────────────────────────────────
 
@@ -175,7 +191,13 @@ class HistoryScreen(ThemeTarget):
 
     def _make_card(self, rec: DownloadRecord) -> ft.Container:
         s     = self._s()
-        color = _STATUS_COLOR.get(rec.status, ft.Colors.GREY_400)
+        t     = self._state.theme
+        text_c      = hex_to_flet(t.text_color)
+        secondary_c = hex_to_flet(t.text_secondary_color)
+        muted_c     = hex_to_flet(t.text_muted_color)
+        surface_c   = hex_to_flet(t.surface_color)
+        border_c    = hex_to_flet(t.border_color)
+        color = _status_color(rec.status, t)
         icon  = _STATUS_ICON.get(rec.status,  ft.Icons.HELP_OUTLINE_ROUNDED)
 
         # Статус из локали
@@ -218,9 +240,9 @@ class HistoryScreen(ThemeTarget):
             )
         else:
             thumbnail_widget = ft.Container(
-                width=96, height=54, bgcolor="#252525", border_radius=4,
+                width=96, height=54, bgcolor=surface_c, border_radius=4,
                 content=ft.Icon(ft.Icons.PLAY_CIRCLE_OUTLINE_ROUNDED,
-                                color=ft.Colors.GREY_800, size=24),
+                                color=muted_c, size=24),
                 alignment=ft.Alignment(0, 0),
             )
 
@@ -233,13 +255,13 @@ class HistoryScreen(ThemeTarget):
         # Кнопки
         btn_folder = ft.IconButton(
             icon=ft.Icons.FOLDER_OPEN_OUTLINED,
-            icon_color=ft.Colors.GREY_500, icon_size=16,
+            icon_color=muted_c, icon_size=16,
             tooltip=s.btn_open_folder, disabled=not bool(folder),
             on_click=lambda _, f=folder: _open_folder(f),
         )
         btn_delete = ft.IconButton(
             icon=ft.Icons.DELETE_OUTLINE_ROUNDED,
-            icon_color=ft.Colors.GREY_600, icon_size=16,
+            icon_color=muted_c, icon_size=16,
             tooltip=s.btn_delete_record,
             on_click=lambda _, tid=rec.task_id: self._delete_record(tid),
         )
@@ -248,28 +270,29 @@ class HistoryScreen(ThemeTarget):
 
         info_column = ft.Column([
             ft.Row([
-                ft.Text(title_short or url_short, size=12, color=ft.Colors.WHITE,
+                ft.Text(title_short or url_short, size=12, color=text_c,
                         weight=ft.FontWeight.W_500, expand=True, no_wrap=True,
                         overflow=ft.TextOverflow.ELLIPSIS),
                 btn_folder, btn_delete,
             ], vertical_alignment=ft.CrossAxisAlignment.CENTER, spacing=2),
-            ft.Text(url_short, size=11, color=ft.Colors.GREY_500,
+            ft.Text(url_short, size=11, color=muted_c,
                     no_wrap=True, overflow=ft.TextOverflow.ELLIPSIS,
                     visible=bool(title_short)),
             ft.Row([
                 *([ft.Container(
-                    content=ft.Text(t, size=10, color=ft.Colors.GREY_400),
-                    bgcolor="#252525", border_radius=4,
+                    content=ft.Text(t, size=10, color=secondary_c),
+                    bgcolor=surface_c, border_radius=4,
                     padding=ft.Padding.symmetric(horizontal=6, vertical=2),
                 ) for t in tags] if tags else []),
                 ft.Row([
                     ft.Icon(icon, color=color, size=12),
                     ft.Text(label, size=11, color=color),
-                    ft.Text(f"{started}{duration}", size=11, color=ft.Colors.GREY_600),
+                    ft.Text(f"{started}{duration}", size=11, color=muted_c),
                 ], spacing=4, tight=True),
             ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
                vertical_alignment=ft.CrossAxisAlignment.CENTER, wrap=True),
-            ft.Text(rec.error_message, size=10, color=ft.Colors.RED_300,
+            ft.Text(rec.error_message, size=10,
+                    color=hex_to_flet(t.status_error_color),
                     visible=bool(rec.error_message),
             ) if rec.error_message else ft.Container(height=0),
         ], spacing=3, tight=True, expand=True)
@@ -277,7 +300,7 @@ class HistoryScreen(ThemeTarget):
         return ft.Container(
             content=ft.Row([thumbnail_widget, info_column],
                            spacing=10, vertical_alignment=ft.CrossAxisAlignment.START),
-            bgcolor="#1a1a1a", border=ft.Border.all(1, "#2a2a2a"),
+            bgcolor=surface_c, border=ft.Border.all(1, border_c),
             border_radius=6, padding=ft.Padding(left=10, right=10, top=8, bottom=8),
         )
 

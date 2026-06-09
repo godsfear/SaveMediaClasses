@@ -3,7 +3,7 @@
         "download_path": "d:\\Downloads",
         "proxy_address": "socks5://127.0.0.1:9050",
         "proxy_enabled": false,
-        "last_check_time": 1780997863.9174693,
+        "last_check_time": 1781000763.8053727,
         "last_needs_update": false
     },
     "tools": {
@@ -101,18 +101,79 @@
     "window": {
         "width": 688,
         "height": 991,
-        "left": 2925,
-        "top": 211
+        "left": 2880,
+        "top": 207
     },
     "theme": {
-        "accent_color": "00B4D8",
-        "switch_color": "00BCD4",
-        "header_color": "00B4D8",
-        "text_color": "E0E0E0",
-        "progress_color": "4CAF50",
-        "button_color": "4CAF50",
-        "appbar_color": "1c1c1c",
-        "card_color": "161616"
+        "mode": "dark",
+        "dark": {
+            "accent_color": "00B4D8",
+            "switch_color": "00BCD4",
+            "header_color": "00BCD4",
+            "progress_color": "4CAF50",
+            "button_color": "4CAF50",
+            "button_text_color": "FFFFFF",
+            "text_color": "E0E0E0",
+            "text_secondary_color": "BDBDBD",
+            "text_muted_color": "9E9E9E",
+            "bg_color": "121212",
+            "appbar_color": "1c1c1c",
+            "bottom_bar_color": "141414",
+            "card_color": "161616",
+            "surface_color": "1A1A1A",
+            "border_color": "2A2A2A",
+            "status_ok_color": "66BB6A",
+            "status_error_color": "EF5350",
+            "status_warning_color": "FFA726",
+            "status_running_color": "42A5F5"
+        },
+        "light": {
+            "accent_color": "0288D1",
+            "switch_color": "43A047",
+            "header_color": "0277BD",
+            "progress_color": "43A047",
+            "button_color": "43A047",
+            "button_text_color": "FFFFFF",
+            "text_color": "212121",
+            "text_secondary_color": "616161",
+            "text_muted_color": "9E9E9E",
+            "bg_color": "FAFAFA",
+            "appbar_color": "ECEFF1",
+            "bottom_bar_color": "ECEFF1",
+            "card_color": "FFFFFF",
+            "surface_color": "F5F5F5",
+            "border_color": "E0E0E0",
+            "status_ok_color": "2E7D32",
+            "status_error_color": "C62828",
+            "status_warning_color": "EF6C00",
+            "status_running_color": "1565C0"
+        },
+        "saved": {
+            "Default": {
+                "mode": "dark",
+                "colors": {
+                    "accent_color": "00B4D8",
+                    "switch_color": "00BCD4",
+                    "header_color": "00BCD4",
+                    "progress_color": "4CAF50",
+                    "button_color": "4CAF50",
+                    "button_text_color": "FFFFFF",
+                    "text_color": "E0E0E0",
+                    "text_secondary_color": "BDBDBD",
+                    "text_muted_color": "9E9E9E",
+                    "bg_color": "121212",
+                    "appbar_color": "1c1c1c",
+                    "bottom_bar_color": "141414",
+                    "card_color": "161616",
+                    "surface_color": "1A1A1A",
+                    "border_color": "2A2A2A",
+                    "status_ok_color": "66BB6A",
+                    "status_error_color": "EF5350",
+                    "status_warning_color": "FFA726",
+                    "status_running_color": "42A5F5"
+                }
+            }
+        }
     },
     "language": "en"
 }

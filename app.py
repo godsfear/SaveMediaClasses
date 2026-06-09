@@ -3,7 +3,7 @@ import time
 import flet as ft
 
 from app_logging import get_logger
-from config import CHECK_INTERVAL_SECONDS
+from config import CHECK_INTERVAL_SECONDS, hex_to_flet
 from controllers import NavigationController, ThemeController, ToolsController, WindowController
 from events import (
     ToolsCheckedEvent, ToolsRestoredEvent,
@@ -28,7 +28,7 @@ class SaveMediaApp:
         log = get_logger("app")
 
         # ── Тема страницы ─────────────────────────────────────────────────────
-        page.theme_mode = ft.ThemeMode.DARK
+        # theme_mode выставляется в theme_ctrl.apply() из state до reveal окна.
         page.theme      = ft.Theme(color_scheme_seed=ft.Colors.BLUE)
         page.title      = "SaveMedia"
         page.padding    = 15
@@ -93,6 +93,7 @@ class SaveMediaApp:
 
         def _on_theme_changed(_e: ThemeChangedEvent) -> None:
             theme_ctrl.apply()
+            nav_ctrl.apply_appbar_theme()
             safe_update()
 
         def _on_tools_checked(e: ToolsCheckedEvent) -> None:
@@ -116,16 +117,17 @@ class SaveMediaApp:
 
         page.appbar = ft.AppBar(
             title=ft.Text("SaveMedia [yt-dlp GUI]", size=18, weight=ft.FontWeight.W_600),
-            bgcolor="#1c1c1c",
+            bgcolor=hex_to_flet(svc.state.theme.appbar_color),
             leading=nav_ctrl._logo(),
             leading_width=44,
             actions=[
-                nav_ctrl.settings_btn, nav_ctrl.history_btn,
+                nav_ctrl.theme_btn, nav_ctrl.settings_btn, nav_ctrl.history_btn,
                 nav_ctrl.proxy_btn, nav_ctrl.folder_btn, nav_ctrl.exit_btn,
             ],
         )
         page.bottom_appbar = ft.BottomAppBar(
-            content=nav_ctrl.main_status_container, bgcolor="#141414"
+            content=nav_ctrl.main_status_container,
+            bgcolor=hex_to_flet(svc.state.theme.bottom_bar_color),
         )
 
         window_ctrl.register_close_handler()
@@ -133,6 +135,7 @@ class SaveMediaApp:
         # ── Финальная инициализация ───────────────────────────────────────────
         nav_ctrl.update_proxy_ui()
         nav_ctrl.update_cookies_ui()
+        nav_ctrl.apply_appbar_theme()
         theme_ctrl.apply()
         page.add(main_screen.layout, settings_screen.layout, history_screen.layout)
 
