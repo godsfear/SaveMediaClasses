@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 from typing import Dict
 
 from config import (
-    ThemeConfig, WindowConfig, ToolConfig, YtDlpConfig, VersionState,
+    ThemeConfig, NamedTheme, WindowConfig, ToolConfig, YtDlpConfig, VersionState,
     DEFAULT_DOWNLOAD_PATH, DEFAULT_PROXY_ADDRESS,
 )
 from i18l import Locale
@@ -55,10 +55,22 @@ class AppState:
     # проверкой версий, персистится в секции "tool_versions" config.json.
     tool_versions: Dict[str, VersionState] = field(default_factory=dict)
 
-    # ── Тема и геометрия — типизированные dataclass вместо Dict ──────────────
-    theme:    ThemeConfig  = field(default_factory=ThemeConfig)
+    # ── Тема: режим (отдельная ось) + две всегда-живые палитры ───────────────
+    # theme_mode выбирает активную палитру; редактируются независимо. Именованные
+    # наборы (saved_themes) — отдельные снимки, каждый помнит свой mode.
+    theme_mode:  str         = "dark"
+    theme_dark:  ThemeConfig = field(default_factory=ThemeConfig.dark_default)
+    theme_light: ThemeConfig = field(default_factory=ThemeConfig.light_default)
+    saved_themes: Dict[str, NamedTheme] = field(default_factory=dict)
+
+    # ── Геометрия и язык ──────────────────────────────────────────────────────
     window:   WindowConfig = field(default_factory=WindowConfig)
     language: str          = field(default_factory=Locale.default_language)
+
+    # ── Активная палитра по режиму (совместимость со всеми чтениями .theme) ───
+    @property
+    def theme(self) -> ThemeConfig:
+        return self.theme_light if self.theme_mode == "light" else self.theme_dark
 
     # ── Типобезопасный доступ к конфигам инструментов ─────────────────────────
     # Имена инструментов локализованы здесь, а не разбросаны строками по UI.

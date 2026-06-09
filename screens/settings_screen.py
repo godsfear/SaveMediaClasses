@@ -2,7 +2,7 @@
 import flet as ft
 
 from config import (
-    THEME_FIELDS, THEME_GROUPS, PALETTE, ThemeConfig,
+    THEME_FIELDS, THEME_GROUPS, PALETTE, ThemeConfig, NamedTheme,
     hex_to_flet, is_valid_hex, safe_str
 )
 from managers.tools_manager import (
@@ -61,6 +61,7 @@ class SettingsScreen(ThemeTarget):
 
         self._build_widgets()
         self._build_theme_section()
+        self._build_theme_sets_section()
         self._build_layout()
 
         self._unsubs = [
@@ -208,6 +209,7 @@ class SettingsScreen(ThemeTarget):
         self.header_deps          = ft.Text(s.section_deps,        size=14, weight=ft.FontWeight.BOLD,  color=ft.Colors.CYAN_400)
         self.header_deps_urls     = ft.Text(s.section_deps_urls,   size=12, weight=ft.FontWeight.W_500, color=ft.Colors.GREY_400)
         self.header_theme         = ft.Text(s.section_theme,       size=14, weight=ft.FontWeight.BOLD,  color=ft.Colors.CYAN_400)
+        self.header_modes         = ft.Text(s.section_modes,       size=14, weight=ft.FontWeight.BOLD,  color=ft.Colors.CYAN_400)
         self.header_appearance    = ft.Text(s.section_appearance, size=14, weight=ft.FontWeight.BOLD,  color=ft.Colors.CYAN_400)
 
     # ── Куки UI ───────────────────────────────────────────────────────────────
@@ -261,6 +263,8 @@ class SettingsScreen(ThemeTarget):
                 content=palette_grid, bgcolor="#1e1e1e", border_radius=8,
                 padding=8, border=ft.Border.all(1, "#333333"), visible=False,
             )
+            self.register_surfaces(palette_container)
+            self.register_borders(palette_container)
 
             def apply_color(hex_val: str):
                 setattr(self._state.theme, field_key, hex_val)
@@ -312,9 +316,11 @@ class SettingsScreen(ThemeTarget):
         for group_label_key, field_keys in THEME_GROUPS:
             group_label = getattr(s, group_label_key, group_label_key)
             rows = [make_color_row(k, field_map[k]) for k in field_keys]
+            divider = ft.Divider(height=1, color="#2a2a2a")
+            self.register_dividers(divider)
             group_columns.append(ft.Column([
                 ft.Text(group_label, size=12, color=ft.Colors.GREY_500, weight=ft.FontWeight.W_500),
-                ft.Divider(height=1, color="#2a2a2a"),
+                divider,
                 *rows,
             ], spacing=8))
 
@@ -335,8 +341,150 @@ class SettingsScreen(ThemeTarget):
             bgcolor="#161616", border_radius=8, padding=15,
         )
 
+    # ── Секция «Тёмная/Светлая» + именованные наборы ─────────────────────────
+
+    def _build_theme_sets_section(self) -> None:
+        s = self._s
+
+        self._mode_row = ft.Row(spacing=8)
+        self._rebuild_mode_buttons()
+
+        self.theme_set_dropdown = ft.Dropdown(
+            label=s.theme_saved_label, border_radius=8, width=220,
+            focused_border_color=ft.Colors.BLUE, options=[],
+        )
+        self._refresh_set_options()
+        self.register_accents(self.theme_set_dropdown)
+
+        self._btn_set_apply = ft.IconButton(
+            icon=ft.Icons.CHECK_CIRCLE_OUTLINE_ROUNDED, icon_size=20,
+            tooltip=s.btn_theme_apply, on_click=self._apply_saved_theme,
+        )
+        self._btn_set_delete = ft.IconButton(
+            icon=ft.Icons.DELETE_OUTLINE_ROUNDED, icon_size=20,
+            tooltip=s.btn_theme_delete, on_click=self._delete_saved_theme,
+        )
+        self._btn_set_save = ft.Button(
+            content=ft.Row([ft.Icon(ft.Icons.SAVE_OUTLINED, size=18),
+                            ft.Text(s.btn_theme_save)], tight=True, spacing=8),
+            on_click=self._open_save_dialog,
+        )
+        self.register_buttons(self._btn_set_save)
+
+        self.theme_sets_section = ft.Container(
+            content=ft.Column([
+                self.header_modes,
+                self._mode_row,
+                ft.Row([self.theme_set_dropdown, self._btn_set_apply, self._btn_set_delete],
+                       vertical_alignment=ft.CrossAxisAlignment.CENTER, spacing=6),
+                ft.Row([self._btn_set_save], alignment=ft.MainAxisAlignment.START),
+            ], spacing=12, horizontal_alignment=ft.CrossAxisAlignment.STRETCH),
+            border_radius=8, padding=15,
+        )
+
+    def _rebuild_mode_buttons(self) -> None:
+        s = self._s
+        t = self._state.theme
+        accent   = hex_to_flet(t.accent_color)
+        on_acc   = hex_to_flet(t.button_text_color)
+        inactive = hex_to_flet(t.text_secondary_color)
+        border   = hex_to_flet(t.border_color)
+        defs = [(s.theme_mode_dark, "dark"), (s.theme_mode_light, "light")]
+        self._mode_row.controls = [
+            ft.TextButton(
+                content=ft.Text(
+                    lbl, size=13,
+                    color=on_acc if self._state.theme_mode == m else inactive,
+                ),
+                style=ft.ButtonStyle(
+                    bgcolor=accent if self._state.theme_mode == m else ft.Colors.TRANSPARENT,
+                    shape=ft.RoundedRectangleBorder(radius=8),
+                    side=ft.BorderSide(1, border),
+                    padding=ft.Padding.symmetric(horizontal=18, vertical=6),
+                ),
+                on_click=lambda _, mm=m: self._set_mode(mm),
+            )
+            for lbl, m in defs
+        ]
+
+    def _refresh_set_options(self) -> None:
+        self.theme_set_dropdown.options = [
+            ft.dropdown.Option(name) for name in sorted(self._state.saved_themes.keys())
+        ]
+        if self.theme_set_dropdown.value not in self._state.saved_themes:
+            self.theme_set_dropdown.value = None
+
+    def _set_mode(self, mode: str) -> None:
+        if self._state.theme_mode == mode:
+            return
+        self._state.theme_mode = mode
+        self._rebuild_mode_buttons()
+        self.refresh_theme_fields()
+        self._bus.emit(ThemeChangedEvent())
+        self._bus.emit(SettingsChangedEvent())
+        self._safe_update()
+
+    def _apply_saved_theme(self, _) -> None:
+        name = safe_str(self.theme_set_dropdown.value)
+        nt = self._state.saved_themes.get(name)
+        if nt is None:
+            return
+        new_cfg = ThemeConfig.from_dict(nt.config.to_dict())   # глубокая копия
+        if nt.mode == "light":
+            self._state.theme_light = new_cfg
+        else:
+            self._state.theme_dark = new_cfg
+        self._state.theme_mode = nt.mode
+        self._rebuild_mode_buttons()
+        self.refresh_theme_fields()
+        self._bus.emit(ThemeChangedEvent())
+        self._bus.emit(SettingsChangedEvent())
+        self._safe_update()
+
+    def _delete_saved_theme(self, _) -> None:
+        name = safe_str(self.theme_set_dropdown.value)
+        if name in self._state.saved_themes:
+            del self._state.saved_themes[name]
+            self._refresh_set_options()
+            self._bus.emit(SettingsChangedEvent())
+            self._safe_update()
+
+    def _open_save_dialog(self, _) -> None:
+        s = self._s
+        name_field = ft.TextField(
+            label=s.theme_name_label, autofocus=True, border_radius=8, max_length=40,
+        )
+
+        def do_save(_e) -> None:
+            name = safe_str(name_field.value).strip()
+            if not name:
+                name_field.border_color = ft.Colors.RED_400
+                name_field.update()
+                return
+            self._state.saved_themes[name] = NamedTheme(
+                mode=self._state.theme_mode,
+                config=ThemeConfig.from_dict(self._state.theme.to_dict()),
+            )
+            self._refresh_set_options()
+            self.theme_set_dropdown.value = name
+            self._bus.emit(SettingsChangedEvent())
+            self._page.pop_dialog()
+            self._safe_update()
+
+        dlg = ft.AlertDialog(
+            modal=True,
+            title=ft.Text(s.theme_save_dialog_title),
+            content=name_field,
+            actions=[
+                ft.TextButton(s.btn_cancel, on_click=lambda e: self._page.pop_dialog()),
+                ft.TextButton(s.btn_ok, on_click=do_save),
+            ],
+        )
+        self._page.show_dialog(dlg)
+
     def _reset_theme(self, _):
-        defaults = ThemeConfig()
+        defaults = ThemeConfig.dark_default() if self._state.theme_mode == "dark" \
+            else ThemeConfig.light_default()
         for key in vars(defaults):
             setattr(self._state.theme, key, getattr(defaults, key))
         self.refresh_theme_fields()
@@ -405,7 +553,16 @@ class SettingsScreen(ThemeTarget):
         self.header_deps.value          = s.section_deps;        self.header_deps.update()
         self.header_deps_urls.value     = s.section_deps_urls;   self.header_deps_urls.update()
         self.header_theme.value         = s.section_theme;       self.header_theme.update()
+        self.header_modes.value         = s.section_modes;       self.header_modes.update()
         self.header_appearance.value    = s.section_appearance;  self.header_appearance.update()
+
+        # Секция наборов тем
+        self._rebuild_mode_buttons();              self._mode_row.update()
+        self.theme_set_dropdown.label = s.theme_saved_label; self.theme_set_dropdown.update()
+        self._btn_set_apply.tooltip   = s.btn_theme_apply
+        self._btn_set_delete.tooltip  = s.btn_theme_delete
+        self._btn_set_save.content.controls[1].value = s.btn_theme_save
+        self._btn_set_save.update()
 
         # Кнопка и статус
         self.update_btn_text.value = s.btn_check;     self.update_btn_text.update()
@@ -575,6 +732,8 @@ class SettingsScreen(ThemeTarget):
             bgcolor="#121212", border_radius=6, padding=12,
             border=ft.Border.all(1, "#2a2a2a"),
         )
+        self.register_surfaces(ytdlp_section)
+        self.register_borders(ytdlp_section)
 
         self._card_net = ft.Container(
             content=ft.Column([
@@ -623,6 +782,7 @@ class SettingsScreen(ThemeTarget):
             self._card_net,
             self._card_downloaders,
             self._card_deps,
+            self.theme_sets_section,
             self.theme_section,
             self._card_appearance,
         ], visible=False, scroll=ft.ScrollMode.AUTO, expand=True, spacing=15,
@@ -632,7 +792,7 @@ class SettingsScreen(ThemeTarget):
         self.register_headers(
             self.header_net, self.header_downloaders, self.header_cookies,
             self.header_ytdlp, self.header_deps,
-            self.header_theme, self.header_appearance,
+            self.header_theme, self.header_modes, self.header_appearance,
         )
         self.register_switches(
             self.clean_titles_switch, self.playlist_switch,
@@ -648,5 +808,6 @@ class SettingsScreen(ThemeTarget):
         self.register_cards(
             self._card_net, self._card_downloaders,
             self._card_deps, self._card_appearance,
+            self.theme_section, self.theme_sets_section,
         )
         self.register_progress(self.progress_bar, self.progress_text)

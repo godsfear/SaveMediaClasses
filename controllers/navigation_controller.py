@@ -21,7 +21,7 @@ import flet as ft
 
 from app_logging import get_logger
 from config import hex_to_flet
-from events import SettingsChangedEvent, StatusMessageEvent
+from events import SettingsChangedEvent, StatusMessageEvent, ThemeChangedEvent
 from i18l import Locale
 
 if TYPE_CHECKING:
@@ -62,10 +62,12 @@ class NavigationController:
         self._folder_picker_title: str = s.folder_select_text
 
         # ── Виджеты тулбара (созданы здесь, назначены снаружи через toolbar_buttons) ──
-        self.history_btn  = ft.IconButton(icon=ft.Icons.HISTORY_ROUNDED,              icon_color=ft.Colors.WHITE, tooltip=s.nav_history)
-        self.folder_btn   = ft.IconButton(icon=ft.Icons.FOLDER_OPEN_ROUNDED,          icon_color=ft.Colors.WHITE, tooltip=s.btn_folder)
-        self.proxy_btn    = ft.IconButton(icon=ft.Icons.SHIELD_OUTLINED,              icon_color=ft.Colors.WHITE, tooltip=s.proxy_tooltip)
-        self.settings_btn = ft.IconButton(icon=ft.Icons.SETTINGS_ROUNDED,             icon_color=ft.Colors.WHITE, tooltip=s.appbar_settings)
+        fg = self._appbar_fg()
+        self.theme_btn    = ft.IconButton(icon=self._theme_icon(),                    icon_color=fg, tooltip=s.theme_mode_tooltip)
+        self.history_btn  = ft.IconButton(icon=ft.Icons.HISTORY_ROUNDED,              icon_color=fg, tooltip=s.nav_history)
+        self.folder_btn   = ft.IconButton(icon=ft.Icons.FOLDER_OPEN_ROUNDED,          icon_color=fg, tooltip=s.btn_folder)
+        self.proxy_btn    = ft.IconButton(icon=ft.Icons.SHIELD_OUTLINED,              icon_color=fg, tooltip=s.proxy_tooltip)
+        self.settings_btn = ft.IconButton(icon=ft.Icons.SETTINGS_ROUNDED,             icon_color=fg, tooltip=s.appbar_settings)
         self.exit_btn     = ft.IconButton(icon=ft.Icons.POWER_SETTINGS_NEW_ROUNDED,   icon_color=ft.Colors.RED_400, tooltip=s.btn_exit)
 
         self._bind_toolbar()
@@ -99,6 +101,40 @@ class NavigationController:
     def status_bar_text(self) -> ft.Text:
         return self._status_bar_text
 
+    # ── Тема AppBar ───────────────────────────────────────────────────────────
+
+    def _appbar_fg(self) -> str:
+        """Цвет иконок/заголовка поверх шапки — контраст к режиму."""
+        return "#212121" if self._svc.state.theme_mode == "light" else ft.Colors.WHITE
+
+    def _theme_icon(self) -> str:
+        """Иконка переключателя: показываем целевой режим."""
+        return (ft.Icons.LIGHT_MODE_ROUNDED
+                if self._svc.state.theme_mode == "dark"
+                else ft.Icons.DARK_MODE_ROUNDED)
+
+    def apply_appbar_theme(self) -> None:
+        """Привести иконки/заголовок текущей шапки в соответствие с режимом."""
+        fg = self._appbar_fg()
+        self.theme_btn.icon = self._theme_icon()
+        for btn in (self.theme_btn, self.settings_btn, self.history_btn, self.folder_btn):
+            btn.icon_color = fg
+        self.update_proxy_ui()
+        ab = self._page.appbar
+        if ab is not None:
+            if getattr(ab, "title", None) is not None:
+                ab.title.color = fg
+            if isinstance(getattr(ab, "leading", None), ft.IconButton):
+                ab.leading.icon_color = fg
+
+    def _toggle_theme_mode(self, _=None) -> None:
+        st = self._svc.state
+        st.theme_mode = "light" if st.theme_mode == "dark" else "dark"
+        self._svc.bus.emit(ThemeChangedEvent())
+        self.apply_appbar_theme()
+        self._svc.bus.emit(SettingsChangedEvent())
+        self._svc.safe_update()
+
     def update_proxy_ui(self) -> None:
         """Обновить иконку и tooltip кнопки прокси по текущему state."""
         s = Locale.load(self._svc.state.language)
@@ -108,7 +144,7 @@ class NavigationController:
             self.proxy_btn.tooltip    = s.proxy_on
         else:
             self.proxy_btn.icon       = ft.Icons.SHIELD_OUTLINED
-            self.proxy_btn.icon_color = ft.Colors.WHITE
+            self.proxy_btn.icon_color = self._appbar_fg()
             self.proxy_btn.tooltip    = s.proxy_off
 
     def update_cookies_ui(self) -> None:
@@ -145,11 +181,12 @@ class NavigationController:
             leading=self._logo(),
             leading_width=44,
             actions=[
-                self.settings_btn, self.history_btn,
+                self.theme_btn, self.settings_btn, self.history_btn,
                 self.proxy_btn, self.folder_btn, self.exit_btn,
             ],
         )
         self._page.bottom_appbar.content = self.main_status_container
+        self.apply_appbar_theme()
         self._svc.safe_update()
 
     def show_settings(self, _=None) -> None:
@@ -166,8 +203,10 @@ class NavigationController:
                 icon=ft.Icons.ARROW_BACK_IOS_NEW_ROUNDED, icon_color=ft.Colors.WHITE,
                 icon_size=16, on_click=self.show_main,
             ),
+            actions=[self.theme_btn],
         )
         self._page.bottom_appbar.content = self.settings_status_container
+        self.apply_appbar_theme()
         self._svc.safe_update()
 
     def show_history(self, _=None) -> None:
@@ -183,8 +222,10 @@ class NavigationController:
                 icon=ft.Icons.ARROW_BACK_IOS_NEW_ROUNDED, icon_color=ft.Colors.WHITE,
                 icon_size=16, on_click=self.show_main,
             ),
+            actions=[self.theme_btn],
         )
         self._page.bottom_appbar.content = ft.Container(height=0)
+        self.apply_appbar_theme()
         self._svc.safe_update()
 
     # ── Приватное ─────────────────────────────────────────────────────────────
@@ -262,16 +303,13 @@ class NavigationController:
                 ft.TextButton("OK", on_click=lambda e: self._close_dlg(dlg)),
             ],
         )
-        self._page.overlay.append(dlg)
-        dlg.open = True
-        self._page.update()
+        self._page.show_dialog(dlg)
 
     def _close_dlg(self, dlg: ft.AlertDialog) -> None:
-        dlg.open = False
-        self._page.update()
-        self._page.overlay.remove(dlg)
+        self._page.pop_dialog()
 
     def _bind_toolbar(self) -> None:
+        self.theme_btn.on_click    = self._toggle_theme_mode
         self.folder_btn.on_click   = self._open_folder_picker
         self.proxy_btn.on_click    = self._toggle_proxy
         self.settings_btn.on_click = self.show_settings
@@ -285,7 +323,7 @@ class NavigationController:
         if path:
             self._svc.state.download_path        = str(path)
             self._main.folder_label.value        = str(path)
-            self._main.folder_label.color        = ft.Colors.GREEN_400
+            self._main.folder_label.color        = hex_to_flet(self._svc.state.theme.status_ok_color)
             try:
                 os.makedirs(self._svc.state.download_path, exist_ok=True)
             except Exception:
