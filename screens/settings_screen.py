@@ -2,8 +2,8 @@
 import flet as ft
 
 from config import (
-    THEME_FIELDS, THEME_GROUPS, PALETTE, ThemeConfig, NamedTheme,
-    hex_to_flet, is_valid_hex, safe_str
+    THEME_FIELDS, THEME_GROUPS, ThemeConfig, NamedTheme,
+    hex_to_flet, safe_str
 )
 from managers.tools_manager import (
     TOOL_VERSION_MISSING, TOOL_VERSION_CALL_ERROR,
@@ -12,6 +12,7 @@ from managers.tools_manager import (
 from managers.tool_registry import DEFAULT_TOOLS
 from controllers.theme_target import ThemeTarget
 from controllers.tools_controller import ToolsController
+from screens.color_row import ColorRow
 from events import (
     ToolsRestoredEvent,
     ToolVersionLocalEvent, ToolVersionRemoteEvent,
@@ -244,84 +245,26 @@ class SettingsScreen(ThemeTarget):
     def _build_theme_section(self) -> None:
         s = self._s
 
-        def make_color_row(field_key: str, label_key: str) -> ft.Column:
-            label   = getattr(s, label_key, label_key)
-            preview = ft.Container(
-                width=28, height=28, border_radius=6,
-                bgcolor=hex_to_flet(getattr(self._state.theme, field_key, "FFFFFF")),
-                border=ft.Border.all(1, "#555555"),
-            )
-            field = ft.TextField(
-                value=getattr(self._state.theme, field_key, "FFFFFF").upper().lstrip("#"),
-                width=100, border_radius=6, text_size=13,
-                capitalization=ft.TextCapitalization.CHARACTERS,
-                max_length=6,
-                content_padding=ft.Padding.symmetric(horizontal=8, vertical=6),
-                hint_text="RRGGBB",
-            )
-            palette_grid = ft.Row(wrap=True, spacing=4, run_spacing=4, width=280)
-            # surface + border на одном контейнере — регистрации вкладываются.
-            palette_container = self.register_surfaces(self.register_borders(ft.Container(
-                content=palette_grid, bgcolor="#1e1e1e", border_radius=8,
-                padding=8, border=ft.Border.all(1, "#333333"), visible=False,
-            )))
-
-            def apply_color(hex_val: str):
-                setattr(self._state.theme, field_key, hex_val)
-                field.value        = hex_val.upper()
-                field.border_color = None
-                preview.bgcolor    = hex_to_flet(hex_val)
-                palette_container.visible = False
-                self._bus.emit(ThemeChangedEvent())
-                self._bus.emit(SettingsChangedEvent())
-
-            for c in PALETTE:
-                palette_grid.controls.append(
-                    ft.Container(
-                        width=24, height=24, border_radius=4,
-                        bgcolor=f"#{c}", border=ft.Border.all(1, "#00000044"),
-                        tooltip=f"#{c}", on_click=lambda e, h=c: apply_color(h),
-                    )
-                )
-
-            preview.on_click = lambda e: (
-                setattr(palette_container, "visible", not palette_container.visible),
-                self._safe_update(),
-            )
-
-            def on_field_change(e):
-                val = safe_str(field.value).strip().lstrip("#").upper()
-                if is_valid_hex(val):
-                    setattr(self._state.theme, field_key, val)
-                    preview.bgcolor    = hex_to_flet(val)
-                    field.border_color = None
-                    self._bus.emit(ThemeChangedEvent())
-                else:
-                    field.border_color = ft.Colors.RED_400
-                    self._safe_update()
-
-            field.on_change = on_field_change
-
-            return ft.Column([
-                ft.Row([
-                    self.register_muted_text(ft.Text(label, size=12, expand=True, color=ft.Colors.GREY_300)),
-                    field, preview,
-                ], vertical_alignment=ft.CrossAxisAlignment.CENTER, spacing=10),
-                palette_container,
-            ], spacing=4, tight=True)
-
-        # Строим по группам из THEME_GROUPS
+        # Каждая строка цвета — самостоятельный ColorRow с явными ссылками на свои
+        # виджеты. Храним плоский список строк и список (метка_группы, ключ) —
+        # refresh/relabel работают по ссылкам, без обхода дерева виджетов.
         field_map = dict(THEME_FIELDS)   # {field_key: label_key}
+        self._color_rows: list[ColorRow] = []
+        self._group_labels: list[tuple[ft.Text, str]] = []
         group_columns = []
         for group_label_key, field_keys in THEME_GROUPS:
-            group_label = getattr(s, group_label_key, group_label_key)
-            rows = [make_color_row(k, field_map[k]) for k in field_keys]
+            group_label = self.register_muted_text(ft.Text(
+                getattr(s, group_label_key, group_label_key),
+                size=12, color=ft.Colors.GREY_500, weight=ft.FontWeight.W_500,
+            ))
+            self._group_labels.append((group_label, group_label_key))
             divider = self.register_dividers(ft.Divider(height=1, color="#2a2a2a"))
-            group_columns.append(ft.Column([
-                self.register_muted_text(ft.Text(group_label, size=12, color=ft.Colors.GREY_500, weight=ft.FontWeight.W_500)),
-                divider,
-                *rows,
-            ], spacing=8))
+            rows = []
+            for k in field_keys:
+                cr = ColorRow(self, k, field_map[k])
+                self._color_rows.append(cr)
+                rows.append(cr.control)
+            group_columns.append(ft.Column([group_label, divider, *rows], spacing=8))
 
         self.theme_fields_column = ft.Column(group_columns, spacing=18)
         self.theme_section = self.register_cards(ft.Container(
@@ -489,22 +432,8 @@ class SettingsScreen(ThemeTarget):
         self._bus.emit(SettingsChangedEvent())
 
     def refresh_theme_fields(self):
-        for group_col in self.theme_fields_column.controls:
-            for ctrl in group_col.controls:
-                if isinstance(ctrl, ft.Column) and ctrl.controls:
-                    row = ctrl.controls[0]
-                    if isinstance(row, ft.Row) and len(row.controls) >= 3:
-                        # field_key восстанавливаем через label — ищем совпадение в Strings
-                        label_text = row.controls[0].value
-                        field_key = next(
-                            (fk for fk, lk in THEME_FIELDS
-                             if getattr(self._s, lk, "") == label_text),
-                            None,
-                        )
-                        if field_key:
-                            row.controls[1].value        = getattr(self._state.theme, field_key).upper().lstrip("#")
-                            row.controls[1].border_color = None
-                            row.controls[2].bgcolor      = hex_to_flet(getattr(self._state.theme, field_key))
+        for row in self._color_rows:
+            row.refresh()
 
     # ── Смена языка — перезагрузка Strings и обновление всех текстов ──────────
 
@@ -565,20 +494,12 @@ class SettingsScreen(ThemeTarget):
         self.update_btn_text.value = s.btn_check;     self.update_btn_text.update()
         self.progress_text.value   = s.status_waiting; self.progress_text.update()
 
-        # Группы цветов — используем индекс в THEME_GROUPS (порядок стабилен)
-        field_map = dict(THEME_FIELDS)
-        for group_idx, (group_key, field_keys) in enumerate(THEME_GROUPS):
-            group_col = self.theme_fields_column.controls[group_idx]
-            group_col.controls[0].value = getattr(s, group_key, "")
-            group_col.controls[0].update()
-            # Строки цветов начинаются с controls[2] (0=label, 1=divider)
-            color_rows = [c for c in group_col.controls[2:] if isinstance(c, ft.Column)]
-            for field_key, color_row in zip(field_keys, color_rows):
-                if color_row.controls:
-                    row = color_row.controls[0]
-                    if isinstance(row, ft.Row) and row.controls:
-                        row.controls[0].value = getattr(s, field_map[field_key], "")
-                        row.controls[0].update()
+        # Группы цветов и сами строки — по сохранённым ссылкам, без обхода дерева.
+        for group_label, group_key in self._group_labels:
+            group_label.value = getattr(s, group_key, "")
+            group_label.update()
+        for row in self._color_rows:
+            row.relabel(s)
 
     # ── Инструменты ───────────────────────────────────────────────────────────
 

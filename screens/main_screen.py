@@ -359,32 +359,7 @@ class MainScreen(ThemeTarget):
             return
 
         self.sync_to_state()
-        st = self._state
-        p  = st.ytdlp.parameters
-        snapshot = DownloadSnapshot(
-            url=url,
-            download_path=st.download_path,
-            proxy_enabled=st.proxy_enabled,
-            proxy_address=st.proxy_address,
-            cookies_enabled=p.cookies.state,
-            cookies_browser=p.cookies.browser,
-            playlist_enabled=p.playlist.state,
-            embed_metadata=p.embed_metadata.state,
-            audio_only=p.audio_only.state,
-            yt_dlp_args=p.extra_args.value,
-            clean_titles=p.clean_titles.state,
-            save_to_source=p.save_to_source.state,
-            cookies_flag=p.cookies.flag,
-            playlist_flag_on=p.playlist.flag_on,
-            playlist_flag_off=p.playlist.flag_off,
-            metadata_flags=p.embed_metadata.args,
-            audio_flags=p.audio_only.args,
-            clean_title_template=p.clean_titles.template_on,
-            title_id_template=p.clean_titles.template_off,
-            playlist_dir_template=p.playlist.dir_template,
-            playlist_idx_prefix=p.playlist.idx_prefix,
-            source_dir_template=p.save_to_source.dir_template,
-        )
+        snapshot = DownloadSnapshot.from_state(self._state, url)
 
         task_id = self._dm.add(snapshot)
         if task_id is None:
