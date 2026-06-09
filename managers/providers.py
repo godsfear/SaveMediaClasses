@@ -16,6 +16,7 @@ import asyncio
 import os
 import re
 import shlex
+import shutil
 import subprocess
 from typing import Callable, Protocol, runtime_checkable
 
@@ -84,8 +85,11 @@ class YtDlpProvider:
     # ── DownloadProvider protocol ─────────────────────────────────────────────
 
     def resolve_exe(self) -> str:
+        # Приоритет — наша tools_dir; фолбэк — yt-dlp, установленный в системе (PATH).
         path = os.path.join(self._paths.tools_dir, f"yt-dlp{self._ext}")
-        return path if os.path.exists(path) and os.path.getsize(path) > 0 else ""
+        if os.path.exists(path) and os.path.getsize(path) > 0:
+            return path
+        return shutil.which("yt-dlp") or ""
 
     def build_command(self, exe: str, snapshot: DownloadSnapshot) -> list[str]:
         s    = snapshot

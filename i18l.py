@@ -120,9 +120,10 @@ class Strings:
     tool_querying:      str = ""  # {name} {loc}
 
     # Инструменты — отображаемые статусы (перевод sentinel-значений из tools_manager)
-    tool_status_missing:    str = ""  # "Not installed" / "Отсутствует"
-    tool_status_error:      str = ""  # "[Error]" / "[Ошибка]"
-    tool_status_call_error: str = ""  # "[Call error]" / "[Ошибка вызова]"
+    tool_status_missing:      str = ""  # "Not installed" / "Отсутствует"
+    tool_status_error:        str = ""  # "[Error]" / "[Ошибка]"
+    tool_status_call_error:   str = ""  # "[Call error]" / "[Ошибка вызова]"
+    tool_status_needs_python: str = ""  # "[Needs Python 3]" / "[Нужен Python 3]"
 
     # Статусы обновления инструментов (показываются во время update_all)
     tool_update_downloading: str = ""  # "downloading..."

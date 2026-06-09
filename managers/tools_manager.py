@@ -40,6 +40,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+import shutil
 import subprocess
 from typing import TYPE_CHECKING, Callable, Optional
 
@@ -49,7 +50,7 @@ from app_logging import get_logger
 from managers.tool_specs import (
     ToolBinary, ToolSpec, InstallContext, ManualInstallRequired,
     TOOL_VERSION_MISSING, TOOL_VERSION_CALL_ERROR, TOOL_VERSION_REMOTE_ERR,
-    TOOL_VERSION_UNKNOWN,
+    TOOL_VERSION_UNKNOWN, TOOL_VERSION_NEEDS_RUNTIME,
     classify_version, status_needs_update,
 )
 
@@ -98,8 +99,15 @@ class ToolsManager:
     # ── Пути ──────────────────────────────────────────────────────────────────
 
     def _binary_path(self, binary: ToolBinary) -> str:
-        path = os.path.join(self._paths.tools_dir, f"{binary.filename}{self._ext}")
-        return path if os.path.exists(path) else ""
+        """
+        Путь к бинарнику. Приоритет — наша tools_dir (управляемая приложением
+        копия); если там нет, ищем установленный в системе на PATH (apt/brew/…).
+        Так системные инструменты тоже детектятся как присутствующие.
+        """
+        local = os.path.join(self._paths.tools_dir, f"{binary.filename}{self._ext}")
+        if os.path.exists(local):
+            return local
+        return shutil.which(binary.filename) or ""
 
     # ── Проверка версий ───────────────────────────────────────────────────────
 
@@ -151,6 +159,10 @@ class ToolsManager:
         path = self._binary_path(binary)
         if not path:
             return TOOL_VERSION_MISSING
+        # Бинарник на месте, но без нужного рантайма запускать его бессмысленно
+        # (generic yt-dlp без Python упадёт с непонятной ошибкой вызова).
+        if spec.missing_runtime():
+            return TOOL_VERSION_NEEDS_RUNTIME
         try:
             startup = self._win_startupinfo()
             proc = await asyncio.create_subprocess_exec(
@@ -190,6 +202,9 @@ class ToolsManager:
         """Установить/обновить инструменты, помеченные needs_update в последней check_all()."""
         had_errors = False
         try:
+            # tools_dir может быть в профиле пользователя и ещё не существовать —
+            # создаём перед первой записью (stream_to_file пишет в неё напрямую).
+            os.makedirs(self._paths.tools_dir, exist_ok=True)
             async with httpx.AsyncClient(proxy=proxy_url, timeout=30.0,
                                          follow_redirects=True) as client:
                 for spec in specs:

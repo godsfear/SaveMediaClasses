@@ -18,6 +18,7 @@ from __future__ import annotations
 import asyncio
 import os
 import re
+import shutil
 import zipfile
 from typing import TYPE_CHECKING, Dict
 
@@ -61,6 +62,17 @@ class YtDlpTool(BaseTool):
             },
             parameters   = YtDlpParameters(),
         )
+
+    def missing_runtime(self) -> bool:
+        """
+        На Windows скачивается self-contained yt-dlp.exe — рантайм не нужен.
+        На Linux/macOS используется generic-сборка, которой нужен системный Python 3
+        (self-contained сборки _linux/_macos мы не качаем). Если Python нет —
+        бинарник не запустится, поэтому предупреждаем пользователя.
+        """
+        if os.name == "nt":
+            return False
+        return not (shutil.which("python3") or shutil.which("python"))
 
     def parse_version(self, binary: ToolBinary, output: str) -> str:
         lines = output.splitlines()

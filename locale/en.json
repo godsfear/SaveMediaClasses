@@ -134,6 +134,7 @@
     "tool_status_missing": "Not installed",
     "tool_status_error": "[Error]",
     "tool_status_call_error": "[Call error]",
+    "tool_status_needs_python": "[Needs Python 3 — install python3]",
     "download_completed": "Download complete!",
     "download_error_os": "OS error: {detail}",
     "download_error_code": "Error (code {code})",
