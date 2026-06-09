@@ -68,7 +68,7 @@ class NavigationController:
         self.folder_btn   = ft.IconButton(icon=ft.Icons.FOLDER_OPEN_ROUNDED,          icon_color=fg, tooltip=s.btn_folder)
         self.proxy_btn    = ft.IconButton(icon=ft.Icons.SHIELD_OUTLINED,              icon_color=fg, tooltip=s.proxy_tooltip)
         self.settings_btn = ft.IconButton(icon=ft.Icons.SETTINGS_ROUNDED,             icon_color=fg, tooltip=s.appbar_settings)
-        self.exit_btn     = ft.IconButton(icon=ft.Icons.POWER_SETTINGS_NEW_ROUNDED,   icon_color=ft.Colors.RED_400, tooltip=s.btn_exit)
+        self.exit_btn     = ft.IconButton(icon=ft.Icons.POWER_SETTINGS_NEW_ROUNDED,   icon_color=hex_to_flet(self._svc.state.theme.status_error_color), tooltip=s.btn_exit)
 
         self._bind_toolbar()
 
@@ -257,6 +257,9 @@ class NavigationController:
             return ""
 
     def _show_about(self, _) -> None:
+        t         = self._svc.state.theme
+        muted_c   = hex_to_flet(t.text_muted_color)
+        secondary = hex_to_flet(t.text_secondary_color)
         features = [
             "Тысячи сайтов — YouTube, VK, Rutube, Telegram и др.",
             "Видео, аудио, плейлисты, субтитры",
@@ -276,7 +279,7 @@ class NavigationController:
                     ft.Text("SaveMedia", size=20, weight=ft.FontWeight.BOLD),
                     ft.Text(
                         f"v{ver}" if (ver := self._app_version()) else "",
-                        size=12, color=ft.Colors.GREY_500,
+                        size=12, color=muted_c,
                     ),
                 ],
                 spacing=10,
@@ -285,7 +288,7 @@ class NavigationController:
                 [
                     ft.Text(
                         "Графический интерфейс для yt-dlp + ffmpeg",
-                        size=13, color=ft.Colors.GREY_400,
+                        size=13, color=secondary,
                     ),
                     ft.Divider(height=10),
                     *[ft.Text(f"• {f}", size=12) for f in features],

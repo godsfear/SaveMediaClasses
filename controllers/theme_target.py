@@ -54,6 +54,7 @@ class ThemeTarget:
         self._theme_borders:        list = []
         self._theme_dividers:       list = []
         self._theme_button_texts:   list = []
+        self._theme_icon_buttons:   list = []
 
     # ── Регистрация виджетов ──────────────────────────────────────────────────
     #
@@ -133,6 +134,11 @@ class ThemeTarget:
         self._theme_button_texts.extend(widgets)
         return self._ret(widgets)
 
+    def register_icon_buttons(self, *widgets: ft.IconButton):
+        """ft.IconButton вторичных действий — .icon_color = text_muted_color."""
+        self._theme_icon_buttons.extend(widgets)
+        return self._ret(widgets)
+
     # ── Универсальный apply_theme ─────────────────────────────────────────────
 
     def apply_theme(self, t: ThemeConfig) -> None:
@@ -174,6 +180,8 @@ class ThemeTarget:
             w.color = muted_c
         for w in self._theme_button_texts:
             w.color = button_tc
+        for w in self._theme_icon_buttons:
+            w.icon_color = muted_c
         for w in self._theme_surfaces:
             w.bgcolor = surface_c
         for w in self._theme_borders:

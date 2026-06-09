@@ -192,8 +192,8 @@ class SettingsScreen(ThemeTarget):
         self.ffmpeg_version_input  = self.register_accents(ft.TextField(label=s.url_ffmpeg_version,  border_radius=8, focused_border_color=ft.Colors.BLUE))
         self.ffmpeg_download_input = self.register_accents(ft.TextField(label=s.url_ffmpeg_download, border_radius=8, focused_border_color=ft.Colors.BLUE))
 
-        self.update_btn_icon = ft.Icon(ft.Icons.REFRESH_ROUNDED, color=ft.Colors.WHITE)
-        self.update_btn_text = ft.Text(s.btn_check, color=ft.Colors.WHITE, weight=ft.FontWeight.BOLD)
+        self.update_btn_icon = self.register_button_texts(ft.Icon(ft.Icons.REFRESH_ROUNDED, color=ft.Colors.WHITE))
+        self.update_btn_text = self.register_button_texts(ft.Text(s.btn_check, color=ft.Colors.WHITE, weight=ft.FontWeight.BOLD))
         self.update_btn = self.register_buttons(ft.Button(
             content=ft.Row([self.update_btn_icon, self.update_btn_text], tight=True, spacing=8),
             bgcolor=ft.Colors.GREEN,
@@ -206,9 +206,9 @@ class SettingsScreen(ThemeTarget):
         self.header_downloaders   = self.register_headers(ft.Text(s.section_downloaders, size=14, weight=ft.FontWeight.BOLD,  color=ft.Colors.CYAN_400))
         self.header_cookies       = self.register_headers(ft.Text(s.section_cookies,     size=13, weight=ft.FontWeight.W_600, color=ft.Colors.CYAN_400))
         self.header_ytdlp         = self.register_headers(ft.Text(s.section_ytdlp,       size=13, weight=ft.FontWeight.W_600, color=ft.Colors.CYAN_400))
-        self.header_ytdlp_urls    = ft.Text(s.section_ytdlp_urls,  size=12, weight=ft.FontWeight.W_500, color=ft.Colors.GREY_400)
+        self.header_ytdlp_urls    = self.register_muted_text(ft.Text(s.section_ytdlp_urls,  size=12, weight=ft.FontWeight.W_500, color=ft.Colors.GREY_400))
         self.header_deps          = self.register_headers(ft.Text(s.section_deps,        size=14, weight=ft.FontWeight.BOLD,  color=ft.Colors.CYAN_400))
-        self.header_deps_urls     = ft.Text(s.section_deps_urls,   size=12, weight=ft.FontWeight.W_500, color=ft.Colors.GREY_400)
+        self.header_deps_urls     = self.register_muted_text(ft.Text(s.section_deps_urls,   size=12, weight=ft.FontWeight.W_500, color=ft.Colors.GREY_400))
         self.header_theme         = self.register_headers(ft.Text(s.section_theme,       size=14, weight=ft.FontWeight.BOLD,  color=ft.Colors.CYAN_400))
         self.header_modes         = self.register_headers(ft.Text(s.section_modes,       size=14, weight=ft.FontWeight.BOLD,  color=ft.Colors.CYAN_400))
         self.header_appearance    = self.register_headers(ft.Text(s.section_appearance, size=14, weight=ft.FontWeight.BOLD,  color=ft.Colors.CYAN_400))
@@ -304,7 +304,7 @@ class SettingsScreen(ThemeTarget):
 
             return ft.Column([
                 ft.Row([
-                    ft.Text(label, size=12, expand=True, color=ft.Colors.GREY_300),
+                    self.register_muted_text(ft.Text(label, size=12, expand=True, color=ft.Colors.GREY_300)),
                     field, preview,
                 ], vertical_alignment=ft.CrossAxisAlignment.CENTER, spacing=10),
                 palette_container,
@@ -318,7 +318,7 @@ class SettingsScreen(ThemeTarget):
             rows = [make_color_row(k, field_map[k]) for k in field_keys]
             divider = self.register_dividers(ft.Divider(height=1, color="#2a2a2a"))
             group_columns.append(ft.Column([
-                ft.Text(group_label, size=12, color=ft.Colors.GREY_500, weight=ft.FontWeight.W_500),
+                self.register_muted_text(ft.Text(group_label, size=12, color=ft.Colors.GREY_500, weight=ft.FontWeight.W_500)),
                 divider,
                 *rows,
             ], spacing=8))
@@ -328,13 +328,13 @@ class SettingsScreen(ThemeTarget):
             content=ft.Column([
                 ft.Row([
                     self.header_theme,
-                    ft.IconButton(
+                    self.register_icon_buttons(ft.IconButton(
                         icon=ft.Icons.RESTART_ALT_ROUNDED, icon_color=ft.Colors.GREY_400,
                         icon_size=18, tooltip=s.btn_reset_theme,
                         on_click=self._reset_theme,
-                    ),
+                    )),
                 ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
-                ft.Text(s.theme_hint, size=11, color=ft.Colors.GREY_500),
+                self.register_muted_text(ft.Text(s.theme_hint, size=11, color=ft.Colors.GREY_500)),
                 self.theme_fields_column,
             ], spacing=10, horizontal_alignment=ft.CrossAxisAlignment.STRETCH),
             bgcolor="#161616", border_radius=8, padding=15,
@@ -354,17 +354,17 @@ class SettingsScreen(ThemeTarget):
         ))
         self._refresh_set_options()
 
-        self._btn_set_apply = ft.IconButton(
+        self._btn_set_apply = self.register_icon_buttons(ft.IconButton(
             icon=ft.Icons.CHECK_CIRCLE_OUTLINE_ROUNDED, icon_size=20,
             tooltip=s.btn_theme_apply, on_click=self._apply_saved_theme,
-        )
-        self._btn_set_delete = ft.IconButton(
+        ))
+        self._btn_set_delete = self.register_icon_buttons(ft.IconButton(
             icon=ft.Icons.DELETE_OUTLINE_ROUNDED, icon_size=20,
             tooltip=s.btn_theme_delete, on_click=self._delete_saved_theme,
-        )
+        ))
         self._btn_set_save = self.register_buttons(ft.Button(
-            content=ft.Row([ft.Icon(ft.Icons.SAVE_OUTLINED, size=18),
-                            ft.Text(s.btn_theme_save)], tight=True, spacing=8),
+            content=ft.Row([self.register_button_texts(ft.Icon(ft.Icons.SAVE_OUTLINED, size=18)),
+                            self.register_button_texts(ft.Text(s.btn_theme_save))], tight=True, spacing=8),
             on_click=self._open_save_dialog,
         ))
 
