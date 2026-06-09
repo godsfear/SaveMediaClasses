@@ -210,7 +210,7 @@ class MainScreen(ThemeTarget):
             weight=ft.FontWeight.W_500, expand=True,
             no_wrap=True, overflow=ft.TextOverflow.ELLIPSIS
         )
-        self.url_input = ft.TextField(
+        self.url_input = self.register_accents(ft.TextField(
             label=s.url_label,
             hint_text=s.url_hint,
             expand=True, border_radius=8,
@@ -225,23 +225,23 @@ class MainScreen(ThemeTarget):
                     self._page.update()
                 ]
             )
-        )
-        self.audio_only_switch      = ft.Switch(label=s.switch_audio_only, active_color=ft.Colors.GREEN)
-        self.cookies_enabled_switch = ft.Switch(label=s.switch_cookies,    active_color=ft.Colors.GREEN, value=False)
+        ))
+        self.audio_only_switch      = self.register_switches(ft.Switch(label=s.switch_audio_only, active_color=ft.Colors.GREEN))
+        self.cookies_enabled_switch = self.register_switches(ft.Switch(label=s.switch_cookies,    active_color=ft.Colors.GREEN, value=False))
 
         self._btn_icon = ft.Icon(ft.Icons.DOWNLOAD_ROUNDED, color=ft.Colors.WHITE)
         self._btn_text = ft.Text(s.btn_download, color=ft.Colors.WHITE, weight=ft.FontWeight.BOLD)
-        self.download_btn = ft.Button(
+        self.download_btn = self.register_buttons(ft.Button(
             content=ft.Row([self._btn_icon, self._btn_text], tight=True, spacing=8),
             bgcolor=ft.Colors.GREEN, tooltip=s.btn_download_tooltip,
             style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=8), elevation=0),
             on_click=self._on_download_click
-        )
+        ))
 
         self._cards_column = ft.Column(spacing=6)
-        self.header_folder = ft.Text(s.header_folder,   size=14, weight=ft.FontWeight.BOLD, color=ft.Colors.CYAN_400)
-        self.header_main   = ft.Text(s.header_download, size=14, weight=ft.FontWeight.BOLD, color=ft.Colors.CYAN_400)
-        self.header_queue  = ft.Text(s.header_queue,    size=14, weight=ft.FontWeight.BOLD, color=ft.Colors.CYAN_400)
+        self.header_folder = self.register_headers(ft.Text(s.header_folder,   size=14, weight=ft.FontWeight.BOLD, color=ft.Colors.CYAN_400))
+        self.header_main   = self.register_headers(ft.Text(s.header_download, size=14, weight=ft.FontWeight.BOLD, color=ft.Colors.CYAN_400))
+        self.header_queue  = self.register_headers(ft.Text(s.header_queue,    size=14, weight=ft.FontWeight.BOLD, color=ft.Colors.CYAN_400))
         self._log_btn = ft.IconButton(
             icon=ft.Icons.RECEIPT_LONG_ROUNDED, icon_color=ft.Colors.GREY_500,
             icon_size=18, tooltip=s.btn_open_log,
@@ -249,14 +249,14 @@ class MainScreen(ThemeTarget):
         )
 
     def _build_layout(self) -> None:
-        self.folder_card = ft.Container(
+        self.folder_card = self.register_cards(ft.Container(
             content=ft.Column([
                 self.header_folder,
                 ft.Row([self.folder_label], vertical_alignment=ft.CrossAxisAlignment.CENTER),
             ], spacing=8, horizontal_alignment=ft.CrossAxisAlignment.STRETCH),
             bgcolor="#161616", border_radius=8, padding=15
-        )
-        self.main_card = ft.Container(
+        ))
+        self.main_card = self.register_cards(ft.Container(
             content=ft.Column([
                 self.header_main,
                 ft.Row([self.url_input, self.download_btn],
@@ -264,8 +264,8 @@ class MainScreen(ThemeTarget):
                 ft.Column([self.audio_only_switch, self.cookies_enabled_switch], spacing=10)
             ], spacing=12, horizontal_alignment=ft.CrossAxisAlignment.STRETCH),
             bgcolor="#161616", border_radius=8, padding=15
-        )
-        self._queue_card = ft.Container(
+        ))
+        self._queue_card = self.register_cards(ft.Container(
             content=ft.Column([
                 ft.Row([self.header_queue, self._log_btn],
                        alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
@@ -273,19 +273,12 @@ class MainScreen(ThemeTarget):
                 self._cards_column,
             ], spacing=10, horizontal_alignment=ft.CrossAxisAlignment.STRETCH),
             bgcolor="#161616", border_radius=8, padding=15,
-        )
+        ))
         self.layout = ft.Column([
             self.folder_card, self.main_card, self._queue_card,
         ], visible=True, expand=True, spacing=15,
            horizontal_alignment=ft.CrossAxisAlignment.STRETCH,
            scroll=ft.ScrollMode.AUTO)
-
-        # ── Регистрация виджетов для ThemeTarget ──────────────────────────────
-        self.register_headers(self.header_folder, self.header_main, self.header_queue)
-        self.register_switches(self.audio_only_switch, self.cookies_enabled_switch)
-        self.register_accents(self.url_input)
-        self.register_buttons(self.download_btn)
-        self.register_cards(self.folder_card, self.main_card, self._queue_card)
 
     # ── Синхронизация ─────────────────────────────────────────────────────────
 

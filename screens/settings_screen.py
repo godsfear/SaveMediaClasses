@@ -130,20 +130,20 @@ class SettingsScreen(ThemeTarget):
     def _build_widgets(self) -> None:
         s = self._s
 
-        self.proxy_input = ft.TextField(
+        self.proxy_input = self.register_accents(ft.TextField(
             label=s.proxy_label, border_radius=8,
             focused_border_color=ft.Colors.BLUE,
-        )
-        self.yt_args_input = ft.TextField(
+        ))
+        self.yt_args_input = self.register_accents(ft.TextField(
             label=s.yt_args_label, border_radius=8,
             focused_border_color=ft.Colors.BLUE,
-        )
-        self.clean_titles_switch   = ft.Switch(label=s.switch_clean,    active_color=ft.Colors.GREEN)
-        self.playlist_switch       = ft.Switch(label=s.switch_playlist, active_color=ft.Colors.GREEN)
-        self.embed_metadata_switch = ft.Switch(label=s.switch_metadata, active_color=ft.Colors.GREEN)
-        self.save_to_source_switch = ft.Switch(label=s.switch_source,   active_color=ft.Colors.GREEN)
+        ))
+        self.clean_titles_switch   = self.register_switches(ft.Switch(label=s.switch_clean,    active_color=ft.Colors.GREEN))
+        self.playlist_switch       = self.register_switches(ft.Switch(label=s.switch_playlist, active_color=ft.Colors.GREEN))
+        self.embed_metadata_switch = self.register_switches(ft.Switch(label=s.switch_metadata, active_color=ft.Colors.GREEN))
+        self.save_to_source_switch = self.register_switches(ft.Switch(label=s.switch_source,   active_color=ft.Colors.GREEN))
 
-        self.cookies_browser_dropdown = ft.Dropdown(
+        self.cookies_browser_dropdown = self.register_accents(ft.Dropdown(
             label=s.cookies_label,
             border_radius=8,
             focused_border_color=ft.Colors.BLUE,
@@ -156,7 +156,7 @@ class SettingsScreen(ThemeTarget):
                 ft.dropdown.Option("opera",   s.cookies_opera),
             ],
             on_select=self._on_browser_dropdown_change,
-        )
+        ))
 
         self.language_dropdown = ft.Dropdown(
             label=s.language_label,
@@ -181,36 +181,37 @@ class SettingsScreen(ThemeTarget):
                     color=ft.Colors.GREY_600, size=13, weight=ft.FontWeight.BOLD,
                 )
 
-        self.progress_text = ft.Text(s.status_waiting, size=12, color=ft.Colors.GREEN_400)
-        self.progress_bar  = ft.ProgressBar(
+        self.progress_text = self.register_progress(ft.Text(s.status_waiting, size=12, color=ft.Colors.GREEN_400))
+        self.progress_bar  = self.register_progress(ft.ProgressBar(
             value=0.0, color=ft.Colors.GREEN_400,
             bgcolor=ft.Colors.SURFACE_CONTAINER_HIGHEST, visible=False,
-        )
+        ))
 
-        self.yt_api_input          = ft.TextField(label=s.url_yt_api,          border_radius=8, focused_border_color=ft.Colors.BLUE)
-        self.yt_download_input     = ft.TextField(label=s.url_yt_download,     border_radius=8, focused_border_color=ft.Colors.BLUE)
-        self.ffmpeg_version_input  = ft.TextField(label=s.url_ffmpeg_version,  border_radius=8, focused_border_color=ft.Colors.BLUE)
-        self.ffmpeg_download_input = ft.TextField(label=s.url_ffmpeg_download, border_radius=8, focused_border_color=ft.Colors.BLUE)
+        self.yt_api_input          = self.register_accents(ft.TextField(label=s.url_yt_api,          border_radius=8, focused_border_color=ft.Colors.BLUE))
+        self.yt_download_input     = self.register_accents(ft.TextField(label=s.url_yt_download,     border_radius=8, focused_border_color=ft.Colors.BLUE))
+        self.ffmpeg_version_input  = self.register_accents(ft.TextField(label=s.url_ffmpeg_version,  border_radius=8, focused_border_color=ft.Colors.BLUE))
+        self.ffmpeg_download_input = self.register_accents(ft.TextField(label=s.url_ffmpeg_download, border_radius=8, focused_border_color=ft.Colors.BLUE))
 
         self.update_btn_icon = ft.Icon(ft.Icons.REFRESH_ROUNDED, color=ft.Colors.WHITE)
         self.update_btn_text = ft.Text(s.btn_check, color=ft.Colors.WHITE, weight=ft.FontWeight.BOLD)
-        self.update_btn = ft.Button(
+        self.update_btn = self.register_buttons(ft.Button(
             content=ft.Row([self.update_btn_icon, self.update_btn_text], tight=True, spacing=8),
             bgcolor=ft.Colors.GREEN,
             style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=8), elevation=2),
             on_click=self._handle_update_button_click,
-        )
+        ))
 
-        self.header_net           = ft.Text(s.section_network,     size=14, weight=ft.FontWeight.BOLD,  color=ft.Colors.CYAN_400)
-        self.header_downloaders   = ft.Text(s.section_downloaders, size=14, weight=ft.FontWeight.BOLD,  color=ft.Colors.CYAN_400)
-        self.header_cookies       = ft.Text(s.section_cookies,     size=13, weight=ft.FontWeight.W_600, color=ft.Colors.CYAN_400)
-        self.header_ytdlp         = ft.Text(s.section_ytdlp,       size=13, weight=ft.FontWeight.W_600, color=ft.Colors.CYAN_400)
+        # _urls-подзаголовки (серые) намеренно НЕ регистрируются как headers.
+        self.header_net           = self.register_headers(ft.Text(s.section_network,     size=14, weight=ft.FontWeight.BOLD,  color=ft.Colors.CYAN_400))
+        self.header_downloaders   = self.register_headers(ft.Text(s.section_downloaders, size=14, weight=ft.FontWeight.BOLD,  color=ft.Colors.CYAN_400))
+        self.header_cookies       = self.register_headers(ft.Text(s.section_cookies,     size=13, weight=ft.FontWeight.W_600, color=ft.Colors.CYAN_400))
+        self.header_ytdlp         = self.register_headers(ft.Text(s.section_ytdlp,       size=13, weight=ft.FontWeight.W_600, color=ft.Colors.CYAN_400))
         self.header_ytdlp_urls    = ft.Text(s.section_ytdlp_urls,  size=12, weight=ft.FontWeight.W_500, color=ft.Colors.GREY_400)
-        self.header_deps          = ft.Text(s.section_deps,        size=14, weight=ft.FontWeight.BOLD,  color=ft.Colors.CYAN_400)
+        self.header_deps          = self.register_headers(ft.Text(s.section_deps,        size=14, weight=ft.FontWeight.BOLD,  color=ft.Colors.CYAN_400))
         self.header_deps_urls     = ft.Text(s.section_deps_urls,   size=12, weight=ft.FontWeight.W_500, color=ft.Colors.GREY_400)
-        self.header_theme         = ft.Text(s.section_theme,       size=14, weight=ft.FontWeight.BOLD,  color=ft.Colors.CYAN_400)
-        self.header_modes         = ft.Text(s.section_modes,       size=14, weight=ft.FontWeight.BOLD,  color=ft.Colors.CYAN_400)
-        self.header_appearance    = ft.Text(s.section_appearance, size=14, weight=ft.FontWeight.BOLD,  color=ft.Colors.CYAN_400)
+        self.header_theme         = self.register_headers(ft.Text(s.section_theme,       size=14, weight=ft.FontWeight.BOLD,  color=ft.Colors.CYAN_400))
+        self.header_modes         = self.register_headers(ft.Text(s.section_modes,       size=14, weight=ft.FontWeight.BOLD,  color=ft.Colors.CYAN_400))
+        self.header_appearance    = self.register_headers(ft.Text(s.section_appearance, size=14, weight=ft.FontWeight.BOLD,  color=ft.Colors.CYAN_400))
 
     # ── Куки UI ───────────────────────────────────────────────────────────────
 
@@ -259,12 +260,11 @@ class SettingsScreen(ThemeTarget):
                 hint_text="RRGGBB",
             )
             palette_grid = ft.Row(wrap=True, spacing=4, run_spacing=4, width=280)
-            palette_container = ft.Container(
+            # surface + border на одном контейнере — регистрации вкладываются.
+            palette_container = self.register_surfaces(self.register_borders(ft.Container(
                 content=palette_grid, bgcolor="#1e1e1e", border_radius=8,
                 padding=8, border=ft.Border.all(1, "#333333"), visible=False,
-            )
-            self.register_surfaces(palette_container)
-            self.register_borders(palette_container)
+            )))
 
             def apply_color(hex_val: str):
                 setattr(self._state.theme, field_key, hex_val)
@@ -316,8 +316,7 @@ class SettingsScreen(ThemeTarget):
         for group_label_key, field_keys in THEME_GROUPS:
             group_label = getattr(s, group_label_key, group_label_key)
             rows = [make_color_row(k, field_map[k]) for k in field_keys]
-            divider = ft.Divider(height=1, color="#2a2a2a")
-            self.register_dividers(divider)
+            divider = self.register_dividers(ft.Divider(height=1, color="#2a2a2a"))
             group_columns.append(ft.Column([
                 ft.Text(group_label, size=12, color=ft.Colors.GREY_500, weight=ft.FontWeight.W_500),
                 divider,
@@ -325,7 +324,7 @@ class SettingsScreen(ThemeTarget):
             ], spacing=8))
 
         self.theme_fields_column = ft.Column(group_columns, spacing=18)
-        self.theme_section = ft.Container(
+        self.theme_section = self.register_cards(ft.Container(
             content=ft.Column([
                 ft.Row([
                     self.header_theme,
@@ -339,7 +338,7 @@ class SettingsScreen(ThemeTarget):
                 self.theme_fields_column,
             ], spacing=10, horizontal_alignment=ft.CrossAxisAlignment.STRETCH),
             bgcolor="#161616", border_radius=8, padding=15,
-        )
+        ))
 
     # ── Секция «Тёмная/Светлая» + именованные наборы ─────────────────────────
 
@@ -349,12 +348,11 @@ class SettingsScreen(ThemeTarget):
         self._mode_row = ft.Row(spacing=8)
         self._rebuild_mode_buttons()
 
-        self.theme_set_dropdown = ft.Dropdown(
+        self.theme_set_dropdown = self.register_accents(ft.Dropdown(
             label=s.theme_saved_label, border_radius=8, width=220,
             focused_border_color=ft.Colors.BLUE, options=[],
-        )
+        ))
         self._refresh_set_options()
-        self.register_accents(self.theme_set_dropdown)
 
         self._btn_set_apply = ft.IconButton(
             icon=ft.Icons.CHECK_CIRCLE_OUTLINE_ROUNDED, icon_size=20,
@@ -364,14 +362,13 @@ class SettingsScreen(ThemeTarget):
             icon=ft.Icons.DELETE_OUTLINE_ROUNDED, icon_size=20,
             tooltip=s.btn_theme_delete, on_click=self._delete_saved_theme,
         )
-        self._btn_set_save = ft.Button(
+        self._btn_set_save = self.register_buttons(ft.Button(
             content=ft.Row([ft.Icon(ft.Icons.SAVE_OUTLINED, size=18),
                             ft.Text(s.btn_theme_save)], tight=True, spacing=8),
             on_click=self._open_save_dialog,
-        )
-        self.register_buttons(self._btn_set_save)
+        ))
 
-        self.theme_sets_section = ft.Container(
+        self.theme_sets_section = self.register_cards(ft.Container(
             content=ft.Column([
                 self.header_modes,
                 self._mode_row,
@@ -380,7 +377,7 @@ class SettingsScreen(ThemeTarget):
                 ft.Row([self._btn_set_save], alignment=ft.MainAxisAlignment.START),
             ], spacing=12, horizontal_alignment=ft.CrossAxisAlignment.STRETCH),
             border_radius=8, padding=15,
-        )
+        ))
 
     def _rebuild_mode_buttons(self) -> None:
         s = self._s
@@ -711,7 +708,8 @@ class SettingsScreen(ThemeTarget):
     # ── Лэйаут ────────────────────────────────────────────────────────────────
 
     def _build_layout(self) -> None:
-        ytdlp_section = ft.Container(
+        # surface + border на одном контейнере — регистрации вкладываются.
+        ytdlp_section = self.register_surfaces(self.register_borders(ft.Container(
             content=ft.Column([
                 self.header_ytdlp,
                 self.yt_args_input,
@@ -731,18 +729,16 @@ class SettingsScreen(ThemeTarget):
             ], spacing=12, horizontal_alignment=ft.CrossAxisAlignment.STRETCH),
             bgcolor="#121212", border_radius=6, padding=12,
             border=ft.Border.all(1, "#2a2a2a"),
-        )
-        self.register_surfaces(ytdlp_section)
-        self.register_borders(ytdlp_section)
+        )))
 
-        self._card_net = ft.Container(
+        self._card_net = self.register_cards(ft.Container(
             content=ft.Column([
                 self.header_net,
                 self.proxy_input,
             ], spacing=12, horizontal_alignment=ft.CrossAxisAlignment.STRETCH),
             bgcolor="#161616", border_radius=8, padding=15,
-        )
-        self._card_downloaders = ft.Container(
+        ))
+        self._card_downloaders = self.register_cards(ft.Container(
             content=ft.Column([
                 self.header_downloaders,
                 self.header_cookies,
@@ -750,8 +746,8 @@ class SettingsScreen(ThemeTarget):
                 ytdlp_section,
             ], spacing=12, horizontal_alignment=ft.CrossAxisAlignment.STRETCH),
             bgcolor="#161616", border_radius=8, padding=15,
-        )
-        self._card_deps = ft.Container(
+        ))
+        self._card_deps = self.register_cards(ft.Container(
             content=ft.Column([
                 self.header_deps,
                 ft.Column(list(self._tool_status.values()), spacing=6),
@@ -769,14 +765,14 @@ class SettingsScreen(ThemeTarget):
                 ),
             ], spacing=12, horizontal_alignment=ft.CrossAxisAlignment.STRETCH),
             bgcolor="#161616", border_radius=8, padding=15,
-        )
-        self._card_appearance = ft.Container(
+        ))
+        self._card_appearance = self.register_cards(ft.Container(
             content=ft.Column([
                 self.header_appearance,
                 self.language_dropdown,
             ], spacing=12, horizontal_alignment=ft.CrossAxisAlignment.STRETCH),
             bgcolor="#161616", border_radius=8, padding=15,
-        )
+        ))
 
         self.layout = ft.Column([
             self._card_net,
@@ -787,27 +783,3 @@ class SettingsScreen(ThemeTarget):
             self._card_appearance,
         ], visible=False, scroll=ft.ScrollMode.AUTO, expand=True, spacing=15,
            horizontal_alignment=ft.CrossAxisAlignment.STRETCH)
-
-        # ── Регистрация виджетов для ThemeTarget ──────────────────────────────
-        self.register_headers(
-            self.header_net, self.header_downloaders, self.header_cookies,
-            self.header_ytdlp, self.header_deps,
-            self.header_theme, self.header_modes, self.header_appearance,
-        )
-        self.register_switches(
-            self.clean_titles_switch, self.playlist_switch,
-            self.embed_metadata_switch, self.save_to_source_switch,
-        )
-        self.register_accents(
-            self.proxy_input, self.yt_args_input,
-            self.cookies_browser_dropdown,
-            self.yt_api_input, self.yt_download_input,
-            self.ffmpeg_version_input, self.ffmpeg_download_input,
-        )
-        self.register_buttons(self.update_btn)
-        self.register_cards(
-            self._card_net, self._card_downloaders,
-            self._card_deps, self._card_appearance,
-            self.theme_section, self.theme_sets_section,
-        )
-        self.register_progress(self.progress_bar, self.progress_text)

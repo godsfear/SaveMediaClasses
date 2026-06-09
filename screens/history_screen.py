@@ -58,17 +58,17 @@ class HistoryScreen(ThemeTarget):
 
     def _build_widgets(self) -> None:
         s = self._s()
-        self.header = ft.Text(
+        self.header = self.register_headers(ft.Text(
             s.header_history, size=14,
             weight=ft.FontWeight.BOLD, color=ft.Colors.CYAN_400
-        )
+        ))
         self._filter_row = ft.Row(spacing=6, wrap=True)
-        self._stats_text = ft.Text("", size=12, color=ft.Colors.GREY_500)
+        self._stats_text = self.register_muted_text(ft.Text("", size=12, color=ft.Colors.GREY_500))
         self._list       = ft.Column(spacing=6)
-        self._empty      = ft.Text(
+        self._empty      = self.register_muted_text(ft.Text(
             s.history_empty, size=13, color=ft.Colors.GREY_600,
             text_align=ft.TextAlign.CENTER, visible=False
-        )
+        ))
         self._rebuild_filter_buttons()
 
     def _rebuild_filter_buttons(self) -> None:
@@ -105,7 +105,7 @@ class HistoryScreen(ThemeTarget):
 
     def _build_layout(self) -> None:
         s = self._s()
-        self._card_header = ft.Container(
+        self._card_header = self.register_cards(ft.Container(
             content=ft.Column([
                 ft.Row([
                     self.header,
@@ -121,8 +121,8 @@ class HistoryScreen(ThemeTarget):
                 self._stats_text,
             ], spacing=10, horizontal_alignment=ft.CrossAxisAlignment.STRETCH),
             border_radius=8, padding=15,
-        )
-        self._card_list = ft.Container(
+        ))
+        self._card_list = self.register_cards(ft.Container(
             content=ft.Column(
                 [self._empty, self._list],
                 expand=True,
@@ -130,17 +130,12 @@ class HistoryScreen(ThemeTarget):
                 horizontal_alignment=ft.CrossAxisAlignment.STRETCH,
             ),
             border_radius=8, padding=15, expand=True,
-        )
+        ))
         self.layout = ft.Column(
             [self._card_header, self._card_list],
             visible=False, expand=True, spacing=15,
             horizontal_alignment=ft.CrossAxisAlignment.STRETCH,
         )
-
-        # ── Регистрация виджетов для ThemeTarget ──────────────────────────────
-        self.register_headers(self.header)
-        self.register_cards(self._card_header, self._card_list)
-        self.register_muted_text(self._stats_text, self._empty)
 
     def apply_theme(self, t) -> None:
         """Применить ThemeConfig к виджетам экрана.
