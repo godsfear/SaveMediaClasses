@@ -23,6 +23,7 @@ from events import (
 
 if TYPE_CHECKING:
     from managers.providers import DownloadProvider
+    from state import AppState
 
 MAX_PARALLEL = 5
 
@@ -59,6 +60,41 @@ class DownloadSnapshot:
     playlist_dir_template: str = "%(playlist_title)s"
     playlist_idx_prefix:   str = "%(playlist_index)s - "
     source_dir_template:   str = "%(extractor_key)s"
+
+    @classmethod
+    def from_state(cls, state: "AppState", url: str) -> "DownloadSnapshot":
+        """Собрать неизменяемый снимок из текущего AppState.
+
+        Знание внутренних имён флагов/шаблонов yt-dlp-параметров локализовано
+        здесь, а не в UI-экране: экрану достаточно вызвать from_state(state, url).
+        Доступ к параметрам — через типизированный аксессор state.ytdlp,
+        поэтому строковых имён инструментов тут тоже нет.
+        """
+        p = state.ytdlp.parameters
+        return cls(
+            url=url,
+            download_path=state.download_path,
+            proxy_enabled=state.proxy_enabled,
+            proxy_address=state.proxy_address,
+            cookies_enabled=p.cookies.state,
+            cookies_browser=p.cookies.browser,
+            playlist_enabled=p.playlist.state,
+            embed_metadata=p.embed_metadata.state,
+            audio_only=p.audio_only.state,
+            yt_dlp_args=p.extra_args.value,
+            clean_titles=p.clean_titles.state,
+            save_to_source=p.save_to_source.state,
+            cookies_flag=p.cookies.flag,
+            playlist_flag_on=p.playlist.flag_on,
+            playlist_flag_off=p.playlist.flag_off,
+            metadata_flags=p.embed_metadata.args,
+            audio_flags=p.audio_only.args,
+            clean_title_template=p.clean_titles.template_on,
+            title_id_template=p.clean_titles.template_off,
+            playlist_dir_template=p.playlist.dir_template,
+            playlist_idx_prefix=p.playlist.idx_prefix,
+            source_dir_template=p.save_to_source.dir_template,
+        )
 
 
 # ── Внутреннее состояние одной задачи ────────────────────────────────────────
