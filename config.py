@@ -9,6 +9,7 @@ CHECK_INTERVAL_SECONDS = 6 * 3600
 # ── Сетевые константы (chunk / timeout) ──────────────────────────────────────
 YT_DLP_CHUNK_SIZE      = 8_192   # байт/итерацию при скачивании yt-dlp
 FFMPEG_CHUNK_SIZE      = 16_384  # байт/итерацию при скачивании ffmpeg zip
+ARIA2_CHUNK_SIZE       = 16_384  # байт/итерацию при скачивании aria2 zip
 THUMBNAIL_TIMEOUT      = 15.0    # секунд — общий async-таймаут скачивания thumbnail
 THUMBNAIL_SOCK_TIMEOUT = 10      # секунд — connect-таймаут httpx для thumbnail
 
@@ -24,6 +25,13 @@ DEFAULT_YT_DOWNLOAD_URL     = (
 )
 DEFAULT_FFMPEG_VERSION_URL  = "https://www.gyan.dev/ffmpeg/builds/release-version"
 DEFAULT_FFMPEG_DOWNLOAD_URL = "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-full.zip"
+
+# aria2 публикует релизы на GitHub. Имя ассета содержит версию
+# (aria2-X.Y.Z-win-64bit-buildN.zip), поэтому стабильного "latest"-URL на сам
+# zip нет: и проверка версии, и установка идут через releases/latest API —
+# Aria2cTool.install() сам находит нужный ассет в ответе. Отсюда оба URL равны.
+DEFAULT_ARIA2_VERSION_URL   = "https://api.github.com/repos/aria2/aria2/releases/latest"
+DEFAULT_ARIA2_DOWNLOAD_URL  = "https://api.github.com/repos/aria2/aria2/releases/latest"
 
 
 # ── Typed конфиги (вместо Dict) ───────────────────────────────────────────────
@@ -542,6 +550,24 @@ def hex_to_flet(hex_str: str) -> str:
 def is_valid_hex(value: str) -> bool:
     h = value.strip().lstrip("#").upper()
     return len(h) == 6 and all(c in "0123456789ABCDEF" for c in h)
+
+
+def download_display_name(url: str) -> str:
+    """Человекочитаемое имя загрузки из URL.
+
+    magnet — параметр dn (display name), он же реальное имя торрента;
+    остальные ссылки возвращаются как есть (для yt-dlp имя берётся из метаданных
+    отдельно, у прямых http-ссылок имя файла и так видно в самом URL)."""
+    from urllib.parse import urlparse, parse_qs, unquote
+    u = safe_str(url).strip()
+    if u.lower().startswith("magnet:"):
+        try:
+            dn = parse_qs(urlparse(u).query).get("dn", [""])[0]
+            if dn:
+                return unquote(dn)
+        except Exception:
+            pass
+    return u
 
 
 def safe_str(value: Any) -> str:

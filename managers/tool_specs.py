@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import abc
 import os
+import zipfile
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Callable, Optional, Protocol, runtime_checkable
 
@@ -292,3 +293,22 @@ async def stream_to_file(
         except Exception:
             pass
         raise
+
+
+def extract_zip_members(zip_path: str, tools_dir: str, members: set[str]) -> int:
+    """
+    Распаковать из zip все записи, чьё базовое имя (в нижнем регистре) есть в
+    members, прямо в tools_dir (без вложенных каталогов архива). Возвращает число
+    извлечённых файлов. Общий примитив для инструментов, поставляемых zip-архивом
+    (ffmpeg-комплект, aria2c во вложенной папке сборки).
+    """
+    found = 0
+    with zipfile.ZipFile(zip_path, "r") as zf:
+        for member in zf.namelist():
+            base = os.path.basename(member).lower()
+            if base in members:
+                target = os.path.join(tools_dir, base)
+                with zf.open(member) as src, open(target, "wb") as dst:
+                    dst.write(src.read())
+                found += 1
+    return found
