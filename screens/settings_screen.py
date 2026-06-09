@@ -2,7 +2,7 @@
 import flet as ft
 
 from config import (
-    THEME_FIELDS, THEME_GROUPS, PALETTE, ThemeConfig, ToolConfig,
+    THEME_FIELDS, THEME_GROUPS, PALETTE, ThemeConfig,
     hex_to_flet, is_valid_hex, safe_str
 )
 from managers.tools_manager import (
@@ -36,20 +36,6 @@ def _resolve_version(version: str, s) -> str:
     if version in (TOOL_VERSION_REMOTE_ERR, TOOL_VERSION_UNKNOWN):
         return s.tool_status_error
     return version
-
-
-def _lookup_binary_info(tools: dict, binary_name: str):
-    """Найти версионную информацию бинарника в иерархии tools.
-
-    Возвращает ToolConfig (для основного бинарника инструмента) или BinaryInfo
-    (для вторичного). Оба имеют атрибуты current/latest/status.
-    """
-    if binary_name in tools:
-        return tools[binary_name]
-    for tc in tools.values():
-        if binary_name in tc.binaries:
-            return tc.binaries[binary_name]
-    return None
 
 
 # Единая карта статус → цвет (используется и при проверке, и при восстановлении).
@@ -100,7 +86,7 @@ class SettingsScreen(ThemeTarget):
 
     def sync_from_state(self) -> None:
         s = self._state
-        p = s.tools["yt-dlp"].parameters
+        p = s.ytdlp.parameters
         self.proxy_input.value                 = s.proxy_address
         self.yt_args_input.value               = p.extra_args.value
         self.clean_titles_switch.value         = p.clean_titles.state
@@ -108,17 +94,15 @@ class SettingsScreen(ThemeTarget):
         self.embed_metadata_switch.value       = p.embed_metadata.state
         self.save_to_source_switch.value       = p.save_to_source.state
         self.cookies_browser_dropdown.value    = p.cookies.browser
-        ytdlp_cfg  = s.tools.get("yt-dlp",  ToolConfig())
-        ffmpeg_cfg = s.tools.get("ffmpeg",  ToolConfig())
-        self.yt_api_input.value          = ytdlp_cfg.version_url
-        self.yt_download_input.value     = ytdlp_cfg.download_url
-        self.ffmpeg_version_input.value  = ffmpeg_cfg.version_url
-        self.ffmpeg_download_input.value = ffmpeg_cfg.download_url
+        self.yt_api_input.value          = s.ytdlp.version_url
+        self.yt_download_input.value     = s.ytdlp.download_url
+        self.ffmpeg_version_input.value  = s.ffmpeg.version_url
+        self.ffmpeg_download_input.value = s.ffmpeg.download_url
         self.language_dropdown.value           = s.language
 
     def sync_to_state(self) -> None:
         s = self._state
-        p = s.tools["yt-dlp"].parameters
+        p = s.ytdlp.parameters
         s.proxy_address              = safe_str(self.proxy_input.value)
         p.extra_args.value           = safe_str(self.yt_args_input.value)
         p.clean_titles.state         = bool(self.clean_titles_switch.value)
@@ -126,12 +110,10 @@ class SettingsScreen(ThemeTarget):
         p.embed_metadata.state       = bool(self.embed_metadata_switch.value)
         p.save_to_source.state       = bool(self.save_to_source_switch.value)
         p.cookies.browser            = safe_str(self.cookies_browser_dropdown.value)
-        if "yt-dlp" in s.tools:
-            s.tools["yt-dlp"].version_url  = safe_str(self.yt_api_input.value)
-            s.tools["yt-dlp"].download_url = safe_str(self.yt_download_input.value)
-        if "ffmpeg" in s.tools:
-            s.tools["ffmpeg"].version_url  = safe_str(self.ffmpeg_version_input.value)
-            s.tools["ffmpeg"].download_url = safe_str(self.ffmpeg_download_input.value)
+        s.ytdlp.version_url   = safe_str(self.yt_api_input.value)
+        s.ytdlp.download_url  = safe_str(self.yt_download_input.value)
+        s.ffmpeg.version_url  = safe_str(self.ffmpeg_version_input.value)
+        s.ffmpeg.download_url = safe_str(self.ffmpeg_download_input.value)
         s.language              = Locale.resolve_language(
             safe_str(self.language_dropdown.value) or Locale.default_language()
         )
@@ -449,7 +431,7 @@ class SettingsScreen(ThemeTarget):
     def on_tools_restored(self, e: ToolsRestoredEvent) -> None:
         s = self._s
         for name, widget in self._tool_status.items():
-            info = _lookup_binary_info(e.tools, name)
+            info = e.versions.get(name)
             if info:
                 widget.value = s.fmt("tool_versions",
                                      name=name,

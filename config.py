@@ -1,6 +1,6 @@
 import os
 from dataclasses import dataclass, field, replace
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
 # ── Константы приложения ──────────────────────────────────────────────────────
 
@@ -118,34 +118,50 @@ class WindowConfig:
         )
 
 # ── Конфигурация инструментов ────────────────────────────────────────────────
+#
+# Разделение ответственности:
+#   • *Config (ToolConfig, YtDlpConfig, FfmpegConfig, BinaryDef) — СТАТИЧЕСКАЯ
+#     конфигурация: URL, имена файлов, флаги. Редактируется пользователем,
+#     персистится в секции "tools" config.json.
+#   • VersionState — RUNTIME-состояние версий (current/latest/status), которое
+#     контроллер обновляет при проверке. Персистится отдельно, в секции
+#     "tool_versions", ключ — имя бинарника. Конфиг им не «загрязняется».
+
 
 @dataclass
-class BinaryInfo:
-    """Параметры и версионное состояние вторичного бинарника (без собственных URL)."""
-    filename:     str = ""
-    version_flag: str = ""
-    current:      str = ""
-    latest:       str = ""
-    status:       str = ""
+class VersionState:
+    """Runtime-состояние версий одного бинарника. НЕ часть статической конфигурации."""
+    current: str = ""
+    latest:  str = ""
+    status:  str = ""
 
     def to_dict(self) -> Dict[str, str]:
-        return {
-            "filename":     self.filename,
-            "version_flag": self.version_flag,
-            "current":      self.current,
-            "latest":       self.latest,
-            "status":       self.status,
-        }
+        return {"current": self.current, "latest": self.latest, "status": self.status}
 
     @staticmethod
-    def from_dict(d: Dict[str, Any], defaults: "BinaryInfo | None" = None) -> "BinaryInfo":
-        def_ = defaults or BinaryInfo()
-        return BinaryInfo(
+    def from_dict(d: Dict[str, Any]) -> "VersionState":
+        return VersionState(
+            current = safe_str(d.get("current")),
+            latest  = safe_str(d.get("latest")),
+            status  = safe_str(d.get("status")),
+        )
+
+
+@dataclass
+class BinaryDef:
+    """Статическое описание вторичного бинарника инструмента (имя файла + флаг версии)."""
+    filename:     str = ""
+    version_flag: str = ""
+
+    def to_dict(self) -> Dict[str, str]:
+        return {"filename": self.filename, "version_flag": self.version_flag}
+
+    @staticmethod
+    def from_dict(d: Dict[str, Any], defaults: "BinaryDef | None" = None) -> "BinaryDef":
+        def_ = defaults or BinaryDef()
+        return BinaryDef(
             filename     = safe_str(d.get("filename"))     or def_.filename,
             version_flag = safe_str(d.get("version_flag")) or def_.version_flag,
-            current      = safe_str(d.get("current")),
-            latest       = safe_str(d.get("latest")),
-            status       = safe_str(d.get("status")),
         )
 
 
@@ -329,88 +345,91 @@ class YtDlpParameters:
 
 @dataclass
 class ToolConfig:
-    """Параметры и версионное состояние одного инструмента."""
+    """
+    Базовая СТАТИЧЕСКАЯ конфигурация одного инструмента — общая для всех.
+
+    Инструмент-специфичные поля живут в подклассах (YtDlpConfig.parameters,
+    FfmpegConfig.binaries). Runtime-версии (current/latest/status) здесь НЕ
+    хранятся — они в state.tool_versions (VersionState).
+
+    Полиморфизм сериализации: каждый подкласс расширяет to_dict()/from_dict().
+    Загрузчик диспетчеризует по типу дефолта: type(default).from_dict(raw, default).
+    """
     version_url:  str = ""
     download_url: str = ""
     chunk_size:   int = 8_192
     filename:     str = ""        # базовое имя основного бинарника (без расширения)
     version_flag: str = ""        # флаг для получения версии
-    current:      str = ""
-    latest:       str = ""
-    status:       str = ""
-    binaries:   Dict[str, BinaryInfo]          = field(default_factory=dict)
-    parameters: Optional["YtDlpParameters"]    = None   # только для yt-dlp
 
     def to_dict(self) -> Dict[str, Any]:
-        d: Dict[str, Any] = {
+        return {
             "version_url":  self.version_url,
             "download_url": self.download_url,
             "chunk_size":   self.chunk_size,
             "filename":     self.filename,
             "version_flag": self.version_flag,
-            "current":      self.current,
-            "latest":       self.latest,
-            "status":       self.status,
         }
-        if self.binaries:
-            d["binaries"] = {k: v.to_dict() for k, v in self.binaries.items()}
-        if self.parameters is not None:
-            d["parameters"] = self.parameters.to_dict()
-        return d
 
     @staticmethod
-    def from_dict(d: Dict[str, Any], defaults: "ToolConfig") -> "ToolConfig":
-        binaries: Dict[str, BinaryInfo] = {k: replace(v) for k, v in defaults.binaries.items()}
+    def _base_kwargs(d: Dict[str, Any], def_: "ToolConfig") -> Dict[str, Any]:
+        """Общие поля базового ToolConfig — переиспользуется from_dict подклассов."""
+        return dict(
+            version_url  = safe_str(d.get("version_url"))  or def_.version_url,
+            download_url = safe_str(d.get("download_url")) or def_.download_url,
+            chunk_size   = safe_int(d.get("chunk_size"), def_.chunk_size),
+            filename     = safe_str(d.get("filename"))     or def_.filename,
+            version_flag = safe_str(d.get("version_flag")) or def_.version_flag,
+        )
+
+    @classmethod
+    def from_dict(cls, d: Dict[str, Any], defaults: "ToolConfig | None" = None) -> "ToolConfig":
+        def_ = defaults or cls()
+        return cls(**cls._base_kwargs(d, def_))
+
+
+@dataclass
+class YtDlpConfig(ToolConfig):
+    """Конфигурация yt-dlp: добавляет параметры скачивания (переключатели UI + CLI)."""
+    parameters: YtDlpParameters = field(default_factory=YtDlpParameters)
+
+    def to_dict(self) -> Dict[str, Any]:
+        d = super().to_dict()
+        d["parameters"] = self.parameters.to_dict()
+        return d
+
+    @classmethod
+    def from_dict(cls, d: Dict[str, Any], defaults: "ToolConfig | None" = None) -> "YtDlpConfig":
+        def_ = defaults if isinstance(defaults, YtDlpConfig) else cls()
+        raw = d.get("parameters", {})
+        params = YtDlpParameters.from_dict(
+            raw if isinstance(raw, dict) else {}, def_.parameters
+        )
+        return cls(**cls._base_kwargs(d, def_), parameters=params)
+
+
+@dataclass
+class FfmpegConfig(ToolConfig):
+    """Конфигурация ffmpeg-комплекта: добавляет описание вторичных бинарников."""
+    binaries: Dict[str, BinaryDef] = field(default_factory=dict)
+
+    def to_dict(self) -> Dict[str, Any]:
+        d = super().to_dict()
+        if self.binaries:
+            d["binaries"] = {k: v.to_dict() for k, v in self.binaries.items()}
+        return d
+
+    @classmethod
+    def from_dict(cls, d: Dict[str, Any], defaults: "ToolConfig | None" = None) -> "FfmpegConfig":
+        def_ = defaults if isinstance(defaults, FfmpegConfig) else cls()
+        binaries: Dict[str, BinaryDef] = {k: replace(v) for k, v in def_.binaries.items()}
         raw_bins = d.get("binaries", {})
         if isinstance(raw_bins, dict):
             for bin_name, bin_data in raw_bins.items():
                 if isinstance(bin_data, dict):
-                    bin_default = defaults.binaries.get(bin_name, BinaryInfo())
-                    binaries[bin_name] = BinaryInfo.from_dict(bin_data, bin_default)
-        parameters = None
-        if defaults.parameters is not None:
-            raw_params = d.get("parameters", {})
-            parameters = YtDlpParameters.from_dict(
-                raw_params if isinstance(raw_params, dict) else {},
-                defaults.parameters,
-            )
-        return ToolConfig(
-            version_url  = safe_str(d.get("version_url"))  or defaults.version_url,
-            download_url = safe_str(d.get("download_url")) or defaults.download_url,
-            chunk_size   = safe_int(d.get("chunk_size"), defaults.chunk_size),
-            filename     = safe_str(d.get("filename"))     or defaults.filename,
-            version_flag = safe_str(d.get("version_flag")) or defaults.version_flag,
-            current      = safe_str(d.get("current")),
-            latest       = safe_str(d.get("latest")),
-            status       = safe_str(d.get("status")),
-            binaries     = binaries,
-            parameters   = parameters,
-        )
-
-
-def default_tools_config() -> Dict[str, ToolConfig]:
-    """Дефолтная конфигурация всех инструментов приложения."""
-    return {
-        "yt-dlp": ToolConfig(
-            version_url  = DEFAULT_YT_API_URL,
-            download_url = DEFAULT_YT_DOWNLOAD_URL,
-            chunk_size   = YT_DLP_CHUNK_SIZE,
-            filename     = "yt-dlp",
-            version_flag = "--version",
-            parameters   = YtDlpParameters(),
-        ),
-        "ffmpeg": ToolConfig(
-            version_url  = DEFAULT_FFMPEG_VERSION_URL,
-            download_url = DEFAULT_FFMPEG_DOWNLOAD_URL,
-            chunk_size   = FFMPEG_CHUNK_SIZE,
-            filename     = "ffmpeg",
-            version_flag = "-version",
-            binaries     = {
-                "ffplay":  BinaryInfo(filename="ffplay",  version_flag="-version"),
-                "ffprobe": BinaryInfo(filename="ffprobe", version_flag="-version"),
-            },
-        ),
-    }
+                    binaries[bin_name] = BinaryDef.from_dict(
+                        bin_data, def_.binaries.get(bin_name)
+                    )
+        return cls(**cls._base_kwargs(d, def_), binaries=binaries)
 
 
 # ── UI-метаданные темы (порядок полей для Settings) ──────────────────────────

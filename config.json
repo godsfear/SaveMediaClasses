@@ -3,7 +3,7 @@
         "download_path": "d:\\Downloads",
         "proxy_address": "socks5://127.0.0.1:9050",
         "proxy_enabled": false,
-        "last_check_time": 1780960477.8444576,
+        "last_check_time": 1780996535.3044538,
         "last_needs_update": false
     },
     "tools": {
@@ -13,9 +13,6 @@
             "chunk_size": 8192,
             "filename": "yt-dlp",
             "version_flag": "--version",
-            "current": "2026.03.17",
-            "latest": "2026.03.17",
-            "status": "ok",
             "parameters": {
                 "audio_only": {
                     "state": false,
@@ -57,32 +54,45 @@
             "chunk_size": 16384,
             "filename": "ffmpeg",
             "version_flag": "-version",
-            "current": "8.1.1",
-            "latest": "8.1.1",
-            "status": "ok",
             "binaries": {
                 "ffplay": {
                     "filename": "ffplay",
-                    "version_flag": "-version",
-                    "current": "8.1.1",
-                    "latest": "8.1.1",
-                    "status": "ok"
+                    "version_flag": "-version"
                 },
                 "ffprobe": {
                     "filename": "ffprobe",
-                    "version_flag": "-version",
-                    "current": "8.1.1",
-                    "latest": "8.1.1",
-                    "status": "ok"
+                    "version_flag": "-version"
                 }
             }
+        }
+    },
+    "tool_versions": {
+        "yt-dlp": {
+            "current": "2026.03.17",
+            "latest": "2026.03.17",
+            "status": "ok"
+        },
+        "ffmpeg": {
+            "current": "8.1.1",
+            "latest": "8.1.1",
+            "status": "ok"
+        },
+        "ffplay": {
+            "current": "8.1.1",
+            "latest": "8.1.1",
+            "status": "ok"
+        },
+        "ffprobe": {
+            "current": "8.1.1",
+            "latest": "8.1.1",
+            "status": "ok"
         }
     },
     "window": {
         "width": 688,
         "height": 991,
-        "left": 3081,
-        "top": 283
+        "left": 3095,
+        "top": 224
     },
     "theme": {
         "accent_color": "00B4D8",
@@ -94,5 +104,5 @@
         "appbar_color": "1c1c1c",
         "card_color": "161616"
     },
-    "language": "en"
+    "language": "ru"
 }
