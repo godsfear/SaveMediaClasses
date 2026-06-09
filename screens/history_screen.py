@@ -109,12 +109,12 @@ class HistoryScreen(ThemeTarget):
             content=ft.Column([
                 ft.Row([
                     self.header,
-                    ft.IconButton(
+                    self.register_icon_buttons(ft.IconButton(
                         icon=ft.Icons.REFRESH_ROUNDED,
                         icon_color=ft.Colors.GREY_500,
                         icon_size=18, tooltip=s.btn_refresh,
                         on_click=lambda _: self.refresh(),
-                    ),
+                    )),
                 ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
                    vertical_alignment=ft.CrossAxisAlignment.CENTER),
                 self._filter_row,

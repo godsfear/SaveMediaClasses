@@ -210,27 +210,28 @@ class MainScreen(ThemeTarget):
             weight=ft.FontWeight.W_500, expand=True,
             no_wrap=True, overflow=ft.TextOverflow.ELLIPSIS
         )
+        url_clear_btn = self.register_icon_buttons(ft.IconButton(
+            icon=ft.Icons.CANCEL_ROUNDED, icon_color=ft.Colors.GREY_500,
+            icon_size=18, tooltip=s.btn_clear,
+            on_click=lambda _: [
+                setattr(self.url_input, "value", ""),
+                self._on_url_change(None),
+                self._page.update()
+            ]
+        ))
         self.url_input = self.register_accents(ft.TextField(
             label=s.url_label,
             hint_text=s.url_hint,
             expand=True, border_radius=8,
             focused_border_color=ft.Colors.BLUE,
             on_change=self._on_url_change,
-            suffix=ft.IconButton(
-                icon=ft.Icons.CANCEL_ROUNDED, icon_color=ft.Colors.GREY_500,
-                icon_size=18, tooltip=s.btn_clear,
-                on_click=lambda _: [
-                    setattr(self.url_input, "value", ""),
-                    self._on_url_change(None),
-                    self._page.update()
-                ]
-            )
+            suffix=url_clear_btn,
         ))
         self.audio_only_switch      = self.register_switches(ft.Switch(label=s.switch_audio_only, active_color=ft.Colors.GREEN))
         self.cookies_enabled_switch = self.register_switches(ft.Switch(label=s.switch_cookies,    active_color=ft.Colors.GREEN, value=False))
 
-        self._btn_icon = ft.Icon(ft.Icons.DOWNLOAD_ROUNDED, color=ft.Colors.WHITE)
-        self._btn_text = ft.Text(s.btn_download, color=ft.Colors.WHITE, weight=ft.FontWeight.BOLD)
+        self._btn_icon = self.register_button_texts(ft.Icon(ft.Icons.DOWNLOAD_ROUNDED, color=ft.Colors.WHITE))
+        self._btn_text = self.register_button_texts(ft.Text(s.btn_download, color=ft.Colors.WHITE, weight=ft.FontWeight.BOLD))
         self.download_btn = self.register_buttons(ft.Button(
             content=ft.Row([self._btn_icon, self._btn_text], tight=True, spacing=8),
             bgcolor=ft.Colors.GREEN, tooltip=s.btn_download_tooltip,
@@ -242,11 +243,11 @@ class MainScreen(ThemeTarget):
         self.header_folder = self.register_headers(ft.Text(s.header_folder,   size=14, weight=ft.FontWeight.BOLD, color=ft.Colors.CYAN_400))
         self.header_main   = self.register_headers(ft.Text(s.header_download, size=14, weight=ft.FontWeight.BOLD, color=ft.Colors.CYAN_400))
         self.header_queue  = self.register_headers(ft.Text(s.header_queue,    size=14, weight=ft.FontWeight.BOLD, color=ft.Colors.CYAN_400))
-        self._log_btn = ft.IconButton(
+        self._log_btn = self.register_icon_buttons(ft.IconButton(
             icon=ft.Icons.RECEIPT_LONG_ROUNDED, icon_color=ft.Colors.GREY_500,
             icon_size=18, tooltip=s.btn_open_log,
             on_click=lambda _: self._open_log(str(self._paths.log_file))
-        )
+        ))
 
     def _build_layout(self) -> None:
         self.folder_card = self.register_cards(ft.Container(
