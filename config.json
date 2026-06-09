@@ -3,7 +3,7 @@
         "download_path": "d:\\Downloads",
         "proxy_address": "socks5://127.0.0.1:9050",
         "proxy_enabled": false,
-        "last_check_time": 1780996535.3044538,
+        "last_check_time": 1780997863.9174693,
         "last_needs_update": false
     },
     "tools": {
@@ -11,8 +11,13 @@
             "version_url": "https://api.github.com/repos/yt-dlp/yt-dlp/releases/latest",
             "download_url": "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe",
             "chunk_size": 8192,
-            "filename": "yt-dlp",
-            "version_flag": "--version",
+            "binaries": {
+                "yt-dlp": {
+                    "filename": "yt-dlp",
+                    "version_flag": "--version",
+                    "is_primary": true
+                }
+            },
             "parameters": {
                 "audio_only": {
                     "state": false,
@@ -52,16 +57,21 @@
             "version_url": "https://www.gyan.dev/ffmpeg/builds/release-version",
             "download_url": "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-full.zip",
             "chunk_size": 16384,
-            "filename": "ffmpeg",
-            "version_flag": "-version",
             "binaries": {
+                "ffmpeg": {
+                    "filename": "ffmpeg",
+                    "version_flag": "-version",
+                    "is_primary": true
+                },
                 "ffplay": {
                     "filename": "ffplay",
-                    "version_flag": "-version"
+                    "version_flag": "-version",
+                    "is_primary": false
                 },
                 "ffprobe": {
                     "filename": "ffprobe",
-                    "version_flag": "-version"
+                    "version_flag": "-version",
+                    "is_primary": false
                 }
             }
         }
@@ -91,8 +101,8 @@
     "window": {
         "width": 688,
         "height": 991,
-        "left": 3095,
-        "top": 224
+        "left": 2925,
+        "top": 211
     },
     "theme": {
         "accent_color": "00B4D8",
@@ -104,5 +114,5 @@
         "appbar_color": "1c1c1c",
         "card_color": "161616"
     },
-    "language": "ru"
+    "language": "en"
 }
