@@ -16,6 +16,7 @@ import flet as ft
 from app_logging import get_logger
 from config import hex_to_flet
 from controllers.theme_target import ThemeTarget
+from events import DownloadCompletedEvent, DownloadCancelledEvent, AppClosingEvent
 from i18l import Locale, Strings
 from managers.download_repository import DownloadRecord, DownloadRepository
 from services import Services
@@ -46,13 +47,33 @@ class HistoryScreen(ThemeTarget):
         self._page           = page
         self._db             = svc.db
         self._state          = svc.state
+        self._bus            = svc.bus
+        self._safe_update    = svc.safe_update
         self._current_filter: Optional[str] = None
 
         self._build_widgets()
         self._build_layout()
 
+        # Pull-модель остаётся, но открытый экран обновляется вживую при
+        # финализации загрузки — без опроса и без знания о других экранах.
+        self._unsubs = [
+            self._bus.on(DownloadCompletedEvent, self._on_download_finalized),
+            self._bus.on(DownloadCancelledEvent, self._on_download_finalized),
+            self._bus.on(AppClosingEvent,        lambda e: self.dispose()),
+        ]
+
     def _s(self) -> Strings:
         return Locale.load(self._state.language)
+
+    def dispose(self) -> None:
+        """Отписаться от шины при закрытии приложения."""
+        for unsub in getattr(self, "_unsubs", []):
+            unsub()
+
+    def _on_download_finalized(self, _e) -> None:
+        """Загрузка завершилась/отменена — обновить список, только если экран открыт."""
+        if getattr(self, "layout", None) is not None and self.layout.visible:
+            self.refresh()
 
     # ── Виджеты ───────────────────────────────────────────────────────────────
 
@@ -154,7 +175,7 @@ class HistoryScreen(ThemeTarget):
         records = self._db.get_history(limit=200, status=self._current_filter)
         self._render_list(records)
         self._render_stats()
-        self._page.update()
+        self._safe_update()
 
     def rebuild_for_language(self) -> None:
         s = self._s()

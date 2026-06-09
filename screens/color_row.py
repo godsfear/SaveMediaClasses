@@ -93,6 +93,7 @@ class ColorRow:
             self._preview.bgcolor    = hex_to_flet(val)
             self._field.border_color = None
             self._owner._bus.emit(ThemeChangedEvent())
+            self._owner._bus.emit(SettingsChangedEvent())
         else:
             self._field.border_color = ft.Colors.RED_400
             self._owner._safe_update()

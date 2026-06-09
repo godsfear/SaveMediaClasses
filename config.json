@@ -3,7 +3,7 @@
         "download_path": "d:\\Downloads",
         "proxy_address": "socks5://127.0.0.1:9050",
         "proxy_enabled": false,
-        "last_check_time": 1781015191.0504866,
+        "last_check_time": 1781015999.911558,
         "last_needs_update": false
     },
     "tools": {
@@ -101,8 +101,8 @@
     "window": {
         "width": 688,
         "height": 991,
-        "left": 3280,
-        "top": 210
+        "left": 3332,
+        "top": 250
     },
     "theme": {
         "mode": "dark",
@@ -175,5 +175,5 @@
             }
         }
     },
-    "language": "ru"
+    "language": "en"
 }

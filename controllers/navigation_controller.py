@@ -147,9 +147,6 @@ class NavigationController:
             self.proxy_btn.icon_color = self._appbar_fg()
             self.proxy_btn.tooltip    = s.proxy_off
 
-    def update_cookies_ui(self) -> None:
-        self._settings.update_cookies_ui(self._main.cookies_enabled_switch)
-
     def on_tools_restored_pending(self, e) -> None:
         """Сохранить последнее ToolsRestoredEvent — показать при входе в настройки."""
         self._pending_restored.clear()
@@ -166,25 +163,51 @@ class NavigationController:
         self.update_proxy_ui()
         self._refresh_appbar_title(s)
 
+    # ── Сборка AppBar (единая фабрика) ────────────────────────────────────────
+
+    def _make_appbar(self, title: str, *, root: bool) -> ft.AppBar:
+        """Единая сборка AppBar — устраняет дублирование между экранами.
+
+        root=True  — корневой экран: лого + полный тулбар.
+        root=False — вложенный экран: кнопка «назад» + переключатель темы.
+        Цвета иконок/заголовка приводит к режиму последующий apply_appbar_theme().
+        """
+        if root:
+            leading       = self._logo()
+            leading_width = 44
+            actions       = [
+                self.theme_btn, self.settings_btn, self.history_btn,
+                self.proxy_btn, self.folder_btn, self.exit_btn,
+            ]
+        else:
+            leading = ft.IconButton(
+                icon=ft.Icons.ARROW_BACK_IOS_NEW_ROUNDED, icon_color=ft.Colors.WHITE,
+                icon_size=16, on_click=self.show_main,
+            )
+            leading_width = None
+            actions       = [self.theme_btn]
+
+        return ft.AppBar(
+            title=ft.Text(title, size=18, weight=ft.FontWeight.W_600),
+            bgcolor=hex_to_flet(self._svc.state.theme.appbar_color),
+            leading=leading,
+            leading_width=leading_width,
+            actions=actions,
+        )
+
+    def build_initial_appbar(self) -> ft.AppBar:
+        """Стартовая панель (корневой экран) с брендовым заголовком — для app.py."""
+        return self._make_appbar("SaveMedia [yt-dlp GUI]", root=True)
+
     # ── Навигация ─────────────────────────────────────────────────────────────
 
     def show_main(self, _=None) -> None:
         self._svc.bus.emit(SettingsChangedEvent())
-        self.update_cookies_ui()
         self._main.layout.visible     = True
         self._settings.layout.visible = False
         self._history.layout.visible  = False
         s = Locale.load(self._svc.state.language)
-        self._page.appbar = ft.AppBar(
-            title=ft.Text(s.appbar_main, size=18, weight=ft.FontWeight.W_600),
-            bgcolor=hex_to_flet(self._svc.state.theme.appbar_color),
-            leading=self._logo(),
-            leading_width=44,
-            actions=[
-                self.theme_btn, self.settings_btn, self.history_btn,
-                self.proxy_btn, self.folder_btn, self.exit_btn,
-            ],
-        )
+        self._page.appbar = self._make_appbar(s.appbar_main, root=True)
         self._page.bottom_appbar.content = self.main_status_container
         self.apply_appbar_theme()
         self._svc.safe_update()
@@ -196,15 +219,7 @@ class NavigationController:
         if self._pending_restored:
             self._settings.on_tools_restored(self._pending_restored[-1])
         s = Locale.load(self._svc.state.language)
-        self._page.appbar = ft.AppBar(
-            title=ft.Text(s.appbar_settings, size=18, weight=ft.FontWeight.W_600),
-            bgcolor=hex_to_flet(self._svc.state.theme.appbar_color),
-            leading=ft.IconButton(
-                icon=ft.Icons.ARROW_BACK_IOS_NEW_ROUNDED, icon_color=ft.Colors.WHITE,
-                icon_size=16, on_click=self.show_main,
-            ),
-            actions=[self.theme_btn],
-        )
+        self._page.appbar = self._make_appbar(s.appbar_settings, root=False)
         self._page.bottom_appbar.content = self.settings_status_container
         self.apply_appbar_theme()
         self._svc.safe_update()
@@ -215,15 +230,7 @@ class NavigationController:
         self._history.layout.visible  = True
         self._history.refresh()
         s = Locale.load(self._svc.state.language)
-        self._page.appbar = ft.AppBar(
-            title=ft.Text(s.appbar_history, size=18, weight=ft.FontWeight.W_600),
-            bgcolor=hex_to_flet(self._svc.state.theme.appbar_color),
-            leading=ft.IconButton(
-                icon=ft.Icons.ARROW_BACK_IOS_NEW_ROUNDED, icon_color=ft.Colors.WHITE,
-                icon_size=16, on_click=self.show_main,
-            ),
-            actions=[self.theme_btn],
-        )
+        self._page.appbar = self._make_appbar(s.appbar_history, root=False)
         self._page.bottom_appbar.content = ft.Container(height=0)
         self.apply_appbar_theme()
         self._svc.safe_update()
