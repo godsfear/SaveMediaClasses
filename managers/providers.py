@@ -330,6 +330,7 @@ class Aria2cProvider(_SubprocessProvider):
     PART_DIRNAME = ".part"   # подпапка временных загрузок внутри папки назначения
     _SCHEMES = ("http://", "https://", "ftp://", "sftp://", "magnet:", "metalink:")
     _PROGRESS_RE = re.compile(r"\((\d+)%\)")
+    _SIZE_RE     = re.compile(r"(\S+)/(\S+)\(\d+%\)")   # "166MiB/378MiB(44%)"
     _DL_RE       = re.compile(r"DL:([^\s\]]+)")
     _ETA_RE      = re.compile(r"ETA:([^\s\]]+)")
     _GID_RE      = re.compile(r"\[#(\w+)")
@@ -499,13 +500,15 @@ class Aria2cProvider(_SubprocessProvider):
 
     @classmethod
     def format_status(cls, line: str) -> str:
-        # Скорость/ETA для строки деталей (процент отдельно показывает _pct_text):
-        # "2.3MiB/s  •  ETA 2s" из сырой сводки aria2.
-        dl  = cls._DL_RE.search(line)
-        eta = cls._ETA_RE.search(line)
+        # Строка деталей под баром (процент отдельно показывает _pct_text):
+        # "166MiB/378MiB  •  2.3MiB/s  •  ETA 2s" из сырой сводки aria2.
+        size = cls._SIZE_RE.search(line)
+        dl   = cls._DL_RE.search(line)
+        eta  = cls._ETA_RE.search(line)
         parts = []
-        if dl:  parts.append(f"{dl.group(1)}/s")
-        if eta: parts.append(f"ETA {eta.group(1)}")
+        if size: parts.append(f"{size.group(1)}/{size.group(2)}")
+        if dl:   parts.append(f"{dl.group(1)}/s")
+        if eta:  parts.append(f"ETA {eta.group(1)}")
         return "  •  ".join(parts)
 
     @classmethod
