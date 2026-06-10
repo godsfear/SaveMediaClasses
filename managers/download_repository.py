@@ -26,6 +26,7 @@ from dataclasses import asdict, fields
 from typing import Any, Dict, Generator, List, Optional
 
 from app_logging import get_logger
+from config import magnet_btih
 from events import (
     EventBus,
     DownloadStartedEvent,
@@ -219,6 +220,24 @@ class DownloadRepository:
         rows = self._fetch(
             "SELECT * FROM downloads WHERE url = ? ORDER BY started_at DESC LIMIT 1",
             [url]
+        )
+        return rows[0] if rows else None
+
+    def find_completed(self, url: str) -> Optional[DownloadRecord]:
+        """Самая свежая УСПЕШНО завершённая загрузка с этим URL (для предупреждения
+        о повторе). Незавершённые/ошибочные не считаются — их логично качать заново.
+
+        Для magnet сравниваем по btih (он в самом URL), а не по строке целиком —
+        тот же торрент с другими трекерами/именем тоже считается дубликатом."""
+        btih = magnet_btih(url)
+        if btih:
+            where, param = "url LIKE ?", f"%btih:{btih}%"   # btih — ASCII, LIKE без эскейпа
+        else:
+            where, param = "url = ?", url
+        rows = self._fetch(
+            f"SELECT * FROM downloads WHERE {where} AND status = 'completed' "
+            "ORDER BY started_at DESC LIMIT 1",
+            [param]
         )
         return rows[0] if rows else None
 

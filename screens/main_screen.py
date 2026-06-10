@@ -1,4 +1,5 @@
 import asyncio
+import datetime
 import os
 import subprocess
 import sys
@@ -33,6 +34,16 @@ _PROVIDER_CLASSES = {
     "yt-dlp": YtDlpProvider,
     "aria2c": Aria2cProvider,
 }
+
+
+def _fmt_ts(ts) -> str:
+    """Unix-время → короткая дата для предупреждения о повторной загрузке."""
+    if not ts:
+        return "—"
+    try:
+        return datetime.datetime.fromtimestamp(ts).strftime("%d %b %Y  %H:%M")
+    except Exception:
+        return "—"
 
 
 class DownloadCard:
@@ -441,6 +452,35 @@ class MainScreen(ThemeTarget):
             self._show_status(s.err_already_active, ft.Colors.ORANGE)
             return
 
+        # Предупреждение о повторе: эта ссылка уже была успешно загружена (любым
+        # инструментом — проверка по истории идёт по URL, без учёта source).
+        prev = self._db.find_completed(url) if self._db else None
+        if prev is not None:
+            self._confirm_redownload(url, tool, prev)
+            return
+
+        self._start_download(url, tool)
+
+    def _confirm_redownload(self, url: str, tool: str, prev) -> None:
+        s    = self._s()
+        when = _fmt_ts(getattr(prev, "finished_at", None) or getattr(prev, "started_at", None))
+
+        def proceed(_e) -> None:
+            self._page.pop_dialog()
+            self._start_download(url, tool)
+
+        self._page.show_dialog(ft.AlertDialog(
+            modal=True,
+            title=ft.Text(s.dup_warning_title),
+            content=ft.Text(s.fmt("dup_warning", when=when)),
+            actions=[
+                ft.TextButton(s.btn_cancel,   on_click=lambda e: self._page.pop_dialog()),
+                ft.TextButton(s.btn_download, on_click=proceed),
+            ],
+        ))
+
+    def _start_download(self, url: str, tool: str) -> None:
+        s = self._s()
         self.sync_to_state()
         snapshot = DownloadSnapshot.from_state(self._state, url)
 

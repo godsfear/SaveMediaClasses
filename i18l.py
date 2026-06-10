@@ -73,6 +73,7 @@ class Strings:
     theme_name_label:        str = ""
     btn_cancel:              str = ""
     btn_ok:                  str = ""
+    btn_close:               str = ""
 
     # Поля настроек
     proxy_label:        str = ""
@@ -177,6 +178,8 @@ class Strings:
     err_url_invalid:      str = ""
     err_max_parallel:     str = ""  # {n}
     err_already_active:   str = ""
+    dup_warning_title:    str = ""
+    dup_warning:          str = ""  # {when}
 
     # history_screen
     header_history:       str = ""

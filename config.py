@@ -570,6 +570,17 @@ def download_display_name(url: str) -> str:
     return u
 
 
+def magnet_btih(url: str) -> str:
+    """BitTorrent info-hash (btih) из magnet-ссылки в нижнем регистре; '' если нет.
+
+    Лежит прямо в URL: magnet:?xt=urn:btih:<HASH>&... — отдельно хранить не нужно.
+    Идентифицирует содержимое торрента независимо от трекеров (tr) и имени (dn),
+    поэтому годится как ключ дедупликации повторных загрузок."""
+    import re
+    m = re.search(r"xt=urn:btih:([0-9a-zA-Z]+)", safe_str(url), re.IGNORECASE)
+    return m.group(1).lower() if m else ""
+
+
 def safe_str(value: Any) -> str:
     return "" if value is None else str(value)
 

@@ -271,7 +271,7 @@ class SettingsScreen(ThemeTarget):
                    if removed else s.clean_temp_empty)
             self._page.show_dialog(ft.AlertDialog(
                 modal=True, title=ft.Text(s.btn_clean_temp), content=ft.Text(msg),
-                actions=[ft.TextButton(s.btn_ok, on_click=lambda e: self._page.pop_dialog())],
+                actions=[ft.TextButton(s.btn_close, on_click=lambda e: self._page.pop_dialog())],
             ))
             self._safe_update()
 
