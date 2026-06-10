@@ -391,7 +391,7 @@ class HistoryScreen(ThemeTarget):
         отдаём в менеджер с тем же task_id (запись перейдёт в статус 'seeding').
         Карточки на главном экране нет — статусом управляет эта кнопка."""
         snapshot = DownloadSnapshot.from_params(rec.url, rec.params)
-        snapshot = replace(snapshot, seed=True, aria2_seed_args=self._state.aria2c.seed_args)
+        snapshot = replace(snapshot, seed=True, aria2_seed_args=self._state.aria2c.parameters.seed)
         tool = rec.source or "aria2c"
         self._dm.add(snapshot, provider_key=tool, task_id=rec.task_id)
         self.refresh()

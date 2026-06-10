@@ -8,7 +8,7 @@ from typing import Dict
 import flet as ft
 
 from app_logging import get_logger
-from config import safe_str, hex_to_flet, ThemeConfig, download_display_name, CARD_LINGER_SECONDS
+from config import safe_str, hex_to_flet, ThemeConfig, download_display_name
 from controllers.theme_target import ThemeTarget
 from events import (
     EventBus,
@@ -287,7 +287,7 @@ class MainScreen(ThemeTarget):
             self.cookies_enabled_switch.label    = s.cookies_switch_on.format(browser=browser_name)
 
     async def _remove_card_after_delay(self, task_id: str) -> None:
-        await asyncio.sleep(CARD_LINGER_SECONDS)
+        await asyncio.sleep(self._state.timeouts.card_fade)
         self._remove_card(task_id)
 
     # ── Виджеты ───────────────────────────────────────────────────────────────
@@ -591,7 +591,7 @@ class MainScreen(ThemeTarget):
         self._safe_update()
 
     async def _close_paused_card_after_delay(self, task_id: str) -> None:
-        await asyncio.sleep(CARD_LINGER_SECONDS)
+        await asyncio.sleep(self._state.timeouts.card_fade)
         # Возобновили за это время (в карточке или из истории)? — карточку оставляем.
         if task_id in self._paused:
             self._dm.drop(task_id)        # убрать из активных — живёт в истории
@@ -624,7 +624,10 @@ class MainScreen(ThemeTarget):
             if not exe:
                 return
             proxy_url = self._state.proxy_address.strip() if self._state.proxy_enabled else None
-            thumb_data, meta = await provider.fetch_thumbnail(exe, url, proxy_url=proxy_url)
+            to = self._state.timeouts
+            thumb_data, meta = await provider.fetch_thumbnail(
+                exe, url, proxy_url=proxy_url,
+                connect_timeout=to.thumbnail_connect, read_timeout=to.thumbnail_read)
             if self._db is not None:
                 if thumb_data:
                     self._db.save_thumbnail(task_id, thumb_data)

@@ -188,6 +188,47 @@ class WindowConfig:
             top    = max(0, top),
         )
 
+
+@dataclass
+class TimeoutsConfig:
+    """Сетевые таймауты (секунды), персистятся в config.json — раньше были
+    захардкожены в коде (tools_manager, providers)."""
+    connect:           float = 5.0    # connect httpx при проверке версий инструментов
+    read:              float = 8.0    # read при проверке версий
+    tool_download:     float = 30.0   # общий таймаут скачивания инструментов
+    thumbnail_connect: float = THUMBNAIL_SOCK_TIMEOUT   # connect при загрузке превью
+    thumbnail_read:    float = THUMBNAIL_TIMEOUT        # read при загрузке превью
+    card_fade:         float = CARD_LINGER_SECONDS      # задержка карточки до удаления (0 = сразу)
+
+    def to_dict(self) -> Dict[str, float]:
+        return {
+            "connect":           self.connect,
+            "read":              self.read,
+            "tool_download":     self.tool_download,
+            "thumbnail_connect": self.thumbnail_connect,
+            "thumbnail_read":    self.thumbnail_read,
+            "card_fade":         self.card_fade,
+        }
+
+    @staticmethod
+    def from_dict(d: Dict[str, Any]) -> "TimeoutsConfig":
+        r = TimeoutsConfig()
+        d = d if isinstance(d, dict) else {}
+        def _f(key: str, default: float, allow_zero: bool = False) -> float:
+            try:
+                v = float(d.get(key))
+                return v if (v >= 0 if allow_zero else v > 0) else default
+            except (TypeError, ValueError):
+                return default
+        return TimeoutsConfig(
+            connect           = _f("connect",           r.connect),
+            read              = _f("read",              r.read),
+            tool_download     = _f("tool_download",     r.tool_download),
+            thumbnail_connect = _f("thumbnail_connect", r.thumbnail_connect),
+            thumbnail_read    = _f("thumbnail_read",    r.thumbnail_read),
+            card_fade         = _f("card_fade",         r.card_fade, allow_zero=True),
+        )
+
 # ── Конфигурация инструментов ────────────────────────────────────────────────
 #
 # Разделение ответственности:
@@ -507,29 +548,46 @@ class YtDlpConfig(ToolConfig):
 
 
 @dataclass
-class Aria2cConfig(ToolConfig):
-    """Конфигурация aria2c: фиксированные CLI-флаги скачивания и имя temp-подпапки.
-    Раньше были захардкожены в провайдере — теперь персистятся (config.json)."""
-    extra_args:   str = DEFAULT_ARIA2_ARGS
-    seed_args:    str = DEFAULT_ARIA2_SEED_ARGS
+class Aria2cParameters:
+    """Параметры aria2c (по аналогии с YtDlpParameters): CLI-флаги скачивания и
+    раздачи + имя temp-подпапки. Персистятся в секции parameters конфига."""
+    download:     str = DEFAULT_ARIA2_ARGS       # флаги обычного скачивания
+    seed:         str = DEFAULT_ARIA2_SEED_ARGS   # флаги режима раздачи
     part_dirname: str = DEFAULT_ARIA2_PART_DIRNAME
 
     def to_dict(self) -> Dict[str, Any]:
+        return {"download": self.download, "seed": self.seed,
+                "part_dirname": self.part_dirname}
+
+    @staticmethod
+    def from_dict(d: Dict[str, Any], defaults: "Aria2cParameters | None" = None) -> "Aria2cParameters":
+        r = defaults or Aria2cParameters()
+        d = d if isinstance(d, dict) else {}
+        return Aria2cParameters(
+            download     = safe_str(d.get("download"))     or r.download,
+            seed         = safe_str(d.get("seed"))         or r.seed,
+            part_dirname = safe_str(d.get("part_dirname")) or r.part_dirname,
+        )
+
+
+@dataclass
+class Aria2cConfig(ToolConfig):
+    """Конфигурация aria2c: добавляет parameters (флаги скачивания/раздачи)."""
+    parameters: Aria2cParameters = field(default_factory=Aria2cParameters)
+
+    def to_dict(self) -> Dict[str, Any]:
         d = super().to_dict()
-        d["extra_args"]   = self.extra_args
-        d["seed_args"]    = self.seed_args
-        d["part_dirname"] = self.part_dirname
+        d["parameters"] = self.parameters.to_dict()
         return d
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any], defaults: "ToolConfig | None" = None) -> "Aria2cConfig":
         def_ = defaults if isinstance(defaults, Aria2cConfig) else cls()
-        return cls(
-            **cls._base_kwargs(d, def_),
-            extra_args   = safe_str(d.get("extra_args"))   or def_.extra_args,
-            seed_args    = safe_str(d.get("seed_args"))    or def_.seed_args,
-            part_dirname = safe_str(d.get("part_dirname")) or def_.part_dirname,
+        raw = d.get("parameters", {})
+        params = Aria2cParameters.from_dict(
+            raw if isinstance(raw, dict) else {}, def_.parameters
         )
+        return cls(**cls._base_kwargs(d, def_), parameters=params)
 
 
 # ── UI-метаданные темы (порядок полей для Settings) ──────────────────────────

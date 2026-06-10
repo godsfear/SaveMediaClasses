@@ -4,7 +4,7 @@
         "proxy_address": "socks5://127.0.0.1:9050",
         "proxy_enabled": false,
         "download_tool": "aria2c",
-        "last_check_time": 1781099581.331423,
+        "last_check_time": 1781103364.5755095,
         "last_needs_update": false
     },
     "tools": {
@@ -87,9 +87,11 @@
                     "is_primary": true
                 }
             },
-            "extra_args": "--summary-interval=0 --console-log-level=warn --continue=true --auto-file-renaming=false --allow-overwrite=true --auto-save-interval=1 --seed-time=0",
-            "seed_args": "--summary-interval=0 --console-log-level=warn --check-integrity=true --seed-ratio=0.0 --bt-detach-seed-only=false",
-            "part_dirname": ".part"
+            "parameters": {
+                "download": "--summary-interval=0 --console-log-level=warn --continue=true --auto-file-renaming=false --allow-overwrite=true --auto-save-interval=1 --seed-time=0",
+                "seed": "--summary-interval=0 --console-log-level=warn --check-integrity=true --seed-ratio=0.0 --bt-detach-seed-only=false",
+                "part_dirname": ".part"
+            }
         }
     },
     "tool_versions": {
@@ -122,8 +124,16 @@
     "window": {
         "width": 778,
         "height": 991,
-        "left": 3787,
-        "top": 164
+        "left": 3268,
+        "top": 250
+    },
+    "timeouts": {
+        "connect": 5.0,
+        "read": 8.0,
+        "tool_download": 30.0,
+        "thumbnail_connect": 10.0,
+        "thumbnail_read": 15.0,
+        "card_fade": 3
     },
     "theme": {
         "mode": "dark",
