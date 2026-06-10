@@ -330,7 +330,6 @@ class Aria2cProvider(_SubprocessProvider):
 
     SOURCE_NAME = "aria2c"
     SUPPORTS_PAUSE = True    # pause = kill процесс, resume = перезапуск с --continue
-    PART_DIRNAME = ".part"   # подпапка временных загрузок внутри папки назначения
     _SCHEMES = ("http://", "https://", "ftp://", "sftp://", "magnet:", "metalink:")
     _FILE_EXTS = (".torrent", ".metalink")   # локальные файлы-задания aria2c
     _PROGRESS_RE = re.compile(r"\((\d+)%\)")
@@ -366,29 +365,19 @@ class Aria2cProvider(_SubprocessProvider):
         self._is_magnet = safe_str(s.url).strip().lower().startswith("magnet:")
         self._gids = []   # сброс на каждый запуск: важно для resume (иначе фаза
                           # метаданных magnet не подавится — _gids уже был ≥2)
-        args = [exe,
-                # summary-interval=0 убирает многострочные блоки "Download Progress
-                # Summary" (спам в логе); остаётся компактная строка прогресса,
-                # которую aria2c обновляет через \r — её и парсим (run() режет по \r/\n).
-                "--summary-interval=0",
-                "--console-log-level=warn",
-                "--continue=true",               # докачивать при наличии .part
-                "--auto-file-renaming=false",
-                "--allow-overwrite=true",
-                # Контрольный файл .aria2 пишем раз в секунду (дефолт 60с). Пауза =
-                # taskkill /F, без graceful-flush; иначе resume откатывается к
-                # последнему автосейву (терялось до минуты прогресса).
-                "--auto-save-interval=1",
-                # Торренты: не раздавать после докачки — иначе процесс не завершится.
-                "--seed-time=0"]
+        # Фиксированные флаги aria2c берём из конфига (snapshot.aria2_args), а не
+        # из кода. Их назначение важно для логики (summary-interval=0 — парсинг
+        # прогресса, auto-save-interval=1 — pause/resume, continue/seed-time).
+        args = [exe, *shlex.split(safe_str(s.aria2_args))]
 
-        # Качаем во временную подпапку .part/<id>; финал — сама папка загрузки.
+        # Качаем во временную подпапку <part_dirname>/<id>; финал — папка загрузки.
         # id = SHA-256(url)[:16] (64 бита): детерминирован, поэтому повторное
         # добавление той же ссылки попадает в ту же папку → aria2 докачивает с
         # --continue. Разные ссылки практически не сталкиваются (коллизия ~n²/2⁶⁵).
         self._final_dir = safe_str(s.download_path)
         part_id = hashlib.sha256(safe_str(s.url).encode("utf-8")).hexdigest()[:16]
-        self._part_dir  = (os.path.join(self._final_dir, self.PART_DIRNAME, part_id)
+        part_dirname = safe_str(s.aria2_part_dirname) or ".part"
+        self._part_dir  = (os.path.join(self._final_dir, part_dirname, part_id)
                            if self._final_dir else "")
         dl_dir = self._part_dir or self._final_dir
         if dl_dir:
@@ -448,16 +437,16 @@ class Aria2cProvider(_SubprocessProvider):
             pass
 
     @classmethod
-    def clean_temp_dirs(cls, download_dir: str,
-                        exclude: "set[str] | None" = None) -> tuple[int, int]:
-        """Удалить временные подпапки <download_dir>/.part (незавершённые/отложенные
-        докачки). exclude — абсолютные пути активных загрузок, их пропускаем.
+    def clean_temp_dirs(cls, download_dir: str, exclude: "set[str] | None" = None,
+                        part_dirname: str = ".part") -> tuple[int, int]:
+        """Удалить временные подпапки <download_dir>/<part_dirname> (незавершённые/
+        отложенные докачки). exclude — абсолютные пути активных загрузок, их пропускаем.
 
-        Возвращает (число удалённых папок, освобождено байт). Сами по себе .part —
-        это потеря возможности докачки, поэтому очистка только ручная (эта функция).
+        Возвращает (число удалённых папок, освобождено байт). Имя temp-подпапки берётся
+        из конфига (Aria2cConfig.part_dirname). Очистка только ручная (эта функция).
         """
         exclude = {os.path.abspath(p) for p in (exclude or set())}
-        root = os.path.join(safe_str(download_dir), cls.PART_DIRNAME)
+        root = os.path.join(safe_str(download_dir), safe_str(part_dirname) or ".part")
         if not safe_str(download_dir) or not os.path.isdir(root):
             return (0, 0)
 

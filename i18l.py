@@ -191,6 +191,7 @@ class Strings:
     filter_completed:     str = ""
     filter_failed:        str = ""
     filter_cancelled:     str = ""
+    filter_incomplete:    str = ""
     btn_refresh:          str = ""
     btn_open_folder:      str = ""
     btn_delete_record:    str = ""

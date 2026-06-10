@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 from typing import Dict
 
 from config import (
-    ThemeConfig, NamedTheme, WindowConfig, ToolConfig, YtDlpConfig, VersionState,
+    ThemeConfig, NamedTheme, WindowConfig, ToolConfig, YtDlpConfig, Aria2cConfig, VersionState,
     DEFAULT_DOWNLOAD_PATH, DEFAULT_PROXY_ADDRESS,
 )
 from i18l import Locale
@@ -92,6 +92,8 @@ class AppState:
         return cfg if isinstance(cfg, ToolConfig) else _tool_default("ffmpeg")
 
     @property
-    def aria2c(self) -> ToolConfig:
+    def aria2c(self) -> Aria2cConfig:
         cfg = self.tools.get("aria2c")
-        return cfg if isinstance(cfg, ToolConfig) else _tool_default("aria2c")
+        if isinstance(cfg, Aria2cConfig):
+            return cfg
+        return _tool_default("aria2c")  # type: ignore[return-value]

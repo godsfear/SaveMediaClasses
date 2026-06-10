@@ -8,7 +8,7 @@ from typing import Dict
 import flet as ft
 
 from app_logging import get_logger
-from config import safe_str, hex_to_flet, ThemeConfig, download_display_name
+from config import safe_str, hex_to_flet, ThemeConfig, download_display_name, CARD_LINGER_SECONDS
 from controllers.theme_target import ThemeTarget
 from events import (
     EventBus,
@@ -287,7 +287,7 @@ class MainScreen(ThemeTarget):
             self.cookies_enabled_switch.label    = s.cookies_switch_on.format(browser=browser_name)
 
     async def _remove_card_after_delay(self, task_id: str) -> None:
-        await asyncio.sleep(3)
+        await asyncio.sleep(CARD_LINGER_SECONDS)
         self._remove_card(task_id)
 
     # ── Виджеты ───────────────────────────────────────────────────────────────
@@ -587,7 +587,16 @@ class MainScreen(ThemeTarget):
             self._paused.add(task_id)
             self._dm.pause(task_id)
             card.set_paused(True)
+            # Через тот же интервал, что при завершении, карточка уезжает в историю.
+            self._page.run_task(self._close_paused_card_after_delay, task_id)
         self._safe_update()
+
+    async def _close_paused_card_after_delay(self, task_id: str) -> None:
+        await asyncio.sleep(CARD_LINGER_SECONDS)
+        # Возобновили за это время (в карточке или из истории)? — карточку оставляем.
+        if task_id in self._paused:
+            self._dm.drop(task_id)        # убрать из активных — живёт в истории
+            self._remove_card(task_id)
 
     def _remove_card(self, task_id: str) -> None:
         card = self._cards.pop(task_id, None)

@@ -103,10 +103,11 @@ class HistoryScreen(ThemeTarget):
         active_fg   = hex_to_flet(t.button_text_color)
         inactive_fg = hex_to_flet(t.text_secondary_color)
         filters = [
-            (s.filter_all,       None),
-            (s.filter_completed, "completed"),
-            (s.filter_failed,    "failed"),
-            (s.filter_cancelled, "cancelled"),
+            (s.filter_all,        None),
+            (s.filter_completed,  "completed"),
+            (s.filter_incomplete, "incomplete"),
+            (s.filter_failed,     "failed"),
+            (s.filter_cancelled,  "cancelled"),
         ]
         self._filter_row.controls = [
             ft.TextButton(
@@ -253,7 +254,7 @@ class HistoryScreen(ThemeTarget):
         is_playlist = meta.get("_is_playlist") or meta.get("_type") == "playlist"
         if is_playlist: tags.append(s.tag_playlist)
 
-        # Thumbnail
+        # Thumbnail. У aria2c превью не бывает — не показываем даже заглушку.
         import base64 as _b64
         thumb_data = getattr(rec, "thumbnail", None)
         if thumb_data:
@@ -263,6 +264,8 @@ class HistoryScreen(ThemeTarget):
                 clip_behavior=ft.ClipBehavior.ANTI_ALIAS,
                 content=ft.Image(src=b64str, width=96, height=54, fit=ft.BoxFit.COVER),
             )
+        elif rec.source == "aria2c":
+            thumbnail_widget = None
         else:
             thumbnail_widget = ft.Container(
                 width=96, height=54, bgcolor=surface_c, border_radius=4,
@@ -330,9 +333,12 @@ class HistoryScreen(ThemeTarget):
             ) if rec.error_message else ft.Container(height=0),
         ], spacing=3, tight=True, expand=True)
 
+        body = info_column if thumbnail_widget is None else ft.Row(
+            [thumbnail_widget, info_column],
+            spacing=10, vertical_alignment=ft.CrossAxisAlignment.START,
+        )
         return ft.Container(
-            content=ft.Row([thumbnail_widget, info_column],
-                           spacing=10, vertical_alignment=ft.CrossAxisAlignment.START),
+            content=body,
             bgcolor=surface_c, border=ft.Border.all(1, border_c),
             border_radius=6, padding=ft.Padding(left=10, right=10, top=8, bottom=8),
         )

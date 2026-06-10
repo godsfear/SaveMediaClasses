@@ -52,6 +52,8 @@ class DownloadSnapshot:
     clean_titles:     bool
     save_to_source:   bool
     # Параметры инструмента из конфига (флаги CLI и шаблоны путей)
+    aria2_args:            str = ""   # фиксированные CLI-флаги aria2c (из Aria2cConfig)
+    aria2_part_dirname:    str = ".part"
     cookies_flag:          str = "--cookies-from-browser"
     playlist_flag_on:      str = "--yes-playlist"
     playlist_flag_off:     str = "--no-playlist"
@@ -73,9 +75,12 @@ class DownloadSnapshot:
         поэтому строковых имён инструментов тут тоже нет.
         """
         p = state.ytdlp.parameters
+        a = state.aria2c
         return cls(
             url=url,
             download_path=state.download_path,
+            aria2_args=a.extra_args,
+            aria2_part_dirname=a.part_dirname,
             proxy_enabled=state.proxy_enabled,
             proxy_address=state.proxy_address,
             cookies_enabled=p.cookies.state,
@@ -233,6 +238,14 @@ class DownloadManager:
     def can_pause(self, task_id: str) -> bool:
         task = self._active.get(task_id)
         return bool(task and getattr(task.provider, "SUPPORTS_PAUSE", False))
+
+    def drop(self, task_id: str) -> None:
+        """Выгрузить ПАУЗНУЮ задачу из активных — она «припаркована» в истории
+        (статус incomplete) и будет возобновлена реконструкцией. Процесс уже убит,
+        partial в .part цел. Активные/качающиеся задачи не трогаем."""
+        task = self._active.get(task_id)
+        if task and task.paused:
+            self._finish(task)   # снимает из _active
 
     # ── Внутренняя логика ─────────────────────────────────────────────────────
 

@@ -266,7 +266,8 @@ class SettingsScreen(ThemeTarget):
         def do_clean(_e) -> None:
             self._page.pop_dialog()
             removed, freed = Aria2cProvider.clean_temp_dirs(
-                self._state.download_path, exclude=self._dm.active_temp_dirs())
+                self._state.download_path, exclude=self._dm.active_temp_dirs(),
+                part_dirname=self._state.aria2c.part_dirname)
             msg = (s.fmt("clean_temp_result", n=removed, size=_fmt_size(freed))
                    if removed else s.clean_temp_empty)
             self._page.show_dialog(ft.AlertDialog(
