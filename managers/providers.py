@@ -334,6 +334,16 @@ class Aria2cProvider(_SubprocessProvider):
     SUPPORTS_PAUSE = True    # pause = kill процесс, resume = перезапуск с --continue
     _SCHEMES = ("http://", "https://", "ftp://", "sftp://", "magnet:", "metalink:")
     _FILE_EXTS = (".torrent", ".metalink")   # локальные файлы-задания aria2c
+    # Расширения «прямых файлов» — в auto-режиме такие ссылки уходят в aria2c
+    # (а ссылки на страницы без расширения — в yt-dlp).
+    _DIRECT_EXTS = (
+        ".torrent", ".metalink",
+        ".zip", ".rar", ".7z", ".tar", ".gz", ".tgz", ".bz2", ".xz", ".zst",
+        ".iso", ".img", ".dmg", ".exe", ".msi", ".deb", ".rpm", ".pkg", ".apk", ".bin",
+        ".pdf", ".epub", ".mobi", ".djvu",
+        ".mp4", ".mkv", ".avi", ".mov", ".webm", ".wmv", ".m4v", ".flv",
+        ".mp3", ".flac", ".wav", ".m4a", ".ogg", ".opus", ".aac",
+    )
     _PROGRESS_RE = re.compile(r"\((\d+)%\)")
     _SIZE_RE     = re.compile(r"(\S+)/(\S+)\(\d+%\)")   # "166MiB/378MiB(44%)"
     _DL_RE       = re.compile(r"DL:([^\s\]]+)")
@@ -531,6 +541,17 @@ class Aria2cProvider(_SubprocessProvider):
         # Схема (http/ftp/magnet/…) ИЛИ локальный файл-задание (.torrent/.metalink).
         u = url.strip().lower()
         return u.startswith(cls._SCHEMES) or u.endswith(cls._FILE_EXTS)
+
+    @classmethod
+    def claims_url(cls, url: str) -> bool:
+        """Auto-режим: True если ссылка ведёт на ФАЙЛ/торрент (→ aria2c), иначе это
+        страница для извлечения (→ yt-dlp). magnet/metalink и пути с файловым
+        расширением — наши; query/fragment отбрасываем перед проверкой расширения."""
+        u = url.strip().lower()
+        if u.startswith(("magnet:", "metalink:")):
+            return True
+        path = u.split("?", 1)[0].split("#", 1)[0]
+        return path.endswith(cls._DIRECT_EXTS)
 
     @classmethod
     def post_processing_tags(cls) -> list[str]:

@@ -117,6 +117,7 @@
     "err_url_invalid": "Error: URL must start with http:// or https://",
     "err_max_parallel": "Maximum {n} simultaneous downloads",
     "err_already_active": "This link is already downloading",
+    "err_check_downloader": "Download failed — check the selected downloader (auto / yt-dlp / aria2c)",
     "dup_warning_title": "Already downloaded",
     "dup_warning": "This link was already downloaded ({when}). Download again?",
     "header_history": "Download History",

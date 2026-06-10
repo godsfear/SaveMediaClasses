@@ -36,6 +36,9 @@ _PROVIDER_CLASSES = {
     "aria2c": Aria2cProvider,
 }
 
+# Варианты в дропдауне: "auto" (выбор по ссылке) + конкретные провайдеры.
+_TOOL_OPTIONS = ("auto", *_PROVIDER_CLASSES)
+
 
 def _fmt_ts(ts) -> str:
     """Unix-время → короткая дата для предупреждения о повторной загрузке."""
@@ -237,6 +240,10 @@ class MainScreen(ThemeTarget):
             card.set_done(e.success, msg)
             self._safe_update()
             self._page.run_task(self._remove_card_after_delay, e.task_id)
+        # При ошибке подсказываем проверить выбор загрузчика (ссылка могла уйти
+        # не тому инструменту — особенно в auto).
+        if not e.success:
+            self._show_status(self._s().err_check_downloader, ft.Colors.ORANGE)
 
     def _on_cancelled(self, e: DownloadCancelledEvent) -> None:
         card = self._cards.get(e.task_id)
@@ -321,7 +328,7 @@ class MainScreen(ThemeTarget):
             label=s.downloader_label,
             border_radius=8, width=130,
             focused_border_color=ft.Colors.BLUE,
-            options=[ft.dropdown.Option(key) for key in _PROVIDER_CLASSES],
+            options=[ft.dropdown.Option(key) for key in _TOOL_OPTIONS],
             value=self._state.download_tool,
             on_select=self._on_downloader_change,
         ))
@@ -400,13 +407,17 @@ class MainScreen(ThemeTarget):
     # ── Выбор загрузчика ──────────────────────────────────────────────────────
 
     def _selected_tool(self) -> str:
-        """Текущий ключ провайдера: значение дропдауна, иначе сохранённый в state.
-        Неизвестный ключ откатывается к yt-dlp."""
+        """Выбор в дропдауне ("auto"|"yt-dlp"|"aria2c"); неизвестное → "auto"."""
         tool = safe_str(self.downloader_dropdown.value) or self._state.download_tool
-        return tool if tool in _PROVIDER_CLASSES else "yt-dlp"
+        return tool if tool in _TOOL_OPTIONS else "auto"
 
-    def _selected_provider_cls(self):
-        return _PROVIDER_CLASSES[self._selected_tool()]
+    def _resolve_tool(self, url: str) -> str:
+        """Конкретный провайдер для ссылки. В "auto": файл/торрент → aria2c,
+        страница → yt-dlp; иначе — явно выбранный провайдер."""
+        sel = self._selected_tool()
+        if sel == "auto":
+            return "aria2c" if Aria2cProvider.claims_url(url) else "yt-dlp"
+        return sel
 
     def _on_downloader_change(self, _) -> None:
         self.sync_to_state()
@@ -451,7 +462,7 @@ class MainScreen(ThemeTarget):
         val = safe_str(self.url_input.value).strip()
         if not val:
             self.url_input.border_color = None
-        elif self._selected_provider_cls().is_valid_url(val):
+        elif _PROVIDER_CLASSES[self._resolve_tool(val)].is_valid_url(val):
             self.url_input.border_color = ft.Colors.GREEN_400
         else:
             self.url_input.border_color = ft.Colors.RED_400
@@ -462,11 +473,11 @@ class MainScreen(ThemeTarget):
     def _on_download_click(self, _) -> None:
         s    = self._s()
         url  = safe_str(self.url_input.value).strip()
-        tool = self._selected_tool()
 
         if not url:
             self._show_status(s.err_url_empty, ft.Colors.RED)
             return
+        tool = self._resolve_tool(url)   # в auto — выбор провайдера по ссылке
         if not _PROVIDER_CLASSES[tool].is_valid_url(url):
             self._show_status(s.err_url_invalid, ft.Colors.RED)
             self.url_input.border_color = ft.Colors.RED_400
@@ -552,7 +563,7 @@ class MainScreen(ThemeTarget):
         # Старую incomplete-запись заменит новая (новый task_id) — не плодим дубли.
         if self._db is not None:
             self._db.delete(e.task_id)
-        tool = e.source if e.source in _PROVIDER_CLASSES else self._selected_tool()
+        tool = e.source if e.source in _PROVIDER_CLASSES else "yt-dlp"
         self._launch(snapshot, tool, e.title or download_display_name(e.url))
 
     def _download_name(self, url: str) -> str:

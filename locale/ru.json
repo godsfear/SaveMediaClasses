@@ -117,6 +117,7 @@
     "err_url_invalid": "Ошибка: Ссылка должна начинаться с http:// или https://",
     "err_max_parallel": "Максимум {n} загрузок одновременно",
     "err_already_active": "Эта ссылка уже загружается",
+    "err_check_downloader": "Ошибка загрузки — проверьте выбор загрузчика (auto / yt-dlp / aria2c)",
     "dup_warning_title": "Уже загружалось",
     "dup_warning": "Эта ссылка уже была загружена ({when}). Загрузить снова?",
     "header_history": "История загрузок",
