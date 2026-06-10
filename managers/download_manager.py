@@ -80,12 +80,12 @@ class DownloadSnapshot:
         поэтому строковых имён инструментов тут тоже нет.
         """
         p = state.ytdlp.parameters
-        a = state.aria2c
+        a = state.aria2c.parameters
         return cls(
             url=url,
             download_path=state.download_path,
-            aria2_args=a.extra_args,
-            aria2_seed_args=a.seed_args,
+            aria2_args=a.download,
+            aria2_seed_args=a.seed,
             aria2_part_dirname=a.part_dirname,
             proxy_enabled=state.proxy_enabled,
             proxy_address=state.proxy_address,

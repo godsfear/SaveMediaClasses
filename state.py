@@ -11,7 +11,8 @@ from dataclasses import dataclass, field
 from typing import Dict
 
 from config import (
-    ThemeConfig, NamedTheme, WindowConfig, ToolConfig, YtDlpConfig, Aria2cConfig, VersionState,
+    ThemeConfig, NamedTheme, WindowConfig, TimeoutsConfig,
+    ToolConfig, YtDlpConfig, Aria2cConfig, VersionState,
     DEFAULT_DOWNLOAD_PATH, DEFAULT_PROXY_ADDRESS,
 )
 from i18l import Locale
@@ -68,6 +69,9 @@ class AppState:
     # ── Геометрия и язык ──────────────────────────────────────────────────────
     window:   WindowConfig = field(default_factory=WindowConfig)
     language: str          = field(default_factory=Locale.default_language)
+
+    # ── Сетевые таймауты ──────────────────────────────────────────────────────
+    timeouts: TimeoutsConfig = field(default_factory=TimeoutsConfig)
 
     # ── Активная палитра по режиму (совместимость со всеми чтениями .theme) ───
     @property

@@ -252,7 +252,9 @@ class YtDlpProvider(_SubprocessProvider):
     def post_processing_tags(cls) -> list[str]:
         return cls._POST_TAGS
 
-    async def fetch_thumbnail(self, exe: str, url: str, proxy_url: str | None = None) -> tuple:
+    async def fetch_thumbnail(self, exe: str, url: str, proxy_url: str | None = None,
+                              connect_timeout: float = THUMBNAIL_SOCK_TIMEOUT,
+                              read_timeout: float = THUMBNAIL_TIMEOUT) -> tuple:
         """
         Получить thumbnail как JPEG-байты и метаданные из yt-dlp:
           1. --dump-single-json --flat-playlist → метаданные верхнего уровня.
@@ -301,7 +303,7 @@ class YtDlpProvider(_SubprocessProvider):
             if not thumb_url:
                 return b"", data
 
-            timeout = httpx.Timeout(connect=THUMBNAIL_SOCK_TIMEOUT, read=THUMBNAIL_TIMEOUT,
+            timeout = httpx.Timeout(connect=connect_timeout, read=read_timeout,
                                     write=5.0, pool=5.0)
             async with httpx.AsyncClient(
                 proxy=proxy_url,

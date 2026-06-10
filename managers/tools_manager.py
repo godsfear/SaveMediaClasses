@@ -138,7 +138,9 @@ class ToolsManager:
                     on_local_version(b.name, ver)
 
             # 2. Удалённые версии — один сетевой запрос на инструмент.
-            timeout = httpx.Timeout(connect=5.0, read=8.0, write=5.0, pool=5.0)
+            to = state.timeouts
+            timeout = httpx.Timeout(connect=to.connect, read=to.read,
+                                    write=to.connect, pool=to.connect)
             async with httpx.AsyncClient(proxy=proxy_url, timeout=timeout) as client:
                 for spec in specs:
                     remote = await self._fetch_remote(spec, state, client)
@@ -205,7 +207,7 @@ class ToolsManager:
             # tools_dir может быть в профиле пользователя и ещё не существовать —
             # создаём перед первой записью (stream_to_file пишет в неё напрямую).
             os.makedirs(self._paths.tools_dir, exist_ok=True)
-            async with httpx.AsyncClient(proxy=proxy_url, timeout=30.0,
+            async with httpx.AsyncClient(proxy=proxy_url, timeout=state.timeouts.tool_download,
                                          follow_redirects=True) as client:
                 for spec in specs:
                     if not self._needs_update.get(spec.name):

@@ -4,7 +4,7 @@ from typing import Any, Dict
 
 from app_logging import get_logger
 from config import (
-    ThemeConfig, NamedTheme, WindowConfig, ToolConfig, VersionState,
+    ThemeConfig, NamedTheme, WindowConfig, TimeoutsConfig, ToolConfig, VersionState,
     safe_str, safe_int, get_fallback_bool,
 )
 from i18l import Locale
@@ -68,6 +68,7 @@ class ConfigManager:
             saved_themes = saved_themes,
             window   = WindowConfig.from_dict(raw.get("window", {})),
             language = Locale.resolve_language(raw.get("language") or defaults.language),
+            timeouts = TimeoutsConfig.from_dict(raw.get("timeouts", {})),
         )
 
     @staticmethod
@@ -160,7 +161,8 @@ class ConfigManager:
             },
             "tools":         {k: v.to_dict() for k, v in state.tools.items()},
             "tool_versions": {k: v.to_dict() for k, v in state.tool_versions.items()},
-            "window": state.window.to_dict(),
+            "window":   state.window.to_dict(),
+            "timeouts": state.timeouts.to_dict(),
             "theme": {
                 "mode":  state.theme_mode,
                 "dark":  state.theme_dark.to_dict(),
