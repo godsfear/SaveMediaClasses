@@ -524,13 +524,12 @@ class MainScreen(ThemeTarget):
             return None
         pausable = getattr(_PROVIDER_CLASSES.get(tool), "SUPPORTS_PAUSE", False)
         self._add_card(task_id, title, pausable=pausable)
-        # У aria2c нет yt-dlp-метаданных — сохраняем имя в историю как meta.title
-        # (история уже умеет показывать meta.title). yt-dlp пишет meta сам при превью.
+        # У aria2c нет yt-dlp-метаданных — имя в историю как meta.title.
         if tool != "yt-dlp" and self._db is not None:
             self._db.save_meta(task_id, {"title": title})
         self._update_download_btn()
         self._safe_update()
-        # Превью/метаданные умеет получать только yt-dlp (по странице медиа).
+        # Превью умеет получать только yt-dlp (по странице медиа).
         if tool == "yt-dlp":
             self._page.run_task(self._fetch_and_show_thumbnail, task_id, snapshot.url)
         return task_id

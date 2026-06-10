@@ -78,6 +78,12 @@ class ResumeDownloadEvent:
     params:  dict
     title:   str = ""
 
+@dataclass(frozen=True)
+class DownloadSeedingEvent:
+    """Началась раздача торрента — БД переводит запись в статус 'seeding'."""
+    task_id: str
+    source:  str = "aria2c"
+
 
 # ── Инструменты (yt-dlp / ffmpeg) ─────────────────────────────────────────────
 

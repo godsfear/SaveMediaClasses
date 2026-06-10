@@ -16,10 +16,14 @@ import flet as ft
 from app_logging import get_logger
 from config import hex_to_flet, download_display_name
 from controllers.theme_target import ThemeTarget
+from dataclasses import replace
+
 from events import (
-    DownloadCompletedEvent, DownloadCancelledEvent, ResumeDownloadEvent, AppClosingEvent,
+    DownloadCompletedEvent, DownloadCancelledEvent,
+    ResumeDownloadEvent, DownloadSeedingEvent, AppClosingEvent,
 )
 from i18l import Locale, Strings
+from managers.download_manager import DownloadSnapshot
 from managers.download_repository import DownloadRecord, DownloadRepository
 from services import Services
 
@@ -29,6 +33,7 @@ _STATUS_TOKEN = {
     "cancelled":  "status_warning_color",
     "running":    "status_running_color",
     "incomplete": "status_warning_color",
+    "seeding":    "status_running_color",
 }
 _STATUS_ICON = {
     "completed":  ft.Icons.CHECK_CIRCLE_OUTLINE_ROUNDED,
@@ -36,6 +41,7 @@ _STATUS_ICON = {
     "cancelled":  ft.Icons.CANCEL_OUTLINED,
     "running":    ft.Icons.DOWNLOADING_ROUNDED,
     "incomplete": ft.Icons.PAUSE_CIRCLE_OUTLINE_ROUNDED,
+    "seeding":    ft.Icons.UPLOAD_ROUNDED,
 }
 
 
@@ -50,6 +56,7 @@ class HistoryScreen(ThemeTarget):
         super().__init__()
         self._page           = page
         self._db             = svc.db
+        self._dm             = svc.dm
         self._state          = svc.state
         self._bus            = svc.bus
         self._safe_update    = svc.safe_update
@@ -63,6 +70,7 @@ class HistoryScreen(ThemeTarget):
         self._unsubs = [
             self._bus.on(DownloadCompletedEvent, self._on_download_finalized),
             self._bus.on(DownloadCancelledEvent, self._on_download_finalized),
+            self._bus.on(DownloadSeedingEvent,   self._on_download_finalized),
             self._bus.on(AppClosingEvent,        lambda e: self.dispose()),
         ]
 
@@ -106,6 +114,7 @@ class HistoryScreen(ThemeTarget):
             (s.filter_all,        None),
             (s.filter_completed,  "completed"),
             (s.filter_incomplete, "incomplete"),
+            (s.filter_seeding,    "seeding"),
             (s.filter_failed,     "failed"),
             (s.filter_cancelled,  "cancelled"),
         ]
@@ -228,6 +237,7 @@ class HistoryScreen(ThemeTarget):
             "cancelled":  s.status_cancelled,
             "running":    s.status_running,
             "incomplete": s.status_incomplete,
+            "seeding":    s.status_seeding,
         }
         label = status_labels.get(rec.status, rec.status)
 
@@ -300,6 +310,25 @@ class HistoryScreen(ThemeTarget):
             tooltip=s.btn_resume,
             on_click=lambda _, r=rec: self._resume(r),
         ) if rec.status == "incomplete" else None
+        # Раздача (seed) — кнопка-тумблер. Для завершённого торрента (есть
+        # content_hash) — «начать», для раздающегося — «остановить». Процесс
+        # фоновый (через DownloadManager), без карточки на главном экране.
+        if rec.status == "seeding":
+            btn_seed = ft.IconButton(
+                icon=ft.Icons.STOP_CIRCLE_OUTLINED,
+                icon_color=hex_to_flet(t.status_error_color), icon_size=16,
+                tooltip=s.btn_seed_stop,
+                on_click=lambda _, r=rec: self._seed_stop(r),
+            )
+        elif rec.status == "completed" and rec.content_hash:
+            btn_seed = ft.IconButton(
+                icon=ft.Icons.UPLOAD_ROUNDED,
+                icon_color=hex_to_flet(t.status_running_color), icon_size=16,
+                tooltip=s.btn_seed,
+                on_click=lambda _, r=rec: self._seed_start(r),
+            )
+        else:
+            btn_seed = None
 
         title_short = (rec_title[:60] + "…") if len(rec_title) > 62 else rec_title
 
@@ -309,6 +338,7 @@ class HistoryScreen(ThemeTarget):
                         weight=ft.FontWeight.W_500, expand=True, no_wrap=True,
                         overflow=ft.TextOverflow.ELLIPSIS),
                 *([btn_resume] if btn_resume else []),
+                *([btn_seed] if btn_seed else []),
                 btn_folder, btn_delete,
             ], vertical_alignment=ft.CrossAxisAlignment.CENTER, spacing=2),
             ft.Text(url_short, size=11, color=muted_c,
@@ -355,6 +385,21 @@ class HistoryScreen(ThemeTarget):
             task_id=rec.task_id, url=rec.url, source=rec.source,
             params=rec.params, title=title,
         ))
+
+    def _seed_start(self, rec: DownloadRecord) -> None:
+        """Запустить раздачу торрента фоном: реконструируем снимок в seed-режиме и
+        отдаём в менеджер с тем же task_id (запись перейдёт в статус 'seeding').
+        Карточки на главном экране нет — статусом управляет эта кнопка."""
+        snapshot = DownloadSnapshot.from_params(rec.url, rec.params)
+        snapshot = replace(snapshot, seed=True, aria2_seed_args=self._state.aria2c.seed_args)
+        tool = rec.source or "aria2c"
+        self._dm.add(snapshot, provider_key=tool, task_id=rec.task_id)
+        self.refresh()
+
+    def _seed_stop(self, rec: DownloadRecord) -> None:
+        """Остановить раздачу: гасим фоновый процесс (запись вернётся в 'completed')."""
+        self._dm.cancel(rec.task_id)
+        self.refresh()
 
     def _render_stats(self) -> None:
         s  = self._s()

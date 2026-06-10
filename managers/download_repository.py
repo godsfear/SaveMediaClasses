@@ -34,6 +34,7 @@ from events import (
     DownloadCancelledEvent,
     DownloadPausedEvent,
     DownloadResumedEvent,
+    DownloadSeedingEvent,
     AppClosingEvent,
 )
 
@@ -89,6 +90,14 @@ WHERE task_id = :task_id;
 _UPDATE_STATUS = """
 UPDATE downloads SET status = :status, finished_at = :finished_at WHERE task_id = :task_id;
 """
+
+_UPDATE_STATUS_ONLY = """
+UPDATE downloads SET status = :status WHERE task_id = :task_id;
+"""
+
+# Раздача не переживает перезапуск (процесс умер вместе с приложением) — на старте
+# возвращаем «зависшие» seeding-записи в completed (контент-то скачан).
+_FIX_STALE_SEEDING = "UPDATE downloads SET status = 'completed' WHERE status = 'seeding';"
 
 _UPDATE_THUMBNAIL = """
 UPDATE downloads SET thumbnail = :thumbnail WHERE task_id = :task_id;
@@ -159,6 +168,7 @@ class DownloadRepository:
                     self._log.exception("Database migration failed")
             for idx in _CREATE_INDEXES:
                 conn.execute(idx)
+            conn.execute(_FIX_STALE_SEEDING)
             self._backfill_content_hash(conn)
 
     def _backfill_content_hash(self, conn) -> None:
@@ -184,6 +194,7 @@ class DownloadRepository:
             self._bus.on(DownloadCancelledEvent, self._on_cancelled),
             self._bus.on(DownloadPausedEvent,    self._on_paused),
             self._bus.on(DownloadResumedEvent,   self._on_resumed),
+            self._bus.on(DownloadSeedingEvent,   self._on_seeding),
             self._bus.on(AppClosingEvent,        lambda e: self.dispose()),
         ]
 
@@ -231,6 +242,14 @@ class DownloadRepository:
 
     def _on_resumed(self, e: DownloadResumedEvent) -> None:
         self._set_status(e.task_id, "running", finished_at=None)
+
+    def _on_seeding(self, e: DownloadSeedingEvent) -> None:
+        # Раздача: только статус, finished_at не трогаем (запись была completed).
+        try:
+            with self._connect() as conn:
+                conn.execute(_UPDATE_STATUS_ONLY, {"task_id": e.task_id, "status": "seeding"})
+        except Exception:
+            self._log.exception("Failed to set seeding status for %s", e.task_id)
 
     def _set_status(self, task_id: str, status: str, finished_at: Optional[float]) -> None:
         try:
