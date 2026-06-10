@@ -153,6 +153,19 @@ class DownloadManager:
     def at_capacity(self) -> bool:
         return self.active_count >= MAX_PARALLEL
 
+    def is_active_url(self, url: str) -> bool:
+        """Уже идёт загрузка с этим URL? Нельзя качать тот же URL дважды
+        одновременно: совпадут временные .part-папки (детерминированы по URL) и
+        процессы подерутся за файлы."""
+        return any(t.snapshot.url == url for t in self._active.values())
+
+    def active_temp_dirs(self) -> set[str]:
+        """Временные папки активных загрузок (чтобы ручная очистка их не трогала)."""
+        return {
+            pd for t in self._active.values()
+            if (pd := getattr(t.provider, "_part_dir", ""))
+        }
+
     def add(self, snapshot: DownloadSnapshot, provider_key: Optional[str] = None) -> Optional[str]:
         """Запустить загрузку выбранным провайдером. Возвращает task_id или None если exe не найден."""
         provider = self._make_provider(provider_key)

@@ -13,6 +13,7 @@ DownloadProvider — протокол одного загрузчика (yt-dlp,
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import os
 import re
 import shlex
@@ -326,6 +327,7 @@ class Aria2cProvider(_SubprocessProvider):
     """
 
     SOURCE_NAME = "aria2c"
+    PART_DIRNAME = ".part"   # подпапка временных загрузок внутри папки назначения
     _SCHEMES = ("http://", "https://", "ftp://", "sftp://", "magnet:", "metalink:")
     _PROGRESS_RE = re.compile(r"\((\d+)%\)")
     _DL_RE       = re.compile(r"DL:([^\s\]]+)")
@@ -339,6 +341,11 @@ class Aria2cProvider(_SubprocessProvider):
         # GID. Чтобы бар не прыгал 100%→0%, прогресс метаданных подавляем.
         self._is_magnet = False
         self._gids: list[str] = []
+        # aria2 пишет сразу в финальные имена. Чтобы папка загрузки не засорялась
+        # недокачанным, качаем во временную <download>/.part/<id>, а по успеху
+        # переносим содержимое в саму папку загрузки.
+        self._part_dir  = ""
+        self._final_dir = ""
 
     # ── DownloadProvider protocol ─────────────────────────────────────────────
 
@@ -364,8 +371,17 @@ class Aria2cProvider(_SubprocessProvider):
                 # Торренты: не раздавать после докачки — иначе процесс не завершится.
                 "--seed-time=0"]
 
-        if s.download_path:
-            args.append(f"--dir={s.download_path}")
+        # Качаем во временную подпапку .part/<id>; финал — сама папка загрузки.
+        # id = SHA-256(url)[:16] (64 бита): детерминирован, поэтому повторное
+        # добавление той же ссылки попадает в ту же папку → aria2 докачивает с
+        # --continue. Разные ссылки практически не сталкиваются (коллизия ~n²/2⁶⁵).
+        self._final_dir = safe_str(s.download_path)
+        part_id = hashlib.sha256(safe_str(s.url).encode("utf-8")).hexdigest()[:16]
+        self._part_dir  = (os.path.join(self._final_dir, self.PART_DIRNAME, part_id)
+                           if self._final_dir else "")
+        dl_dir = self._part_dir or self._final_dir
+        if dl_dir:
+            args.append(f"--dir={dl_dir}")
 
         # aria2c понимает http/https/ftp прокси (SOCKS не поддерживается).
         if s.proxy_enabled and safe_str(s.proxy_address).strip():
@@ -373,6 +389,82 @@ class Aria2cProvider(_SubprocessProvider):
 
         args.append(s.url)
         return args
+
+    async def run(self, cmd_args: list[str],
+                  on_line: Callable[[str], None],
+                  on_finish: Callable[[int], None]) -> None:
+        """Запуск aria2c во временную папку + перенос результата по успеху.
+
+        Перехватываем код возврата базового run(): при rc==0 переносим
+        содержимое .part/<id> в папку загрузки; провал переноса → код ошибки.
+        """
+        if self._part_dir:
+            os.makedirs(self._part_dir, exist_ok=True)
+
+        captured: dict[str, int] = {}
+        await super().run(cmd_args, on_line, lambda rc: captured.__setitem__("rc", rc))
+        rc = captured.get("rc", 1)
+
+        if rc == 0 and self._part_dir and self._part_dir != self._final_dir:
+            try:
+                self._move_to_final()
+            except Exception:
+                get_logger(self.SOURCE_NAME).exception("Failed to move from .part to download dir")
+                on_finish(1)
+                return
+
+        on_finish(rc)
+
+    def _move_to_final(self) -> None:
+        """Перенести готовые файлы из .part/<id> в папку загрузки.
+
+        Остаточные .aria2 (контрольные) пропускаем; существующий приёмник
+        перезаписываем (политика --allow-overwrite). В конце убираем временную
+        подпапку и, если опустела, родительский .part."""
+        os.makedirs(self._final_dir, exist_ok=True)
+        for name in os.listdir(self._part_dir):
+            if name.endswith(".aria2"):
+                continue
+            src = os.path.join(self._part_dir, name)
+            dst = os.path.join(self._final_dir, name)
+            if os.path.exists(dst):
+                shutil.rmtree(dst, ignore_errors=True) if os.path.isdir(dst) else os.remove(dst)
+            shutil.move(src, dst)
+        shutil.rmtree(self._part_dir, ignore_errors=True)
+        try:
+            os.rmdir(os.path.dirname(self._part_dir))   # .part — только если пуста
+        except OSError:
+            pass
+
+    @classmethod
+    def clean_temp_dirs(cls, download_dir: str,
+                        exclude: "set[str] | None" = None) -> tuple[int, int]:
+        """Удалить временные подпапки <download_dir>/.part (незавершённые/отложенные
+        докачки). exclude — абсолютные пути активных загрузок, их пропускаем.
+
+        Возвращает (число удалённых папок, освобождено байт). Сами по себе .part —
+        это потеря возможности докачки, поэтому очистка только ручная (эта функция).
+        """
+        exclude = {os.path.abspath(p) for p in (exclude or set())}
+        root = os.path.join(safe_str(download_dir), cls.PART_DIRNAME)
+        if not safe_str(download_dir) or not os.path.isdir(root):
+            return (0, 0)
+
+        removed = freed = 0
+        for name in os.listdir(root):
+            sub = os.path.join(root, name)
+            if not os.path.isdir(sub) or os.path.abspath(sub) in exclude:
+                continue
+            size = _dir_size(sub)
+            shutil.rmtree(sub, ignore_errors=True)
+            if not os.path.exists(sub):
+                removed += 1
+                freed += size
+        try:
+            os.rmdir(root)   # убрать сам .part, если опустел
+        except OSError:
+            pass
+        return (removed, freed)
 
     @classmethod
     def _is_real_progress(cls, line: str) -> bool:
@@ -424,3 +516,15 @@ class Aria2cProvider(_SubprocessProvider):
     @classmethod
     def post_processing_tags(cls) -> list[str]:
         return []
+
+
+def _dir_size(path: str) -> int:
+    """Суммарный размер файлов в каталоге (рекурсивно), байт."""
+    total = 0
+    for dirpath, _dirs, files in os.walk(path):
+        for f in files:
+            try:
+                total += os.path.getsize(os.path.join(dirpath, f))
+            except OSError:
+                pass
+    return total

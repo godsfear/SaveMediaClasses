@@ -3,8 +3,8 @@
         "download_path": "d:\\Downloads",
         "proxy_address": "socks5://127.0.0.1:9050",
         "proxy_enabled": false,
-        "download_tool": "aria2c",
-        "last_check_time": 1781046682.3311508,
+        "download_tool": "yt-dlp",
+        "last_check_time": 1781072428.0106938,
         "last_needs_update": false
     },
     "tools": {
@@ -91,8 +91,8 @@
     },
     "tool_versions": {
         "yt-dlp": {
-            "current": "2026.03.17",
-            "latest": "2026.03.17",
+            "current": "2026.06.09",
+            "latest": "2026.06.09",
             "status": "ok"
         },
         "ffmpeg": {
@@ -119,8 +119,8 @@
     "window": {
         "width": 778,
         "height": 991,
-        "left": 3624,
-        "top": 317
+        "left": 3153,
+        "top": 277
     },
     "theme": {
         "mode": "dark",
