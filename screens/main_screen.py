@@ -437,6 +437,9 @@ class MainScreen(ThemeTarget):
         if self._dm.at_capacity:
             self._show_status(s.fmt("err_max_parallel", n=MAX_PARALLEL), ft.Colors.ORANGE)
             return
+        if self._dm.is_active_url(url):
+            self._show_status(s.err_already_active, ft.Colors.ORANGE)
+            return
 
         self.sync_to_state()
         snapshot = DownloadSnapshot.from_state(self._state, url)

@@ -10,6 +10,7 @@ from managers.tools_manager import (
     TOOL_VERSION_REMOTE_ERR, TOOL_VERSION_UNKNOWN, TOOL_VERSION_NEEDS_RUNTIME,
 )
 from managers.tool_registry import DEFAULT_TOOLS
+from managers.providers import Aria2cProvider
 from controllers.theme_target import ThemeTarget
 from controllers.tools_controller import ToolsController
 from screens.color_row import ColorRow
@@ -40,6 +41,16 @@ def _resolve_version(version: str, s) -> str:
     return version
 
 
+def _fmt_size(num: int) -> str:
+    """Размер в байтах → читаемая строка (B/KB/MB/GB/TB)."""
+    size = float(num)
+    for unit in ("B", "KB", "MB", "GB", "TB"):
+        if size < 1024 or unit == "TB":
+            return f"{int(size)} {unit}" if unit == "B" else f"{size:.1f} {unit}"
+        size /= 1024
+    return f"{int(num)} B"
+
+
 # Единая карта статус → цвет (используется и при проверке, и при восстановлении).
 _STATUS_COLOR = {
     "ok":       ft.Colors.GREEN_400,
@@ -57,6 +68,7 @@ class SettingsScreen(ThemeTarget):
         self._safe_update = svc.safe_update
         self._state       = svc.state
         self._bus         = svc.bus
+        self._dm          = svc.dm
 
         self._tools_ctrl: ToolsController | None = None
         self._s: Strings = Locale.load(self._state.language)
@@ -199,6 +211,15 @@ class SettingsScreen(ThemeTarget):
         self.ffmpeg_download_input = self.register_accents(ft.TextField(label=s.url_ffmpeg_download, border_radius=8, focused_border_color=ft.Colors.BLUE))
         self.aria2_version_input   = self.register_accents(ft.TextField(label=s.url_aria2_version,   border_radius=8, focused_border_color=ft.Colors.BLUE))
         self.aria2_download_input  = self.register_accents(ft.TextField(label=s.url_aria2_download,  border_radius=8, focused_border_color=ft.Colors.BLUE))
+        # Ручная очистка временных .part-папок aria2c (см. _clean_temp).
+        self.aria2_clean_btn = self.register_buttons(ft.Button(
+            content=ft.Row([
+                self.register_button_texts(ft.Icon(ft.Icons.CLEANING_SERVICES_OUTLINED, size=18)),
+                self.register_button_texts(ft.Text(s.btn_clean_temp)),
+            ], tight=True, spacing=8),
+            style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=8)),
+            on_click=self._clean_temp,
+        ))
 
         self.update_btn_icon = self.register_button_texts(ft.Icon(ft.Icons.REFRESH_ROUNDED, color=ft.Colors.WHITE))
         self.update_btn_text = self.register_button_texts(ft.Text(s.btn_check, color=ft.Colors.WHITE, weight=ft.FontWeight.BOLD))
@@ -215,6 +236,8 @@ class SettingsScreen(ThemeTarget):
         self.header_cookies       = self.register_headers(ft.Text(s.section_cookies,     size=13, weight=ft.FontWeight.W_600, color=ft.Colors.CYAN_400))
         self.header_ytdlp         = self.register_headers(ft.Text(s.section_ytdlp,       size=13, weight=ft.FontWeight.W_600, color=ft.Colors.CYAN_400))
         self.header_ytdlp_urls    = self.register_muted_text(ft.Text(s.section_ytdlp_urls,  size=12, weight=ft.FontWeight.W_500, color=ft.Colors.GREY_400))
+        self.header_aria2         = self.register_headers(ft.Text(s.section_aria2,       size=13, weight=ft.FontWeight.W_600, color=ft.Colors.CYAN_400))
+        self.header_aria2_urls    = self.register_muted_text(ft.Text(s.section_aria2_urls,  size=12, weight=ft.FontWeight.W_500, color=ft.Colors.GREY_400))
         self.header_deps          = self.register_headers(ft.Text(s.section_deps,        size=14, weight=ft.FontWeight.BOLD,  color=ft.Colors.CYAN_400))
         self.header_deps_urls     = self.register_muted_text(ft.Text(s.section_deps_urls,   size=12, weight=ft.FontWeight.W_500, color=ft.Colors.GREY_400))
         self.header_theme         = self.register_headers(ft.Text(s.section_theme,       size=14, weight=ft.FontWeight.BOLD,  color=ft.Colors.CYAN_400))
@@ -233,6 +256,33 @@ class SettingsScreen(ThemeTarget):
         self.sync_to_state()
         self._bus.emit(SettingsChangedEvent())
         self._bus.emit(LanguageChangedEvent())
+
+    # ── Очистка временных папок aria2c ────────────────────────────────────────
+
+    def _clean_temp(self, _) -> None:
+        """Спросить подтверждение и удалить .part-папки (кроме активных загрузок)."""
+        s = self._s
+
+        def do_clean(_e) -> None:
+            self._page.pop_dialog()
+            removed, freed = Aria2cProvider.clean_temp_dirs(
+                self._state.download_path, exclude=self._dm.active_temp_dirs())
+            msg = (s.fmt("clean_temp_result", n=removed, size=_fmt_size(freed))
+                   if removed else s.clean_temp_empty)
+            self._page.show_dialog(ft.AlertDialog(
+                modal=True, title=ft.Text(s.btn_clean_temp), content=ft.Text(msg),
+                actions=[ft.TextButton(s.btn_ok, on_click=lambda e: self._page.pop_dialog())],
+            ))
+            self._safe_update()
+
+        self._page.show_dialog(ft.AlertDialog(
+            modal=True, title=ft.Text(s.btn_clean_temp),
+            content=ft.Text(s.clean_temp_confirm),
+            actions=[
+                ft.TextButton(s.btn_cancel,     on_click=lambda e: self._page.pop_dialog()),
+                ft.TextButton(s.btn_clean_temp, on_click=do_clean),
+            ],
+        ))
 
     # ── Секция темы ───────────────────────────────────────────────────────────
 
@@ -465,6 +515,8 @@ class SettingsScreen(ThemeTarget):
         self.ffmpeg_download_input.label = s.url_ffmpeg_download;  self.ffmpeg_download_input.update()
         self.aria2_version_input.label   = s.url_aria2_version;   self.aria2_version_input.update()
         self.aria2_download_input.label  = s.url_aria2_download;  self.aria2_download_input.update()
+        self.aria2_clean_btn.content.controls[1].value = s.btn_clean_temp
+        self.aria2_clean_btn.update()
 
         # Заголовки секций
         self.header_net.value           = s.section_network;     self.header_net.update()
@@ -472,6 +524,8 @@ class SettingsScreen(ThemeTarget):
         self.header_cookies.value       = s.section_cookies;     self.header_cookies.update()
         self.header_ytdlp.value         = s.section_ytdlp;       self.header_ytdlp.update()
         self.header_ytdlp_urls.value    = s.section_ytdlp_urls;  self.header_ytdlp_urls.update()
+        self.header_aria2.value         = s.section_aria2;       self.header_aria2.update()
+        self.header_aria2_urls.value    = s.section_aria2_urls;  self.header_aria2_urls.update()
         self.header_deps.value          = s.section_deps;        self.header_deps.update()
         self.header_deps_urls.value     = s.section_deps_urls;   self.header_deps_urls.update()
         self.header_theme.value         = s.section_theme;       self.header_theme.update()
@@ -648,6 +702,26 @@ class SettingsScreen(ThemeTarget):
             border=ft.Border.all(1, "#2a2a2a"),
         )))
 
+        # Именованный раздел aria2c — по образцу yt-dlp (заголовок + действие +
+        # сворачиваемые URL). Версия/обновление инструмента — в карточке зависимостей.
+        aria2_section = self.register_surfaces(self.register_borders(ft.Container(
+            content=ft.Column([
+                self.header_aria2,
+                ft.Row([self.aria2_clean_btn], alignment=ft.MainAxisAlignment.START),
+                ft.ExpansionTile(
+                    title=self.header_aria2_urls,
+                    controls=[ft.Container(
+                        content=ft.Column([
+                            self.aria2_version_input, self.aria2_download_input,
+                        ], spacing=10, horizontal_alignment=ft.CrossAxisAlignment.STRETCH),
+                        padding=ft.Padding.only(left=8, right=8, bottom=8),
+                    )],
+                ),
+            ], spacing=12, horizontal_alignment=ft.CrossAxisAlignment.STRETCH),
+            bgcolor="#121212", border_radius=6, padding=12,
+            border=ft.Border.all(1, "#2a2a2a"),
+        )))
+
         self._card_net = self.register_cards(ft.Container(
             content=ft.Column([
                 self.header_net,
@@ -661,6 +735,7 @@ class SettingsScreen(ThemeTarget):
                 self.header_cookies,
                 self.cookies_browser_dropdown,
                 ytdlp_section,
+                aria2_section,
             ], spacing=12, horizontal_alignment=ft.CrossAxisAlignment.STRETCH),
             bgcolor="#161616", border_radius=8, padding=15,
         ))
@@ -676,7 +751,6 @@ class SettingsScreen(ThemeTarget):
                     controls=[ft.Container(
                         content=ft.Column([
                             self.ffmpeg_version_input, self.ffmpeg_download_input,
-                            self.aria2_version_input, self.aria2_download_input,
                         ], spacing=10, horizontal_alignment=ft.CrossAxisAlignment.STRETCH),
                         padding=ft.Padding.only(left=8, right=8, bottom=8),
                     )],

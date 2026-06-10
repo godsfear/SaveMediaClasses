@@ -26,6 +26,8 @@ class Strings:
     section_cookies:      str = ""
     section_ytdlp:        str = ""
     section_ytdlp_urls:   str = ""
+    section_aria2:        str = ""
+    section_aria2_urls:   str = ""
     section_deps:         str = ""
     section_deps_urls:    str = ""
     section_theme:        str = ""
@@ -147,6 +149,12 @@ class Strings:
     # Выбор загрузчика на главном экране (yt-dlp / aria2c)
     downloader_label:    str = ""
 
+    # Очистка временных папок aria2c
+    btn_clean_temp:      str = ""
+    clean_temp_confirm:  str = ""
+    clean_temp_result:   str = ""  # {n} {size}
+    clean_temp_empty:    str = ""
+
     # main_screen
     header_folder:        str = ""
     header_download:      str = ""
@@ -168,6 +176,7 @@ class Strings:
     err_url_empty:        str = ""
     err_url_invalid:      str = ""
     err_max_parallel:     str = ""  # {n}
+    err_already_active:   str = ""
 
     # history_screen
     header_history:       str = ""
