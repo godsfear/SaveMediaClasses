@@ -3,8 +3,8 @@
         "download_path": "d:\\Downloads",
         "proxy_address": "socks5://127.0.0.1:9050",
         "proxy_enabled": false,
-        "download_tool": "aria2c",
-        "last_check_time": 1781116886.301802,
+        "download_tool": "yt-dlp",
+        "last_check_time": 1781117570.8755808,
         "last_needs_update": false
     },
     "tools": {
@@ -124,7 +124,7 @@
     "window": {
         "width": 778,
         "height": 991,
-        "left": 3797,
+        "left": 3247,
         "top": 242
     },
     "timeouts": {
@@ -206,5 +206,5 @@
             }
         }
     },
-    "language": "ru"
+    "language": "en"
 }

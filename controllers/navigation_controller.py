@@ -197,7 +197,7 @@ class NavigationController:
 
     def build_initial_appbar(self) -> ft.AppBar:
         """Стартовая панель (корневой экран) с брендовым заголовком — для app.py."""
-        return self._make_appbar("SaveMedia [yt-dlp GUI]", root=True)
+        return self._make_appbar("SaveMedia [GUI]", root=True)
 
     # ── Навигация ─────────────────────────────────────────────────────────────
 
