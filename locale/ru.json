@@ -125,6 +125,7 @@
     "filter_completed": "Завершённые",
     "filter_failed": "Ошибки",
     "filter_cancelled": "Отменённые",
+    "filter_incomplete": "Не завершённые",
     "btn_refresh": "Обновить",
     "btn_open_folder": "Открыть папку",
     "btn_delete_record": "Удалить из истории",

@@ -28,7 +28,7 @@ from config import (
     DEFAULT_YT_API_URL, DEFAULT_YT_DOWNLOAD_URL,
     DEFAULT_FFMPEG_VERSION_URL, DEFAULT_FFMPEG_DOWNLOAD_URL,
     DEFAULT_ARIA2_VERSION_URL, DEFAULT_ARIA2_DOWNLOAD_URL,
-    ToolConfig, YtDlpConfig, BinaryDef, YtDlpParameters,
+    ToolConfig, YtDlpConfig, Aria2cConfig, BinaryDef, YtDlpParameters,
 )
 from managers.tool_specs import (
     BaseTool, InstallContext, ManualInstallRequired, ToolBinary,
@@ -189,7 +189,7 @@ class Aria2cTool(BaseTool):
     _VERSION_RE = re.compile(r"version\s+([0-9.]+)", re.IGNORECASE)
 
     def default_config(self) -> ToolConfig:
-        return ToolConfig(
+        return Aria2cConfig(
             version_url  = DEFAULT_ARIA2_VERSION_URL,
             download_url = DEFAULT_ARIA2_DOWNLOAD_URL,
             chunk_size   = ARIA2_CHUNK_SIZE,

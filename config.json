@@ -4,7 +4,7 @@
         "proxy_address": "socks5://127.0.0.1:9050",
         "proxy_enabled": false,
         "download_tool": "aria2c",
-        "last_check_time": 1781081549.647777,
+        "last_check_time": 1781096341.8273067,
         "last_needs_update": false
     },
     "tools": {
@@ -86,7 +86,9 @@
                     "version_flag": "--version",
                     "is_primary": true
                 }
-            }
+            },
+            "extra_args": "--summary-interval=0 --console-log-level=warn --continue=true --auto-file-renaming=false --allow-overwrite=true --auto-save-interval=1 --seed-time=0",
+            "part_dirname": ".part"
         }
     },
     "tool_versions": {
@@ -119,8 +121,8 @@
     "window": {
         "width": 778,
         "height": 991,
-        "left": 3723,
-        "top": 261
+        "left": 3229,
+        "top": 275
     },
     "theme": {
         "mode": "dark",

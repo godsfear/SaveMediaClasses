@@ -5,6 +5,7 @@ from typing import Any, Dict
 # ── Константы приложения ──────────────────────────────────────────────────────
 
 CHECK_INTERVAL_SECONDS = 6 * 3600
+CARD_LINGER_SECONDS    = 3       # сколько карточка висит после финала/паузы перед удалением
 
 # ── Сетевые константы (chunk / timeout) ──────────────────────────────────────
 YT_DLP_CHUNK_SIZE      = 8_192   # байт/итерацию при скачивании yt-dlp
@@ -32,6 +33,15 @@ DEFAULT_FFMPEG_DOWNLOAD_URL = "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release
 # Aria2cTool.install() сам находит нужный ассет в ответе. Отсюда оба URL равны.
 DEFAULT_ARIA2_VERSION_URL   = "https://api.github.com/repos/aria2/aria2/releases/latest"
 DEFAULT_ARIA2_DOWNLOAD_URL  = "https://api.github.com/repos/aria2/aria2/releases/latest"
+
+# Фиксированные CLI-флаги aria2c для скачивания. ВАЖНО (от них зависит логика
+# приложения): --summary-interval=0 (парсинг прогресса по \r-строке без спама),
+# --auto-save-interval=1 (контрольный .aria2 актуален для pause/resume),
+# --continue=true (докачка), --seed-time=0 (не сидировать торрент после докачки).
+DEFAULT_ARIA2_ARGS          = ("--summary-interval=0 --console-log-level=warn "
+                               "--continue=true --auto-file-renaming=false "
+                               "--allow-overwrite=true --auto-save-interval=1 --seed-time=0")
+DEFAULT_ARIA2_PART_DIRNAME  = ".part"   # подпапка временных загрузок в папке назначения
 
 
 # ── Typed конфиги (вместо Dict) ───────────────────────────────────────────────
@@ -488,6 +498,29 @@ class YtDlpConfig(ToolConfig):
             raw if isinstance(raw, dict) else {}, def_.parameters
         )
         return cls(**cls._base_kwargs(d, def_), parameters=params)
+
+
+@dataclass
+class Aria2cConfig(ToolConfig):
+    """Конфигурация aria2c: фиксированные CLI-флаги скачивания и имя temp-подпапки.
+    Раньше были захардкожены в провайдере — теперь персистятся (config.json)."""
+    extra_args:   str = DEFAULT_ARIA2_ARGS
+    part_dirname: str = DEFAULT_ARIA2_PART_DIRNAME
+
+    def to_dict(self) -> Dict[str, Any]:
+        d = super().to_dict()
+        d["extra_args"]   = self.extra_args
+        d["part_dirname"] = self.part_dirname
+        return d
+
+    @classmethod
+    def from_dict(cls, d: Dict[str, Any], defaults: "ToolConfig | None" = None) -> "Aria2cConfig":
+        def_ = defaults if isinstance(defaults, Aria2cConfig) else cls()
+        return cls(
+            **cls._base_kwargs(d, def_),
+            extra_args   = safe_str(d.get("extra_args"))   or def_.extra_args,
+            part_dirname = safe_str(d.get("part_dirname")) or def_.part_dirname,
+        )
 
 
 # ── UI-метаданные темы (порядок полей для Settings) ──────────────────────────

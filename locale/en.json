@@ -125,6 +125,7 @@
     "filter_completed": "Completed",
     "filter_failed": "Errors",
     "filter_cancelled": "Cancelled",
+    "filter_incomplete": "Incomplete",
     "btn_refresh": "Refresh",
     "btn_open_folder": "Open folder",
     "btn_delete_record": "Delete from history",
