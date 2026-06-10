@@ -16,22 +16,26 @@ import flet as ft
 from app_logging import get_logger
 from config import hex_to_flet, download_display_name
 from controllers.theme_target import ThemeTarget
-from events import DownloadCompletedEvent, DownloadCancelledEvent, AppClosingEvent
+from events import (
+    DownloadCompletedEvent, DownloadCancelledEvent, ResumeDownloadEvent, AppClosingEvent,
+)
 from i18l import Locale, Strings
 from managers.download_repository import DownloadRecord, DownloadRepository
 from services import Services
 
 _STATUS_TOKEN = {
-    "completed": "status_ok_color",
-    "failed":    "status_error_color",
-    "cancelled": "status_warning_color",
-    "running":   "status_running_color",
+    "completed":  "status_ok_color",
+    "failed":     "status_error_color",
+    "cancelled":  "status_warning_color",
+    "running":    "status_running_color",
+    "incomplete": "status_warning_color",
 }
 _STATUS_ICON = {
-    "completed": ft.Icons.CHECK_CIRCLE_OUTLINE_ROUNDED,
-    "failed":    ft.Icons.ERROR_OUTLINE_ROUNDED,
-    "cancelled": ft.Icons.CANCEL_OUTLINED,
-    "running":   ft.Icons.DOWNLOADING_ROUNDED,
+    "completed":  ft.Icons.CHECK_CIRCLE_OUTLINE_ROUNDED,
+    "failed":     ft.Icons.ERROR_OUTLINE_ROUNDED,
+    "cancelled":  ft.Icons.CANCEL_OUTLINED,
+    "running":    ft.Icons.DOWNLOADING_ROUNDED,
+    "incomplete": ft.Icons.PAUSE_CIRCLE_OUTLINE_ROUNDED,
 }
 
 
@@ -218,10 +222,11 @@ class HistoryScreen(ThemeTarget):
 
         # Статус из локали
         status_labels = {
-            "completed": s.status_completed,
-            "failed":    s.status_failed,
-            "cancelled": s.status_cancelled,
-            "running":   s.status_running,
+            "completed":  s.status_completed,
+            "failed":     s.status_failed,
+            "cancelled":  s.status_cancelled,
+            "running":    s.status_running,
+            "incomplete": s.status_incomplete,
         }
         label = status_labels.get(rec.status, rec.status)
 
@@ -285,6 +290,13 @@ class HistoryScreen(ThemeTarget):
             tooltip=s.btn_delete_record,
             on_click=lambda _, tid=rec.task_id: self._delete_record(tid),
         )
+        # Возобновление незавершённой (приостановленной) загрузки.
+        btn_resume = ft.IconButton(
+            icon=ft.Icons.PLAY_ARROW_ROUNDED,
+            icon_color=hex_to_flet(t.status_ok_color), icon_size=16,
+            tooltip=s.btn_resume,
+            on_click=lambda _, r=rec: self._resume(r),
+        ) if rec.status == "incomplete" else None
 
         title_short = (rec_title[:60] + "…") if len(rec_title) > 62 else rec_title
 
@@ -293,6 +305,7 @@ class HistoryScreen(ThemeTarget):
                 ft.Text(title_short or url_short, size=12, color=text_c,
                         weight=ft.FontWeight.W_500, expand=True, no_wrap=True,
                         overflow=ft.TextOverflow.ELLIPSIS),
+                *([btn_resume] if btn_resume else []),
                 btn_folder, btn_delete,
             ], vertical_alignment=ft.CrossAxisAlignment.CENTER, spacing=2),
             ft.Text(url_short, size=11, color=muted_c,
@@ -327,6 +340,15 @@ class HistoryScreen(ThemeTarget):
     def _delete_record(self, task_id: str) -> None:
         self._db.delete(task_id)
         self.refresh()
+
+    def _resume(self, rec: DownloadRecord) -> None:
+        """Возобновить незавершённую загрузку: событие подхватит главный экран
+        (запустит/докачает) и навигация переключит на него."""
+        title = (rec.meta or {}).get("title") or download_display_name(rec.url)
+        self._bus.emit(ResumeDownloadEvent(
+            task_id=rec.task_id, url=rec.url, source=rec.source,
+            params=rec.params, title=title,
+        ))
 
     def _render_stats(self) -> None:
         s  = self._s()

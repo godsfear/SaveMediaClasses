@@ -8,6 +8,7 @@ from controllers import NavigationController, ThemeController, ToolsController, 
 from events import (
     ToolsCheckedEvent, ToolsRestoredEvent,
     SettingsChangedEvent, LanguageChangedEvent, ThemeChangedEvent,
+    ResumeDownloadEvent,
 )
 from screens.history_screen import HistoryScreen
 from screens.main_screen import MainScreen
@@ -105,6 +106,9 @@ class SaveMediaApp:
             settings_screen.on_tools_restored(e)
             nav_ctrl.on_tools_restored_pending(e)
 
+        # Возобновление из истории: главный экран сам запустит загрузку (он
+        # подписан на ResumeDownloadEvent), а навигация переключит на него.
+        svc.bus.on(ResumeDownloadEvent, lambda e: nav_ctrl.show_main())
         svc.bus.on(SettingsChangedEvent, persist)
         svc.bus.on(LanguageChangedEvent, _on_language_changed)
         svc.bus.on(ThemeChangedEvent,    _on_theme_changed)

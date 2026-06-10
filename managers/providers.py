@@ -22,7 +22,7 @@ import subprocess
 from typing import Callable, Protocol, runtime_checkable
 
 from app_logging import get_logger
-from config import safe_str, THUMBNAIL_TIMEOUT, THUMBNAIL_SOCK_TIMEOUT
+from config import safe_str, magnet_btih, THUMBNAIL_TIMEOUT, THUMBNAIL_SOCK_TIMEOUT
 from managers.download_manager import DownloadSnapshot
 
 
@@ -86,6 +86,8 @@ class _SubprocessProvider:
     Подклассы реализуют специфику: resolve_exe / build_command / parse_progress /
     is_valid_url / post_processing_tags + объявляют SOURCE_NAME.
     """
+
+    SUPPORTS_PAUSE = False   # умеет ли провайдер pause/resume (kill + докачка)
 
     def __init__(self, paths) -> None:
         self._paths = paths   # AppPaths — единый источник путей
@@ -327,8 +329,10 @@ class Aria2cProvider(_SubprocessProvider):
     """
 
     SOURCE_NAME = "aria2c"
+    SUPPORTS_PAUSE = True    # pause = kill процесс, resume = перезапуск с --continue
     PART_DIRNAME = ".part"   # подпапка временных загрузок внутри папки назначения
     _SCHEMES = ("http://", "https://", "ftp://", "sftp://", "magnet:", "metalink:")
+    _FILE_EXTS = (".torrent", ".metalink")   # локальные файлы-задания aria2c
     _PROGRESS_RE = re.compile(r"\((\d+)%\)")
     _SIZE_RE     = re.compile(r"(\S+)/(\S+)\(\d+%\)")   # "166MiB/378MiB(44%)"
     _DL_RE       = re.compile(r"DL:([^\s\]]+)")
@@ -360,6 +364,8 @@ class Aria2cProvider(_SubprocessProvider):
     def build_command(self, exe: str, snapshot: DownloadSnapshot) -> list[str]:
         s    = snapshot
         self._is_magnet = safe_str(s.url).strip().lower().startswith("magnet:")
+        self._gids = []   # сброс на каждый запуск: важно для resume (иначе фаза
+                          # метаданных magnet не подавится — _gids уже был ≥2)
         args = [exe,
                 # summary-interval=0 убирает многострочные блоки "Download Progress
                 # Summary" (спам в логе); остаётся компактная строка прогресса,
@@ -369,6 +375,10 @@ class Aria2cProvider(_SubprocessProvider):
                 "--continue=true",               # докачивать при наличии .part
                 "--auto-file-renaming=false",
                 "--allow-overwrite=true",
+                # Контрольный файл .aria2 пишем раз в секунду (дефолт 60с). Пауза =
+                # taskkill /F, без graceful-flush; иначе resume откатывается к
+                # последнему автосейву (терялось до минуты прогресса).
+                "--auto-save-interval=1",
                 # Торренты: не раздавать после докачки — иначе процесс не завершится.
                 "--seed-time=0"]
 
@@ -513,12 +523,85 @@ class Aria2cProvider(_SubprocessProvider):
 
     @classmethod
     def is_valid_url(cls, url: str) -> bool:
+        # Схема (http/ftp/magnet/…) ИЛИ локальный файл-задание (.torrent/.metalink).
         u = url.strip().lower()
-        return u.startswith(cls._SCHEMES)
+        return u.startswith(cls._SCHEMES) or u.endswith(cls._FILE_EXTS)
 
     @classmethod
     def post_processing_tags(cls) -> list[str]:
         return []
+
+
+def _bdecode(data: bytes, i: int = 0):
+    """Минимальный bencode-декодер (int/str/list/dict). Возвращает (значение, next_i)."""
+    t = data[i:i + 1]
+    if t == b"i":                                  # integer: i<num>e
+        e = data.index(b"e", i)
+        return int(data[i + 1:e]), e + 1
+    if t == b"l":                                  # list: l...e
+        i += 1; out = []
+        while data[i:i + 1] != b"e":
+            v, i = _bdecode(data, i); out.append(v)
+        return out, i + 1
+    if t == b"d":                                  # dict: d(key val)...e
+        i += 1; out = {}
+        while data[i:i + 1] != b"e":
+            k, i = _bdecode(data, i)
+            v, i = _bdecode(data, i)
+            out[k] = v
+        return out, i + 1
+    colon = data.index(b":", i)                    # string: <len>:<bytes>
+    n = int(data[i:colon]); start = colon + 1
+    return data[start:start + n], start + n
+
+
+def torrent_name(path: str) -> str:
+    """Настоящее имя содержимого из .torrent (info.name) — оно в метаданных торрента
+    и не зависит от того, как назван сам .torrent-файл. '' если прочитать не удалось."""
+    try:
+        with open(path, "rb") as f:
+            meta, _ = _bdecode(f.read())
+        info = meta.get(b"info", {}) if isinstance(meta, dict) else {}
+        name = info.get(b"name.utf-8") or info.get(b"name")
+        if isinstance(name, bytes):
+            return name.decode("utf-8", "replace").strip()
+    except Exception:
+        get_logger("aria2c").warning("Failed to read torrent name: %s", path, exc_info=True)
+    return ""
+
+
+def torrent_infohash(path: str) -> str:
+    """btih (v1) из .torrent: SHA-1 от ИСХОДНЫХ байтов словаря info (не перекодируем —
+    иначе хеш разойдётся с реальным). Совпадает с btih из magnet того же контента.
+    '' если прочитать не удалось. (v2-торренты с SHA-256 не покрываем — редкость.)"""
+    try:
+        with open(path, "rb") as f:
+            data = f.read()
+        if data[:1] != b"d":
+            return ""
+        i = 1
+        while i < len(data) and data[i:i + 1] != b"e":
+            key, i = _bdecode(data, i)
+            start = i
+            _val, i = _bdecode(data, i)       # сдвигает i на конец значения
+            if key == b"info":
+                import hashlib
+                return hashlib.sha1(data[start:i]).hexdigest()
+    except Exception:
+        get_logger("aria2c").warning("Failed to compute torrent infohash: %s", path, exc_info=True)
+    return ""
+
+
+def content_hash(url: str) -> str:
+    """Единый ключ контента для дедупликации (нижний регистр hex), '' если неприменимо:
+    btih у magnet (из самой ссылки), infohash у локального .torrent. У http/yt-dlp хеша нет."""
+    u = safe_str(url).strip()
+    low = u.lower()
+    if low.startswith("magnet:"):
+        return magnet_btih(u)
+    if low.endswith(".torrent"):
+        return torrent_infohash(u)
+    return ""
 
 
 def _dir_size(path: str) -> int:

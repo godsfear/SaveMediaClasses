@@ -56,6 +56,28 @@ class DownloadCancelledEvent:
     task_id: str
     source:  str = "yt-dlp"
 
+@dataclass(frozen=True)
+class DownloadPausedEvent:
+    """Загрузка поставлена на паузу — БД переводит запись в статус 'incomplete'."""
+    task_id: str
+    source:  str = "aria2c"
+
+@dataclass(frozen=True)
+class DownloadResumedEvent:
+    """Загрузка снята с паузы и снова идёт — БД возвращает статус 'running'."""
+    task_id: str
+    source:  str = "aria2c"
+
+@dataclass(frozen=True)
+class ResumeDownloadEvent:
+    """Запрос из истории: возобновить незавершённую загрузку на главном экране.
+    Несёт всё для реконструкции (params — снимок без url) + имя для карточки."""
+    task_id: str
+    url:     str
+    source:  str
+    params:  dict
+    title:   str = ""
+
 
 # ── Инструменты (yt-dlp / ffmpeg) ─────────────────────────────────────────────
 
