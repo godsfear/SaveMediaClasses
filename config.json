@@ -4,7 +4,7 @@
         "proxy_address": "socks5://127.0.0.1:9050",
         "proxy_enabled": false,
         "download_tool": "aria2c",
-        "last_check_time": 1781073545.4161658,
+        "last_check_time": 1781074653.1238794,
         "last_needs_update": false
     },
     "tools": {
