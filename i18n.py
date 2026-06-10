@@ -181,6 +181,7 @@ class Strings:
     err_url_invalid:      str = ""
     err_max_parallel:     str = ""  # {n}
     err_already_active:   str = ""
+    err_check_downloader: str = ""
     dup_warning_title:    str = ""
     dup_warning:          str = ""  # {when}
 

@@ -43,8 +43,8 @@ class AppState:
     download_path: str  = field(default_factory=lambda: DEFAULT_DOWNLOAD_PATH)
     proxy_enabled: bool = False
     proxy_address: str  = field(default_factory=lambda: DEFAULT_PROXY_ADDRESS)
-    # Выбранный загрузчик (ключ провайдера: "yt-dlp" | "aria2c"). Запоминается между сессиями.
-    download_tool: str  = "yt-dlp"
+    # Выбранный загрузчик: "auto" (по типу ссылки) | "yt-dlp" | "aria2c". Запоминается.
+    download_tool: str  = "auto"
 
     # ── Мета-состояние ────────────────────────────────────────────────────────
     last_check_time:   float = 0.0
