@@ -6,6 +6,7 @@ from typing import Any, Dict
 
 CHECK_INTERVAL_SECONDS = 6 * 3600
 CARD_LINGER_SECONDS    = 3       # сколько карточка висит после финала/паузы перед удалением
+SEED_LOG_INTERVAL_SECONDS = 600  # как часто логировать строку раздачи aria2 (SEED спамит ~1/с)
 
 # ── Сетевые константы (chunk / timeout) ──────────────────────────────────────
 YT_DLP_CHUNK_SIZE      = 8_192   # байт/итерацию при скачивании yt-dlp
@@ -42,6 +43,11 @@ DEFAULT_ARIA2_ARGS          = ("--summary-interval=0 --console-log-level=warn "
                                "--continue=true --auto-file-renaming=false "
                                "--allow-overwrite=true --auto-save-interval=1 --seed-time=0")
 DEFAULT_ARIA2_PART_DIRNAME  = ".part"   # подпапка временных загрузок в папке назначения
+# Флаги РАЗДАЧИ (seed): проверить уже скачанные файлы и раздавать без лимита по
+# ratio (0.0 = без лимита), пока пользователь не остановит. --check-integrity нужен,
+# т.к. контрольный .aria2 удаляется после докачки (его перемещаем/чистим).
+DEFAULT_ARIA2_SEED_ARGS     = ("--summary-interval=0 --console-log-level=warn "
+                               "--check-integrity=true --seed-ratio=0.0 --bt-detach-seed-only=false")
 
 
 # ── Typed конфиги (вместо Dict) ───────────────────────────────────────────────
@@ -505,11 +511,13 @@ class Aria2cConfig(ToolConfig):
     """Конфигурация aria2c: фиксированные CLI-флаги скачивания и имя temp-подпапки.
     Раньше были захардкожены в провайдере — теперь персистятся (config.json)."""
     extra_args:   str = DEFAULT_ARIA2_ARGS
+    seed_args:    str = DEFAULT_ARIA2_SEED_ARGS
     part_dirname: str = DEFAULT_ARIA2_PART_DIRNAME
 
     def to_dict(self) -> Dict[str, Any]:
         d = super().to_dict()
         d["extra_args"]   = self.extra_args
+        d["seed_args"]    = self.seed_args
         d["part_dirname"] = self.part_dirname
         return d
 
@@ -519,6 +527,7 @@ class Aria2cConfig(ToolConfig):
         return cls(
             **cls._base_kwargs(d, def_),
             extra_args   = safe_str(d.get("extra_args"))   or def_.extra_args,
+            seed_args    = safe_str(d.get("seed_args"))    or def_.seed_args,
             part_dirname = safe_str(d.get("part_dirname")) or def_.part_dirname,
         )
 

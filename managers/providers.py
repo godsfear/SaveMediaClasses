@@ -365,6 +365,20 @@ class Aria2cProvider(_SubprocessProvider):
         self._is_magnet = safe_str(s.url).strip().lower().startswith("magnet:")
         self._gids = []   # сброс на каждый запуск: важно для resume (иначе фаза
                           # метаданных magnet не подавится — _gids уже был ≥2)
+
+        # Режим РАЗДАЧИ: файлы уже в папке загрузки (без .part, без перемещения),
+        # aria2 проверит их и начнёт сидировать (флаги из конфига, seed_args).
+        if s.seed:
+            self._final_dir = ""
+            self._part_dir  = ""
+            args = [exe, *shlex.split(safe_str(s.aria2_seed_args))]
+            if safe_str(s.download_path):
+                args.append(f"--dir={safe_str(s.download_path)}")
+            if s.proxy_enabled and safe_str(s.proxy_address).strip():
+                args.append(f"--all-proxy={safe_str(s.proxy_address).strip()}")
+            args.append(s.url)
+            return args
+
         # Фиксированные флаги aria2c берём из конфига (snapshot.aria2_args), а не
         # из кода. Их назначение важно для логики (summary-interval=0 — парсинг
         # прогресса, auto-save-interval=1 — pause/resume, continue/seed-time).

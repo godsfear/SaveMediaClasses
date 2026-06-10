@@ -7,11 +7,13 @@ DownloadManager — владеет очередью загрузок.
 
 import asyncio
 import os
+import time
 import uuid
 from dataclasses import dataclass, field, fields
 from typing import Any, Callable, Dict, Optional, TYPE_CHECKING
 
 from app_logging import get_logger
+from config import SEED_LOG_INTERVAL_SECONDS
 from events import (
     EventBus,
     DownloadStartedEvent,
@@ -21,6 +23,7 @@ from events import (
     DownloadCancelledEvent,
     DownloadPausedEvent,
     DownloadResumedEvent,
+    DownloadSeedingEvent,
 )
 
 if TYPE_CHECKING:
@@ -53,7 +56,9 @@ class DownloadSnapshot:
     save_to_source:   bool
     # Параметры инструмента из конфига (флаги CLI и шаблоны путей)
     aria2_args:            str = ""   # фиксированные CLI-флаги aria2c (из Aria2cConfig)
+    aria2_seed_args:       str = ""   # флаги режима раздачи (seed)
     aria2_part_dirname:    str = ".part"
+    seed:                  bool = False  # запуск в режиме раздачи (не скачивания)
     cookies_flag:          str = "--cookies-from-browser"
     playlist_flag_on:      str = "--yes-playlist"
     playlist_flag_off:     str = "--no-playlist"
@@ -80,6 +85,7 @@ class DownloadSnapshot:
             url=url,
             download_path=state.download_path,
             aria2_args=a.extra_args,
+            aria2_seed_args=a.seed_args,
             aria2_part_dirname=a.part_dirname,
             proxy_enabled=state.proxy_enabled,
             proxy_address=state.proxy_address,
@@ -106,10 +112,19 @@ class DownloadSnapshot:
     @classmethod
     def from_params(cls, url: str, params: dict) -> "DownloadSnapshot":
         """Восстановить снимок из сохранённого в БД params (asdict без url) — для
-        возобновления загрузки из истории. Лишние/недостающие ключи игнорируются:
-        берём только известные поля, остальное — дефолты dataclass."""
+        возобновления/раздачи из истории. Берём только известные поля; для
+        отсутствующих обязательных подставляем безопасные дефолты (старые/частичные
+        записи не должны ронять реконструкцию)."""
         valid = {f.name for f in fields(cls)}
         kw = {k: v for k, v in (params or {}).items() if k in valid and k != "url"}
+        required_defaults = dict(
+            download_path="", proxy_enabled=False, proxy_address="",
+            cookies_enabled=False, cookies_browser="none", playlist_enabled=False,
+            embed_metadata=False, audio_only=False, yt_dlp_args="",
+            clean_titles=False, save_to_source=False,
+        )
+        for k, v in required_defaults.items():
+            kw.setdefault(k, v)
         return cls(url=url, **kw)
 
 
@@ -122,8 +137,10 @@ class DownloadTask:
     provider:  "DownloadProvider"
     cancelled: bool  = False
     paused:    bool  = False   # на паузе: процесс убит, partial цел, задача ждёт resume
+    seed:      bool  = False   # задача-раздача: завершение/стоп → запись снова 'completed'
     started:   bool  = False   # DownloadStartedEvent уже отправлен (не дублируем на resume)
     _last_pct: float = -1.0   # последний эмитированный прогресс; -1 = ещё не было
+    _last_seed_log: float = -1e9   # monotonic последнего залогированного SEED (троттлинг)
     _handle:   Optional[asyncio.Task] = field(default=None, repr=False)
 
 
@@ -185,15 +202,22 @@ class DownloadManager:
             if (pd := getattr(t.provider, "_part_dir", ""))
         }
 
-    def add(self, snapshot: DownloadSnapshot, provider_key: Optional[str] = None) -> Optional[str]:
-        """Запустить загрузку выбранным провайдером. Возвращает task_id или None если exe не найден."""
+    def add(self, snapshot: DownloadSnapshot, provider_key: Optional[str] = None,
+            task_id: Optional[str] = None) -> Optional[str]:
+        """Запустить загрузку (или раздачу, если snapshot.seed) выбранным провайдером.
+        task_id можно передать (возобновление/раздача переиспользуют запись истории).
+        Возвращает task_id или None если exe не найден."""
         provider = self._make_provider(provider_key)
         if not provider.resolve_exe():
             return None
 
-        task_id  = str(uuid.uuid4())
-        task     = DownloadTask(task_id=task_id, snapshot=snapshot, provider=provider)
+        task_id  = task_id or str(uuid.uuid4())
+        task     = DownloadTask(task_id=task_id, snapshot=snapshot, provider=provider,
+                                seed=snapshot.seed)
         self._active[task_id] = task
+        if snapshot.seed:   # запись истории сразу помечается раздающейся
+            self._bus.emit(DownloadSeedingEvent(
+                task_id=task_id, source=self._provider_source(provider)))
         task._handle = self._task_runner(self._run, task)
         return task_id
 
@@ -285,6 +309,14 @@ class DownloadManager:
                     return
                 pct = provider.parse_progress(line)
                 if pct is None:
+                    # При раздаче aria2 сыплет строки-readout (~1/с): и SEED, и фаза
+                    # метаданных magnet ([#gid 0B/0B …]). Любую такую строку ([#…)
+                    # логируем редко; остальное (ошибки/notice) — как обычно.
+                    if task.seed and "[#" in line:
+                        now = time.monotonic()
+                        if now - task._last_seed_log < SEED_LOG_INTERVAL_SECONDS:
+                            return
+                        task._last_seed_log = now
                     self._write_log(line, source)
                 # abs(): прогресс может и убывать (новый файл/поток у yt-dlp,
                 # смена фазы у торрента) — иначе бар застревает на прежнем максимуме.
@@ -310,12 +342,20 @@ class DownloadManager:
             except Exception as err:
                 self._log.exception("Download process failed: %s", snap.url)
                 self._finish(task)
+                # Сбой раздачи не ошибка контента — запись остаётся завершённой.
                 self._bus.emit(DownloadCompletedEvent(
-                    task_id=task.task_id, success=False,
-                    message=f"OS error: {err}",   # для БД — английский технический текст
-                    error_detail=str(err),
+                    task_id=task.task_id, success=task.seed,
+                    message="" if task.seed else f"OS error: {err}",
+                    error_detail="" if task.seed else str(err),
                     source=source,
                 ))
+                return
+
+            # Раздача завершилась/остановлена — контент цел, запись снова 'completed'.
+            if task.seed:
+                self._finish(task)
+                self._bus.emit(DownloadCompletedEvent(
+                    task_id=task.task_id, success=True, message="", source=source))
                 return
 
             # Пауза: процесс убит, но задачу НЕ финализируем — она ждёт resume().
