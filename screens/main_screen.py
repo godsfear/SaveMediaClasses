@@ -23,7 +23,7 @@ from events import (
     ResumeDownloadEvent,
     AppClosingEvent,
 )
-from i18l import Locale, Strings
+from i18n import Locale, Strings
 from managers.download_manager import DownloadManager, DownloadSnapshot, MAX_PARALLEL
 from services import Services
 from managers.providers import YtDlpProvider, Aria2cProvider, torrent_name

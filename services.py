@@ -22,7 +22,7 @@ from typing import Any, Callable
 
 from app_logging import configure_logging
 from events import EventBus
-from i18l import Locale
+from i18n import Locale
 from managers.config_manager import ConfigManager
 from managers.download_manager import DownloadManager
 from managers.download_repository import DownloadRepository

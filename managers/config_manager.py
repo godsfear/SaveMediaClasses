@@ -7,7 +7,7 @@ from config import (
     ThemeConfig, NamedTheme, WindowConfig, TimeoutsConfig, ToolConfig, VersionState,
     safe_str, safe_int, get_fallback_bool,
 )
-from i18l import Locale
+from i18n import Locale
 from state import AppState
 
 
