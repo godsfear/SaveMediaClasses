@@ -22,7 +22,7 @@ from events import (
     DownloadCompletedEvent, DownloadCancelledEvent,
     ResumeDownloadEvent, DownloadSeedingEvent, AppClosingEvent,
 )
-from i18l import Locale, Strings
+from i18n import Locale, Strings
 from managers.download_manager import DownloadSnapshot
 from managers.download_repository import DownloadRecord, DownloadRepository
 from services import Services

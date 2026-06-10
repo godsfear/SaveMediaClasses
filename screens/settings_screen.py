@@ -23,7 +23,7 @@ from events import (
     SettingsChangedEvent, ThemeChangedEvent, LanguageChangedEvent,
     CookiesChangedEvent, AppClosingEvent,
 )
-from i18l import Locale, Strings
+from i18n import Locale, Strings
 from services import Services
 
 

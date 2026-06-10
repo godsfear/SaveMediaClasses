@@ -4,7 +4,7 @@
         "proxy_address": "socks5://127.0.0.1:9050",
         "proxy_enabled": false,
         "download_tool": "aria2c",
-        "last_check_time": 1781103364.5755095,
+        "last_check_time": 1781116886.301802,
         "last_needs_update": false
     },
     "tools": {
@@ -124,8 +124,8 @@
     "window": {
         "width": 778,
         "height": 991,
-        "left": 3268,
-        "top": 250
+        "left": 3797,
+        "top": 242
     },
     "timeouts": {
         "connect": 5.0,
@@ -133,7 +133,7 @@
         "tool_download": 30.0,
         "thumbnail_connect": 10.0,
         "thumbnail_read": 15.0,
-        "card_fade": 3
+        "card_fade": 3.0
     },
     "theme": {
         "mode": "dark",

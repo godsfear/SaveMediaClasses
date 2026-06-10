@@ -15,7 +15,7 @@ from config import (
     ToolConfig, YtDlpConfig, Aria2cConfig, VersionState,
     DEFAULT_DOWNLOAD_PATH, DEFAULT_PROXY_ADDRESS,
 )
-from i18l import Locale
+from i18n import Locale
 
 
 # Импорты реестра ленивые: он живёт в пакете managers, чей __init__ тянет

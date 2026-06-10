@@ -22,7 +22,7 @@ import flet as ft
 from app_logging import get_logger
 from config import hex_to_flet
 from events import SettingsChangedEvent, StatusMessageEvent, ThemeChangedEvent
-from i18l import Locale
+from i18n import Locale
 
 if TYPE_CHECKING:
     from controllers.theme_controller import ThemeController
