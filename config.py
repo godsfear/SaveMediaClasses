@@ -567,6 +567,9 @@ def download_display_name(url: str) -> str:
                 return unquote(dn)
         except Exception:
             pass
+    # Локальный .torrent/.metalink — показываем имя файла, а не весь путь.
+    if u.lower().endswith((".torrent", ".metalink")):
+        return os.path.basename(u.replace("\\", "/")) or u
     return u
 
 

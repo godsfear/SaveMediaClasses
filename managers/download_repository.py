@@ -26,12 +26,14 @@ from dataclasses import asdict, fields
 from typing import Any, Dict, Generator, List, Optional
 
 from app_logging import get_logger
-from config import magnet_btih
+from managers.providers import content_hash
 from events import (
     EventBus,
     DownloadStartedEvent,
     DownloadCompletedEvent,
     DownloadCancelledEvent,
+    DownloadPausedEvent,
+    DownloadResumedEvent,
     AppClosingEvent,
 )
 
@@ -49,7 +51,8 @@ CREATE TABLE IF NOT EXISTS downloads (
     error_message TEXT,
     params        TEXT NOT NULL DEFAULT '{}',
     thumbnail     BLOB,
-    meta          TEXT
+    meta          TEXT,
+    content_hash  TEXT
 );
 """
 
@@ -61,21 +64,30 @@ _MIGRATE_META = """
 ALTER TABLE downloads ADD COLUMN meta TEXT;
 """
 
+_MIGRATE_CONTENT_HASH = """
+ALTER TABLE downloads ADD COLUMN content_hash TEXT;
+"""
+
 _CREATE_INDEXES = [
-    "CREATE INDEX IF NOT EXISTS idx_downloads_status     ON downloads (status);",
-    "CREATE INDEX IF NOT EXISTS idx_downloads_url        ON downloads (url);",
-    "CREATE INDEX IF NOT EXISTS idx_downloads_started_at ON downloads (started_at DESC);",
+    "CREATE INDEX IF NOT EXISTS idx_downloads_status       ON downloads (status);",
+    "CREATE INDEX IF NOT EXISTS idx_downloads_url          ON downloads (url);",
+    "CREATE INDEX IF NOT EXISTS idx_downloads_started_at   ON downloads (started_at DESC);",
+    "CREATE INDEX IF NOT EXISTS idx_downloads_content_hash ON downloads (content_hash);",
 ]
 
 _INSERT = """
-INSERT OR IGNORE INTO downloads (task_id, url, source, status, started_at, params)
-VALUES (:task_id, :url, :source, 'running', :started_at, :params);
+INSERT OR IGNORE INTO downloads (task_id, url, source, status, started_at, params, content_hash)
+VALUES (:task_id, :url, :source, 'running', :started_at, :params, :content_hash);
 """
 
 _UPDATE_FINISHED = """
 UPDATE downloads
 SET status = :status, finished_at = :finished_at, error_message = :error_message
 WHERE task_id = :task_id;
+"""
+
+_UPDATE_STATUS = """
+UPDATE downloads SET status = :status, finished_at = :finished_at WHERE task_id = :task_id;
 """
 
 _UPDATE_THUMBNAIL = """
@@ -96,11 +108,11 @@ class DownloadRecord:
     __slots__ = (
         "task_id", "url", "source", "status",
         "started_at", "finished_at", "error_message",
-        "params", "thumbnail", "meta",
+        "params", "thumbnail", "meta", "content_hash",
     )
 
     def __init__(self, params: str = "{}", thumbnail: Optional[bytes] = None,
-                 meta: Optional[str] = None, **kwargs):
+                 meta: Optional[str] = None, content_hash: Optional[str] = None, **kwargs):
         for k, v in kwargs.items():
             if k in self.__slots__:
                 setattr(self, k, v)
@@ -109,6 +121,7 @@ class DownloadRecord:
         except (json.JSONDecodeError, TypeError):
             self.params = {}
         self.thumbnail: Optional[bytes] = thumbnail
+        self.content_hash: Optional[str] = content_hash
         try:
             self.meta: Optional[Dict[str, Any]] = json.loads(meta) if isinstance(meta, str) else meta
         except (json.JSONDecodeError, TypeError):
@@ -135,9 +148,8 @@ class DownloadRepository:
         with self._connect() as conn:
             conn.execute("PRAGMA journal_mode=WAL")
             conn.execute(_CREATE_TABLE)
-            for idx in _CREATE_INDEXES:
-                conn.execute(idx)
-            for migration in (_MIGRATE_THUMBNAIL, _MIGRATE_META):
+            # Миграции — ДО индексов: индекс по content_hash требует наличия колонки.
+            for migration in (_MIGRATE_THUMBNAIL, _MIGRATE_META, _MIGRATE_CONTENT_HASH):
                 try:
                     conn.execute(migration)
                 except sqlite3.OperationalError as err:
@@ -145,12 +157,33 @@ class DownloadRepository:
                         self._log.exception("Database migration failed")
                 except Exception:
                     self._log.exception("Database migration failed")
+            for idx in _CREATE_INDEXES:
+                conn.execute(idx)
+            self._backfill_content_hash(conn)
+
+    def _backfill_content_hash(self, conn) -> None:
+        """Однократно проставить content_hash старым magnet-записям (btih из URL).
+        .torrent не бэкфиллим — файла может уже не быть. Идемпотентно (потом — пусто)."""
+        try:
+            rows = conn.execute(
+                "SELECT task_id, url FROM downloads "
+                "WHERE (content_hash IS NULL OR content_hash = '') AND url LIKE 'magnet:%'"
+            ).fetchall()
+            for task_id, url in rows:
+                ch = content_hash(url)
+                if ch:
+                    conn.execute("UPDATE downloads SET content_hash = ? WHERE task_id = ?",
+                                 (ch, task_id))
+        except Exception:
+            self._log.exception("content_hash backfill failed")
 
     def _subscribe(self) -> None:
         self._unsubs = [
             self._bus.on(DownloadStartedEvent,   self._on_started),
             self._bus.on(DownloadCompletedEvent, self._on_completed),
             self._bus.on(DownloadCancelledEvent, self._on_cancelled),
+            self._bus.on(DownloadPausedEvent,    self._on_paused),
+            self._bus.on(DownloadResumedEvent,   self._on_resumed),
             self._bus.on(AppClosingEvent,        lambda e: self.dispose()),
         ]
 
@@ -175,11 +208,12 @@ class DownloadRepository:
         try:
             with self._connect() as conn:
                 conn.execute(_INSERT, {
-                    "task_id":    e.task_id,
-                    "url":        snap.url,
-                    "source":     e.source,
-                    "started_at": time.time(),
-                    "params":     params_json,
+                    "task_id":      e.task_id,
+                    "url":          snap.url,
+                    "source":       e.source,
+                    "started_at":   time.time(),
+                    "params":       params_json,
+                    "content_hash": content_hash(snap.url),
                 })
         except Exception:
             self._log.exception("Failed to insert download record: %s", e.task_id)
@@ -190,6 +224,22 @@ class DownloadRepository:
 
     def _on_cancelled(self, e: DownloadCancelledEvent) -> None:
         self._finish(e.task_id, "cancelled", None)
+
+    def _on_paused(self, e: DownloadPausedEvent) -> None:
+        # 'incomplete' — приостановлено, не финал: finished_at не ставим.
+        self._set_status(e.task_id, "incomplete", finished_at=None)
+
+    def _on_resumed(self, e: DownloadResumedEvent) -> None:
+        self._set_status(e.task_id, "running", finished_at=None)
+
+    def _set_status(self, task_id: str, status: str, finished_at: Optional[float]) -> None:
+        try:
+            with self._connect() as conn:
+                conn.execute(_UPDATE_STATUS, {
+                    "task_id": task_id, "status": status, "finished_at": finished_at,
+                })
+        except Exception:
+            self._log.exception("Failed to set status %s for %s", status, task_id)
 
     def _finish(self, task_id: str, status: str, error: Optional[str]) -> None:
         try:
@@ -224,14 +274,15 @@ class DownloadRepository:
         return rows[0] if rows else None
 
     def find_completed(self, url: str) -> Optional[DownloadRecord]:
-        """Самая свежая УСПЕШНО завершённая загрузка с этим URL (для предупреждения
-        о повторе). Незавершённые/ошибочные не считаются — их логично качать заново.
+        """Самая свежая УСПЕШНО завершённая загрузка того же контента (для
+        предупреждения о повторе). Незавершённые/ошибочные не считаются.
 
-        Для magnet сравниваем по btih (он в самом URL), а не по строке целиком —
-        тот же торрент с другими трекерами/именем тоже считается дубликатом."""
-        btih = magnet_btih(url)
-        if btih:
-            where, param = "url LIKE ?", f"%btih:{btih}%"   # btih — ASCII, LIKE без эскейпа
+        Для контента с хешем (magnet btih, .torrent infohash) ищем по
+        ИНДЕКСИРОВАННОЙ колонке content_hash — поэтому magnet и .torrent одного
+        торрента распознаются как один контент. Иначе — точное совпадение URL."""
+        chash = content_hash(url)
+        if chash:
+            where, param = "content_hash = ?", chash
         else:
             where, param = "url = ?", url
         rows = self._fetch(

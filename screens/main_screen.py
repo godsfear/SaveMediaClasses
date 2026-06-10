@@ -20,12 +20,13 @@ from events import (
     StatusMessageEvent,
     CookiesChangedEvent,
     SettingsChangedEvent,
+    ResumeDownloadEvent,
     AppClosingEvent,
 )
 from i18l import Locale, Strings
 from managers.download_manager import DownloadManager, DownloadSnapshot, MAX_PARALLEL
 from services import Services
-from managers.providers import YtDlpProvider, Aria2cProvider
+from managers.providers import YtDlpProvider, Aria2cProvider, torrent_name
 from state import AppState
 
 # Доступные загрузчики: ключ провайдера → класс (для is_valid_url и выпадающего списка).
@@ -52,7 +53,8 @@ class DownloadCard:
     Цвета берутся из активной ThemeConfig; apply_theme() позволяет перекрасить
     живую карточку при смене темы/режима."""
 
-    def __init__(self, task_id: str, title: str, on_cancel, s: Strings, t: ThemeConfig) -> None:
+    def __init__(self, task_id: str, title: str, on_cancel, s: Strings, t: ThemeConfig,
+                 on_pause=None) -> None:
         self.task_id   = task_id
         self._s        = s
         self._t        = t
@@ -68,13 +70,21 @@ class DownloadCard:
         self._status   = ft.Text("", size=11,
                                  color=hex_to_flet(t.text_secondary_color),
                                  no_wrap=True, overflow=ft.TextOverflow.ELLIPSIS)
+        # Кнопка pause/resume — только если провайдер это умеет (aria2c).
+        self._pause_btn = None
+        if on_pause is not None:
+            self._pause_btn = ft.IconButton(
+                icon=ft.Icons.PAUSE_ROUNDED, icon_color=hex_to_flet(t.text_secondary_color),
+                icon_size=16, tooltip=s.btn_pause, on_click=lambda _: on_pause(),
+            )
         self._cancel_btn = ft.IconButton(
             icon=ft.Icons.CLOSE_ROUNDED, icon_color=hex_to_flet(t.status_error_color),
             icon_size=16, tooltip=s.btn_clear, on_click=on_cancel
         )
+        top_row = [self._title] + ([self._pause_btn] if self._pause_btn else []) + [self._cancel_btn]
         self.container = ft.Container(
             content=ft.Column([
-                ft.Row([self._title, self._cancel_btn],
+                ft.Row(top_row,
                        alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
                        vertical_alignment=ft.CrossAxisAlignment.CENTER),
                 ft.Row([self._bar, self._pct_text],
@@ -100,12 +110,25 @@ class DownloadCard:
         self._status.color     = hex_to_flet(t.text_secondary_color)
         self._pct_text.color   = hex_to_flet(t.text_secondary_color)
         self._cancel_btn.icon_color = hex_to_flet(t.status_error_color)
+        if self._pause_btn:
+            self._pause_btn.icon_color = hex_to_flet(t.text_secondary_color)
 
     def set_progress(self, pct: float, status: str) -> None:
         self._bar.value      = pct
         self._bar.color      = hex_to_flet(self._t.progress_color)
         self._pct_text.value = f"{int(pct * 100)}%"
         self._status.value   = status
+
+    def set_paused(self, paused: bool) -> None:
+        """Переключить вид карточки и кнопку pause↔resume."""
+        if not self._pause_btn:
+            return
+        self._pause_btn.icon    = ft.Icons.PLAY_ARROW_ROUNDED if paused else ft.Icons.PAUSE_ROUNDED
+        self._pause_btn.tooltip = self._s.btn_resume if paused else self._s.btn_pause
+        if paused:
+            self._bar.color    = hex_to_flet(self._t.status_warning_color)
+            self._status.value = self._s.status_paused
+        # При снятии паузы цвет/статус вернёт следующий set_progress.
 
     def set_postprocessing(self) -> None:
         self._bar.value      = None
@@ -120,6 +143,7 @@ class DownloadCard:
         self._pct_text.value     = "100%" if success else "✗"
         self._status.value       = message
         self._cancel_btn.visible = False
+        if self._pause_btn: self._pause_btn.visible = False
 
     def set_cancelled(self) -> None:
         self._bar.value          = 0.0
@@ -127,6 +151,7 @@ class DownloadCard:
         self._pct_text.value     = "—"
         self._status.value       = self._s.status_cancelled
         self._cancel_btn.visible = False
+        if self._pause_btn: self._pause_btn.visible = False
 
     def set_thumbnail(self, data: bytes) -> None:
         import base64 as _b64
@@ -157,6 +182,7 @@ class MainScreen(ThemeTarget):
         self._log         = get_logger("app")
 
         self._cards: Dict[str, DownloadCard] = {}
+        self._paused: set = set()   # task_id поставленных на паузу карточек
 
         self._subscribe()
         self._build_widgets()
@@ -175,6 +201,7 @@ class MainScreen(ThemeTarget):
             self._bus.on(DownloadCancelledEvent,      self._on_cancelled),
             self._bus.on(ToolsCheckedEvent,           self._on_tools_checked),
             self._bus.on(CookiesChangedEvent,         self._on_cookies_changed),
+            self._bus.on(ResumeDownloadEvent,         self._on_resume_download),
             self._bus.on(AppClosingEvent,             lambda e: self.dispose()),
         ]
 
@@ -480,37 +507,91 @@ class MainScreen(ThemeTarget):
         ))
 
     def _start_download(self, url: str, tool: str) -> None:
-        s = self._s()
         self.sync_to_state()
         snapshot = DownloadSnapshot.from_state(self._state, url)
+        if self._launch(snapshot, tool, self._download_name(url)) is not None:
+            self.url_input.value        = ""
+            self.url_input.border_color = None
+            self._safe_update()
 
+    def _launch(self, snapshot, tool: str, title: str):
+        """Запустить загрузку по готовому снимку: задача в менеджер + карточка.
+        Общий путь для нового скачивания и для возобновления из истории."""
+        s = self._s()
         task_id = self._dm.add(snapshot, provider_key=tool)
         if task_id is None:
             self._show_status(s.status_ytdlp_missing, ft.Colors.ORANGE)
-            return
-
-        self._add_card(task_id, url)
-        self.url_input.value        = ""
-        self.url_input.border_color = None
+            return None
+        pausable = getattr(_PROVIDER_CLASSES.get(tool), "SUPPORTS_PAUSE", False)
+        self._add_card(task_id, title, pausable=pausable)
+        # У aria2c нет yt-dlp-метаданных — сохраняем имя в историю как meta.title
+        # (история уже умеет показывать meta.title). yt-dlp пишет meta сам при превью.
+        if tool != "yt-dlp" and self._db is not None:
+            self._db.save_meta(task_id, {"title": title})
         self._update_download_btn()
         self._safe_update()
         # Превью/метаданные умеет получать только yt-dlp (по странице медиа).
         if tool == "yt-dlp":
-            self._page.run_task(self._fetch_and_show_thumbnail, task_id, url)
+            self._page.run_task(self._fetch_and_show_thumbnail, task_id, snapshot.url)
+        return task_id
+
+    def _on_resume_download(self, e: ResumeDownloadEvent) -> None:
+        """Возобновление из истории. Если задача ещё жива в этой сессии (на паузе) —
+        просто снять с паузы; иначе реконструировать снимок и запустить заново
+        (докачка идёт через детерминированную .part)."""
+        if e.task_id in self._cards:
+            self._paused.discard(e.task_id)
+            self._dm.resume(e.task_id)
+            self._cards[e.task_id].set_paused(False)
+            self._safe_update()
+            return
+        try:
+            snapshot = DownloadSnapshot.from_params(e.url, e.params or {})
+        except Exception:
+            self._log.warning("Failed to rebuild snapshot for resume: %s", e.url, exc_info=True)
+            snapshot = DownloadSnapshot.from_state(self._state, e.url)
+        # Старую incomplete-запись заменит новая (новый task_id) — не плодим дубли.
+        if self._db is not None:
+            self._db.delete(e.task_id)
+        tool = e.source if e.source in _PROVIDER_CLASSES else self._selected_tool()
+        self._launch(snapshot, tool, e.title or download_display_name(e.url))
+
+    def _download_name(self, url: str) -> str:
+        """Имя для карточки/истории. Для .torrent — реальное имя из метаданных
+        торрента (info.name), не из имени файла; иначе — общий резолвер."""
+        if url.lower().endswith(".torrent"):
+            return torrent_name(url) or download_display_name(url)
+        return download_display_name(url)
 
     # ── Карточки ──────────────────────────────────────────────────────────────
 
-    def _add_card(self, task_id: str, url: str) -> None:
+    def _add_card(self, task_id: str, title: str, pausable: bool = False) -> None:
         card = DownloadCard(
-            task_id=task_id, title=download_display_name(url),
+            task_id=task_id, title=title,
             on_cancel=lambda _: self._dm.cancel(task_id),
+            on_pause=(lambda: self._toggle_pause(task_id)) if pausable else None,
             s=self._s(), t=self._state.theme,
         )
         self._cards[task_id] = card
         self._cards_column.controls.append(card.container)
 
+    def _toggle_pause(self, task_id: str) -> None:
+        card = self._cards.get(task_id)
+        if not card:
+            return
+        if task_id in self._paused:
+            self._paused.discard(task_id)
+            self._dm.resume(task_id)
+            card.set_paused(False)
+        else:
+            self._paused.add(task_id)
+            self._dm.pause(task_id)
+            card.set_paused(True)
+        self._safe_update()
+
     def _remove_card(self, task_id: str) -> None:
         card = self._cards.pop(task_id, None)
+        self._paused.discard(task_id)
         if card and card.container in self._cards_column.controls:
             self._cards_column.controls.remove(card.container)
         self._update_download_btn()

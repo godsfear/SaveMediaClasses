@@ -8,7 +8,7 @@ DownloadManager — владеет очередью загрузок.
 import asyncio
 import os
 import uuid
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields
 from typing import Any, Callable, Dict, Optional, TYPE_CHECKING
 
 from app_logging import get_logger
@@ -19,6 +19,8 @@ from events import (
     DownloadPostprocessingEvent,
     DownloadCompletedEvent,
     DownloadCancelledEvent,
+    DownloadPausedEvent,
+    DownloadResumedEvent,
 )
 
 if TYPE_CHECKING:
@@ -96,6 +98,15 @@ class DownloadSnapshot:
             source_dir_template=p.save_to_source.dir_template,
         )
 
+    @classmethod
+    def from_params(cls, url: str, params: dict) -> "DownloadSnapshot":
+        """Восстановить снимок из сохранённого в БД params (asdict без url) — для
+        возобновления загрузки из истории. Лишние/недостающие ключи игнорируются:
+        берём только известные поля, остальное — дефолты dataclass."""
+        valid = {f.name for f in fields(cls)}
+        kw = {k: v for k, v in (params or {}).items() if k in valid and k != "url"}
+        return cls(url=url, **kw)
+
 
 # ── Внутреннее состояние одной задачи ────────────────────────────────────────
 
@@ -105,6 +116,8 @@ class DownloadTask:
     snapshot:  DownloadSnapshot
     provider:  "DownloadProvider"
     cancelled: bool  = False
+    paused:    bool  = False   # на паузе: процесс убит, partial цел, задача ждёт resume
+    started:   bool  = False   # DownloadStartedEvent уже отправлен (не дублируем на resume)
     _last_pct: float = -1.0   # последний эмитированный прогресс; -1 = ещё не было
     _handle:   Optional[asyncio.Task] = field(default=None, repr=False)
 
@@ -147,7 +160,8 @@ class DownloadManager:
 
     @property
     def active_count(self) -> int:
-        return len(self._active)
+        # Паузные задачи не качаются и не занимают слот — в счёт ёмкости не идут.
+        return sum(1 for t in self._active.values() if not t.paused)
 
     @property
     def at_capacity(self) -> bool:
@@ -180,13 +194,45 @@ class DownloadManager:
 
     def cancel(self, task_id: str) -> None:
         task = self._active.get(task_id)
-        if task and not task.cancelled:
-            task.cancelled = True
+        if not task or task.cancelled:
+            return
+        task.cancelled = True
+        if task.paused:
+            # У паузной задачи нет живого процесса/короутины — финализируем сами.
+            task.paused = False
+            self._finish(task)
+            self._bus.emit(DownloadCancelledEvent(
+                task_id=task_id, source=self._provider_source(task.provider)))
+        else:
             task.provider.cancel()
 
     def cancel_all(self) -> None:
         for task_id in list(self._active):
             self.cancel(task_id)
+
+    def pause(self, task_id: str) -> None:
+        """Поставить на паузу: убить процесс (partial и .aria2 остаются для докачки).
+        Задача остаётся в _active в состоянии paused до resume(). БД → 'incomplete'."""
+        task = self._active.get(task_id)
+        if task and not task.cancelled and not task.paused:
+            task.paused = True
+            task.provider.cancel()
+            self._bus.emit(DownloadPausedEvent(
+                task_id=task_id, source=self._provider_source(task.provider)))
+
+    def resume(self, task_id: str) -> None:
+        """Снять с паузы: перезапустить загрузку (та же .part/<id> + --continue).
+        БД → 'running'."""
+        task = self._active.get(task_id)
+        if task and task.paused and not task.cancelled:
+            task.paused = False
+            self._bus.emit(DownloadResumedEvent(
+                task_id=task_id, source=self._provider_source(task.provider)))
+            task._handle = self._task_runner(self._run, task)
+
+    def can_pause(self, task_id: str) -> bool:
+        task = self._active.get(task_id)
+        return bool(task and getattr(task.provider, "SUPPORTS_PAUSE", False))
 
     # ── Внутренняя логика ─────────────────────────────────────────────────────
 
@@ -202,12 +248,15 @@ class DownloadManager:
             exe      = provider.resolve_exe()
             source   = self._provider_source(provider)
 
-            # Сообщаем репозиторию о старте — он запишет snapshot в БД
-            self._bus.emit(DownloadStartedEvent(
-                task_id=task.task_id,
-                snapshot=snap,
-                source=source,
-            ))
+            # Сообщаем репозиторию о старте — он запишет snapshot в БД.
+            # Только один раз: resume перезапускает _run, повторно слать не нужно.
+            if not task.started:
+                task.started = True
+                self._bus.emit(DownloadStartedEvent(
+                    task_id=task.task_id,
+                    snapshot=snap,
+                    source=source,
+                ))
 
             if snap.download_path:
                 try:
@@ -254,6 +303,11 @@ class DownloadManager:
                     error_detail=str(err),
                     source=source,
                 ))
+                return
+
+            # Пауза: процесс убит, но задачу НЕ финализируем — она ждёт resume().
+            # Выход из `async with` освобождает слот семафора; partial цел в .part.
+            if task.paused:
                 return
 
             if task.cancelled:
