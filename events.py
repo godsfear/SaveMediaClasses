@@ -13,9 +13,12 @@ events.py — типизированные события приложения +
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Callable, Dict, List, Type, TypeVar
+from typing import Callable, Dict, List, TYPE_CHECKING, Type, TypeVar
 
 from app_logging import get_logger
+
+if TYPE_CHECKING:
+    from managers.snapshot import DownloadSnapshot
 
 E = TypeVar("E")
 
@@ -48,7 +51,7 @@ class DownloadStartedEvent:
     """Эмитируется в момент старта загрузки — содержит полный снимок параметров.
     DownloadRepository использует его для записи в БД."""
     task_id:  str
-    snapshot: object   # DownloadSnapshot — избегаем циклического импорта
+    snapshot: "DownloadSnapshot"   # импорт под TYPE_CHECKING (модуль снимка лёгкий, но не тянем менеджеры в события)
     source:   str = "yt-dlp"
 
 @dataclass(frozen=True)

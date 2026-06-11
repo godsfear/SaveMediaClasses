@@ -5,9 +5,10 @@ DownloadProvider — протокол одного загрузчика (yt-dlp,
   Один экземпляр = одна загрузка. DownloadManager создаёт через фабрику.
 
 Добавить новый провайдер:
-  1. Реализовать все методы протокола.
-  2. Передать фабрику в DownloadManager при создании в app.py.
-  Больше ничего менять не нужно.
+  1. Реализовать все методы протокола (проще — наследовать _SubprocessProvider).
+  2. Добавить класс в реестр PROVIDERS внизу этого файла.
+  Больше ничего менять не нужно: DownloadManager, дропдаун выбора загрузчика
+  и auto-режим подхватывают реестр автоматически.
 """
 
 from __future__ import annotations
@@ -19,11 +20,11 @@ import re
 import shlex
 import shutil
 import subprocess
-from typing import Callable, Protocol, runtime_checkable
+from typing import Callable, ClassVar, Protocol, runtime_checkable
 
 from app_logging import get_logger
 from config import safe_str, magnet_btih, THUMBNAIL_TIMEOUT, THUMBNAIL_SOCK_TIMEOUT
-from managers.download_manager import DownloadSnapshot
+from managers.snapshot import DownloadSnapshot
 
 
 # ── Протокол ──────────────────────────────────────────────────────────────────
@@ -31,6 +32,11 @@ from managers.download_manager import DownloadSnapshot
 @runtime_checkable
 class DownloadProvider(Protocol):
     """Контракт одного загрузчика. DownloadManager работает только с этим интерфейсом."""
+
+    # Ключ в реестре провайдеров и метка источника в событиях/логах/БД.
+    SOURCE_NAME: ClassVar[str]
+    # Умеет ли провайдер pause/resume (kill процесса + докачка с --continue).
+    SUPPORTS_PAUSE: ClassVar[bool]
 
     def resolve_exe(self) -> str:
         """Вернуть путь к исполняемому файлу или пустую строку если не найден."""
@@ -44,6 +50,10 @@ class DownloadProvider(Protocol):
         """Остановить текущий процесс."""
         ...
 
+    def temp_dir(self) -> str:
+        """Временная папка текущей загрузки ('' если провайдер её не использует)."""
+        ...
+
     async def run(self, cmd_args: list[str],
                   on_line: Callable[[str], None],
                   on_finish: Callable[[int], None]) -> None:
@@ -51,13 +61,12 @@ class DownloadProvider(Protocol):
         on_finish с кодом возврата по завершении."""
         ...
 
-    @classmethod
-    def parse_progress(cls, line: str) -> float | None:
-        """Распарсить строку вывода и вернуть прогресс 0.0–1.0 или None."""
+    def parse_progress(self, line: str) -> float | None:
+        """Распарсить строку вывода и вернуть прогресс 0.0–1.0 или None.
+        Может быть @classmethod у провайдеров без состояния парсинга."""
         ...
 
-    @classmethod
-    def format_status(cls, line: str) -> str:
+    def format_status(self, line: str) -> str:
         """Превратить сырую строку прогресса в человекочитаемый статус для UI."""
         ...
 
@@ -93,6 +102,10 @@ class _SubprocessProvider:
         self._paths = paths   # AppPaths — единый источник путей
         self._ext   = ".exe" if os.name == "nt" else ""
         self._proc  = None
+
+    def temp_dir(self) -> str:
+        """По умолчанию провайдер качает сразу в папку назначения — temp-папки нет."""
+        return ""
 
     @classmethod
     def format_status(cls, line: str) -> str:
@@ -365,6 +378,10 @@ class Aria2cProvider(_SubprocessProvider):
 
     # ── DownloadProvider protocol ─────────────────────────────────────────────
 
+    def temp_dir(self) -> str:
+        """Временная папка <download>/.part/<id> текущей загрузки ('' для seed)."""
+        return self._part_dir
+
     def resolve_exe(self) -> str:
         # Приоритет — наша tools_dir; фолбэк — aria2c, установленный в системе (PATH).
         path = os.path.join(self._paths.tools_dir, f"aria2c{self._ext}")
@@ -556,6 +573,32 @@ class Aria2cProvider(_SubprocessProvider):
     @classmethod
     def post_processing_tags(cls) -> list[str]:
         return []
+
+
+# ── Реестр провайдеров — единственный источник истины ────────────────────────
+#
+# Ключ = SOURCE_NAME провайдера; он же ключ provider_factories в DownloadManager,
+# значение дропдауна выбора загрузчика в UI и поле source в событиях/БД.
+# Добавить провайдер = реализовать класс + строка здесь; UI и менеджер
+# подхватывают его автоматически.
+
+PROVIDERS: dict[str, type] = {
+    YtDlpProvider.SOURCE_NAME:  YtDlpProvider,
+    Aria2cProvider.SOURCE_NAME: Aria2cProvider,
+}
+
+DEFAULT_PROVIDER = YtDlpProvider.SOURCE_NAME
+
+
+def provider_factories(paths) -> dict[str, Callable[[], DownloadProvider]]:
+    """Фабрики провайдеров для DownloadManager (один экземпляр = одна загрузка)."""
+    return {key: (lambda cls=cls: cls(paths)) for key, cls in PROVIDERS.items()}
+
+
+def resolve_provider_for_url(url: str) -> str:
+    """Auto-режим: ссылка на файл/торрент → aria2c, страница для извлечения → yt-dlp."""
+    return (Aria2cProvider.SOURCE_NAME if Aria2cProvider.claims_url(url)
+            else DEFAULT_PROVIDER)
 
 
 def _bdecode(data: bytes, i: int = 0):

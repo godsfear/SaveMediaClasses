@@ -58,7 +58,7 @@ class Services:
     ) -> "Services":
         """Собирает все зависимости в правильном порядке.
         task_runner — планировщик coroutine (в app.py: page.run_task)."""
-        from managers.providers import YtDlpProvider, Aria2cProvider
+        from managers.providers import provider_factories, DEFAULT_PROVIDER
 
         # Единый источник путей — создаётся первым и раздаётся всем остальным.
         paths = AppPaths.detect()
@@ -73,11 +73,8 @@ class Services:
         state      = config_mgr.load()
         db         = DownloadRepository(db_path=paths.db_file, bus=bus)
         dm         = DownloadManager(
-            provider_factories={
-                "yt-dlp": lambda: YtDlpProvider(paths),
-                "aria2c": lambda: Aria2cProvider(paths),
-            },
-            default_provider="yt-dlp",
+            provider_factories=provider_factories(paths),
+            default_provider=DEFAULT_PROVIDER,
             log_path=paths.log_file,
             bus=bus,
             task_runner=task_runner,
