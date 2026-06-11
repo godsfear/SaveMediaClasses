@@ -448,12 +448,16 @@ class MainScreen(ThemeTarget):
                 ft.Row([self.url_input, self.add_files_btn,
                         self.downloader_dropdown, self.download_btn],
                        vertical_alignment=ft.CrossAxisAlignment.CENTER, spacing=10),
+                # Сетка параметров: строка переключателей, под ней — строка
+                # дропдаунов (не вперемешку — так ряды выровнены по типу контрола).
                 ft.Column([
-                    ft.Row([self.audio_only_switch, self.quality_dropdown],
-                           vertical_alignment=ft.CrossAxisAlignment.CENTER, spacing=15),
-                    ft.Row([self.cookies_enabled_switch, self.subtitles_dropdown],
-                           vertical_alignment=ft.CrossAxisAlignment.CENTER, spacing=15),
-                ], spacing=10)
+                    ft.Row([self.audio_only_switch, self.cookies_enabled_switch],
+                           vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                           spacing=20, wrap=True),
+                    ft.Row([self.quality_dropdown, self.subtitles_dropdown],
+                           vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                           spacing=15, wrap=True),
+                ], spacing=12)
             ], spacing=12, horizontal_alignment=ft.CrossAxisAlignment.STRETCH),
             bgcolor="#161616", border_radius=8, padding=15
         ))
