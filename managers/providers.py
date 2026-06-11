@@ -267,7 +267,8 @@ class YtDlpProvider(_SubprocessProvider):
 
     async def fetch_thumbnail(self, exe: str, url: str, proxy_url: str | None = None,
                               connect_timeout: float = THUMBNAIL_SOCK_TIMEOUT,
-                              read_timeout: float = THUMBNAIL_TIMEOUT) -> tuple:
+                              read_timeout: float = THUMBNAIL_TIMEOUT,
+                              meta_timeout: float = 20.0) -> tuple:
         """
         Получить thumbnail как JPEG-байты и метаданные из yt-dlp:
           1. --dump-single-json --flat-playlist → метаданные верхнего уровня.
@@ -293,7 +294,7 @@ class YtDlpProvider(_SubprocessProvider):
                 startupinfo=startup,
             )
             try:
-                stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=20)
+                stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=meta_timeout)
             except asyncio.TimeoutError:
                 proc.kill()
                 return b"", {}
