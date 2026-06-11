@@ -10,11 +10,15 @@ import contextlib
 import os
 import time
 import uuid
+from collections import deque
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, Optional, TYPE_CHECKING
 
 from app_logging import get_logger
-from config import SEED_LOG_INTERVAL_SECONDS, DEFAULT_MAX_PARALLEL, MAX_PARALLEL_CEILING
+from config import (
+    SEED_LOG_INTERVAL_SECONDS, DEFAULT_MAX_PARALLEL, MAX_PARALLEL_CEILING,
+    ERROR_TAIL_LINES,
+)
 from managers.snapshot import DownloadSnapshot
 from events import (
     EventBus,
@@ -49,6 +53,8 @@ class DownloadTask:
     started:   bool  = False   # DownloadStartedEvent уже отправлен (не дублируем на resume)
     _last_pct: float = -1.0   # последний эмитированный прогресс; -1 = ещё не было
     _last_seed_log: float = -1e9   # monotonic последнего залогированного SEED (троттлинг)
+    # Кольцевой буфер последних НЕ-прогрессных строк вывода — диагностика при сбое.
+    _tail: deque = field(default_factory=lambda: deque(maxlen=ERROR_TAIL_LINES), repr=False)
     _handle:   Optional[asyncio.Task] = field(default=None, repr=False)
 
 
@@ -268,6 +274,7 @@ class DownloadManager:
                         if now - task._last_seed_log < SEED_LOG_INTERVAL_SECONDS:
                             return
                         task._last_seed_log = now
+                    task._tail.append(line)   # хвост для диагностики при сбое
                     self._write_log(line, source)
                 # abs(): прогресс может и убывать (новый файл/поток у yt-dlp,
                 # смена фазы у торрента) — иначе бар застревает на прежнем максимуме.
@@ -298,6 +305,7 @@ class DownloadManager:
                     task_id=task.task_id, success=task.seed,
                     message="" if task.seed else f"OS error: {err}",
                     error_detail="" if task.seed else str(err),
+                    output_tail="" if task.seed else "\n".join(task._tail),
                     source=source,
                 ))
                 return
@@ -331,6 +339,7 @@ class DownloadManager:
             self._bus.emit(DownloadCompletedEvent(
                 task_id=task.task_id, success=success, message=message,
                 error_code=returncode if not success else None,
+                output_tail="" if success else "\n".join(task._tail),
                 source=source,
             ))
 

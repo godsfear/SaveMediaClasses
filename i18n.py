@@ -161,6 +161,17 @@ class Strings:
     subs_auto:           str = ""
     subs_all:            str = ""
 
+    # Пакетная загрузка (несколько ссылок строками + файлы-задания)
+    btn_add_files:       str = ""
+    files_select_text:   str = ""
+    batch_started:       str = ""   # {n}
+    batch_skipped:       str = ""   # {n} {m}
+
+    # Слежение за буфером обмена (тумблер в тулбаре)
+    clipboard_on:        str = ""
+    clipboard_off:       str = ""
+    clipboard_added:     str = ""
+
     # Очистка временных папок aria2c
     btn_clean_temp:      str = ""
     clean_temp_confirm:  str = ""
@@ -185,6 +196,8 @@ class Strings:
     status_paused:        str = ""
     btn_pause:            str = ""
     btn_resume:           str = ""
+    btn_retry:            str = ""
+    btn_error_details:    str = ""
     status_tools_ok:      str = ""
     status_tools_update:  str = ""
     status_ytdlp_missing: str = ""

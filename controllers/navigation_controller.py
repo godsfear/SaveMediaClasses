@@ -67,6 +67,7 @@ class NavigationController:
         self.history_btn  = ft.IconButton(icon=ft.Icons.HISTORY_ROUNDED,              icon_color=fg, tooltip=s.nav_history)
         self.folder_btn   = ft.IconButton(icon=ft.Icons.FOLDER_OPEN_ROUNDED,          icon_color=fg, tooltip=s.btn_folder)
         self.proxy_btn    = ft.IconButton(icon=ft.Icons.SHIELD_OUTLINED,              icon_color=fg, tooltip=s.proxy_tooltip)
+        self.clipboard_btn = ft.IconButton(icon=ft.Icons.CONTENT_PASTE_OFF_ROUNDED,   icon_color=fg, tooltip=s.clipboard_off)
         self.settings_btn = ft.IconButton(icon=ft.Icons.SETTINGS_ROUNDED,             icon_color=fg, tooltip=s.appbar_settings)
         self.exit_btn     = ft.IconButton(icon=ft.Icons.POWER_SETTINGS_NEW_ROUNDED,   icon_color=hex_to_flet(self._svc.state.theme.status_error_color), tooltip=s.btn_exit)
 
@@ -124,6 +125,7 @@ class NavigationController:
         # Кнопка выхода — статусный цвет «ошибка» из активной палитры.
         self.exit_btn.icon_color = hex_to_flet(self._svc.state.theme.status_error_color)
         self.update_proxy_ui()
+        self.update_clipboard_ui()
         ab = self._page.appbar
         if ab is not None:
             if getattr(ab, "title", None) is not None:
@@ -151,6 +153,26 @@ class NavigationController:
             self.proxy_btn.icon_color = self._appbar_fg()
             self.proxy_btn.tooltip    = s.proxy_off
 
+    def update_clipboard_ui(self) -> None:
+        """Обновить иконку и tooltip кнопки слежения за буфером по state."""
+        s = Locale.load(self._svc.state.language)
+        if self._svc.state.clipboard_watch:
+            self.clipboard_btn.icon       = ft.Icons.CONTENT_PASTE_ROUNDED
+            self.clipboard_btn.icon_color = severity_color(self._svc.state.theme, "ok")
+            self.clipboard_btn.tooltip    = s.clipboard_on
+        else:
+            self.clipboard_btn.icon       = ft.Icons.CONTENT_PASTE_OFF_ROUNDED
+            self.clipboard_btn.icon_color = self._appbar_fg()
+            self.clipboard_btn.tooltip    = s.clipboard_off
+
+    def _toggle_clipboard(self, _) -> None:
+        """Тумблер слежения за буфером: state + персист; сам опрос ведёт
+        ClipboardController, перечитывающий флаг на каждом цикле."""
+        self._svc.state.clipboard_watch = not self._svc.state.clipboard_watch
+        self.update_clipboard_ui()
+        self._svc.bus.emit(SettingsChangedEvent())
+        self._svc.safe_update()
+
     def on_language_changed(self) -> None:
         """Перестроить все тексты тулбара и AppBar после смены языка."""
         s = Locale.load(self._svc.state.language)
@@ -160,6 +182,7 @@ class NavigationController:
         self.folder_btn.tooltip    = s.btn_folder
         self.exit_btn.tooltip      = s.btn_exit
         self.update_proxy_ui()
+        self.update_clipboard_ui()
         self._refresh_appbar_title(s)
 
     # ── Сборка AppBar (единая фабрика) ────────────────────────────────────────
@@ -176,7 +199,7 @@ class NavigationController:
             leading_width = 44
             actions       = [
                 self.theme_btn, self.settings_btn, self.history_btn,
-                self.proxy_btn, self.folder_btn, self.exit_btn,
+                self.proxy_btn, self.clipboard_btn, self.folder_btn, self.exit_btn,
             ]
         else:
             leading = ft.IconButton(
@@ -318,9 +341,10 @@ class NavigationController:
         self._page.pop_dialog()
 
     def _bind_toolbar(self) -> None:
-        self.theme_btn.on_click    = self._toggle_theme_mode
-        self.folder_btn.on_click   = self._open_folder_picker
-        self.proxy_btn.on_click    = self._toggle_proxy
+        self.theme_btn.on_click     = self._toggle_theme_mode
+        self.folder_btn.on_click    = self._open_folder_picker
+        self.proxy_btn.on_click     = self._toggle_proxy
+        self.clipboard_btn.on_click = self._toggle_clipboard
         self.settings_btn.on_click = self.show_settings
         self.history_btn.on_click  = self.show_history
         self.exit_btn.on_click     = self._window_ctrl.force_exit

@@ -48,6 +48,8 @@ class AppState:
     # Лимит одновременных загрузок; применяется на лету (DownloadManager читает
     # его динамически). Персистится в settings.max_parallel.
     max_parallel:  int  = DEFAULT_MAX_PARALLEL
+    # Слежение за буфером обмена: скопированные ссылки добавляются в поле URL.
+    clipboard_watch: bool = False
 
     # ── Мета-состояние ────────────────────────────────────────────────────────
     last_check_time:   float = 0.0

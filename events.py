@@ -45,6 +45,7 @@ class DownloadCompletedEvent:
     source:       str = "yt-dlp"
     error_code:   int | None = None  # код возврата процесса (только при success=False)
     error_detail: str = ""           # текст ошибки ОС (только при сбое запуска)
+    output_tail:  str = ""           # последние строки вывода процесса (только при сбое)
 
 @dataclass(frozen=True)
 class DownloadStartedEvent:
@@ -92,6 +93,12 @@ class ThumbnailReadyEvent:
     """Превью загрузки получено (ThumbnailService) — карточка может показать картинку."""
     task_id: str
     data:    bytes
+
+@dataclass(frozen=True)
+class ClipboardUrlEvent:
+    """В буфере обмена появились ссылки на загрузку (слежение включено).
+    MainScreen добавляет их строками в поле URL."""
+    urls: tuple
 
 
 # ── Инструменты (yt-dlp / ffmpeg) ─────────────────────────────────────────────

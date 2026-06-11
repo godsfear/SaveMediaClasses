@@ -8,7 +8,9 @@ from typing import Dict
 import flet as ft
 
 from app_logging import get_logger
-from config import safe_str, hex_to_flet, ThemeConfig, download_display_name
+from config import (
+    safe_str, hex_to_flet, ThemeConfig, download_display_name, parse_url_lines,
+)
 from controllers.theme_target import ThemeTarget
 from events import (
     EventBus,
@@ -18,6 +20,7 @@ from events import (
     DownloadCancelledEvent,
     ToolsCheckedEvent,
     StatusMessageEvent,
+    ClipboardUrlEvent,
     CookiesChangedEvent,
     DownloadPathChangedEvent,
     SettingsChangedEvent,
@@ -209,6 +212,7 @@ class MainScreen(ThemeTarget):
             self._bus.on(SettingsChangedEvent,        lambda e: self._update_download_btn()),
             self._bus.on(ResumeDownloadEvent,         self._on_resume_download),
             self._bus.on(ThumbnailReadyEvent,         self._on_thumbnail_ready),
+            self._bus.on(ClipboardUrlEvent,           self._on_clipboard_urls),
             self._bus.on(AppClosingEvent,             lambda e: self.dispose()),
         ]
 
@@ -277,6 +281,17 @@ class MainScreen(ThemeTarget):
             card.set_thumbnail(e.data)
             self._safe_update()
 
+    def _on_clipboard_urls(self, e: ClipboardUrlEvent) -> None:
+        """Слежение за буфером поймало ссылки — дописать новые строками в поле.
+        Загрузка НЕ стартует сама: запуск остаётся за пользователем."""
+        existing = parse_url_lines(safe_str(self.url_input.value))
+        fresh = [u for u in e.urls if u not in existing]
+        if not fresh:
+            return
+        self.url_input.value = "\n".join(existing + fresh)
+        self._on_url_change(None)        # валидация рамки + safe_update
+        self._show_status(self._s().clipboard_added, "info")
+
     # ── Метка папки загрузки: состояние выводится из state ────────────────────
 
     def update_folder_ui(self) -> None:
@@ -343,13 +358,25 @@ class MainScreen(ThemeTarget):
                 self._on_url_change(None),
             ]
         ))
+        # Поле принимает НЕСКОЛЬКО ссылок — по одной на строку (вставка пачки,
+        # Shift+Enter — новая строка, Enter — запуск). Поле растёт до 4 строк.
         self.url_input = self.register_accents(ft.TextField(
             label=s.url_label,
             hint_text=s.url_hint,
             expand=True, border_radius=8,
+            multiline=True, min_lines=1, max_lines=4, shift_enter=True,
             focused_border_color=ft.Colors.BLUE,
             on_change=self._on_url_change,
+            on_submit=self._on_download_click,
             suffix=url_clear_btn,
+        ))
+        # Добавление локальных файлов-заданий (.torrent / .metalink) — замена
+        # drag&drop: Flet не принимает OS-перетаскивание файлов на окно.
+        self._file_picker = ft.FilePicker()
+        self.add_files_btn = self.register_icon_buttons(ft.IconButton(
+            icon=ft.Icons.ATTACH_FILE_ROUNDED, icon_color=ft.Colors.GREY_500,
+            icon_size=18, tooltip=s.btn_add_files,
+            on_click=self._pick_task_files,
         ))
         # Выбор загрузчика для текущей ссылки: yt-dlp (медиа-сайты) или aria2c
         # (прямые файловые ссылки). Стоит справа от поля URL; выбор запоминается.
@@ -418,8 +445,9 @@ class MainScreen(ThemeTarget):
         self.main_card = self.register_cards(ft.Container(
             content=ft.Column([
                 self.header_main,
-                ft.Row([self.url_input, self.downloader_dropdown, self.download_btn],
-                       vertical_alignment=ft.CrossAxisAlignment.CENTER, spacing=15),
+                ft.Row([self.url_input, self.add_files_btn,
+                        self.downloader_dropdown, self.download_btn],
+                       vertical_alignment=ft.CrossAxisAlignment.CENTER, spacing=10),
                 ft.Column([
                     ft.Row([self.audio_only_switch, self.quality_dropdown],
                            vertical_alignment=ft.CrossAxisAlignment.CENTER, spacing=15),
@@ -550,6 +578,7 @@ class MainScreen(ThemeTarget):
         self.header_queue.value   = s.header_queue;    self.header_queue.update()
         self.url_input.label      = s.url_label;       self.url_input.update()
         self.url_input.hint_text  = s.url_hint
+        self.add_files_btn.tooltip = s.btn_add_files;  self.add_files_btn.update()
         self.downloader_dropdown.label = s.downloader_label; self.downloader_dropdown.update()
         self.quality_dropdown.label    = s.quality_label
         self.quality_dropdown.options  = self._quality_options(s)
@@ -566,11 +595,11 @@ class MainScreen(ThemeTarget):
     # ── Валидация URL ─────────────────────────────────────────────────────────
 
     def _on_url_change(self, _) -> None:
-        t   = self._state.theme
-        val = safe_str(self.url_input.value).strip()
-        if not val:
+        t    = self._state.theme
+        urls = parse_url_lines(safe_str(self.url_input.value))
+        if not urls:
             self.url_input.border_color = None
-        elif PROVIDERS[self._resolve_tool(val)].is_valid_url(val):
+        elif all(PROVIDERS[self._resolve_tool(u)].is_valid_url(u) for u in urls):
             self.url_input.border_color = hex_to_flet(t.status_ok_color)
         else:
             self.url_input.border_color = hex_to_flet(t.status_error_color)
@@ -580,11 +609,19 @@ class MainScreen(ThemeTarget):
 
     def _on_download_click(self, _) -> None:
         s    = self._s()
-        url  = safe_str(self.url_input.value).strip()
+        urls = parse_url_lines(safe_str(self.url_input.value))
 
-        if not url:
+        if not urls:
             self._show_status(s.err_url_empty, "error")
             return
+        if len(urls) == 1:
+            self._submit_single(urls[0])
+        else:
+            self._submit_batch(urls)
+
+    def _submit_single(self, url: str) -> None:
+        """Одна ссылка — прежний путь с диалогом подтверждения повтора."""
+        s    = self._s()
         tool = self._resolve_tool(url)   # в auto — выбор провайдера по ссылке
         if not PROVIDERS[tool].is_valid_url(url):
             self._show_status(s.err_url_invalid, "error")
@@ -606,6 +643,56 @@ class MainScreen(ThemeTarget):
             return
 
         self._start_download(url, tool)
+
+    def _submit_batch(self, urls: list) -> None:
+        """Пачка ссылок: запускаем валидные, невлезшие/невалидные остаются в поле.
+
+        Диалог «уже скачивалось» в пакете не показываем — N подтверждений подряд
+        хуже, чем повторная загрузка; статус-бар сообщает итог."""
+        s = self._s()
+        self.sync_to_state()             # один коммит переключателей на всю пачку
+        started, leftover = 0, []
+        for url in urls:
+            tool = self._resolve_tool(url)
+            if (self._dm.at_capacity
+                    or not PROVIDERS[tool].is_valid_url(url)
+                    or self._dm.is_active_url(url)):
+                leftover.append(url)
+                continue
+            snapshot = DownloadSnapshot.from_state(self._state, url)
+            if self._launch(snapshot, tool, self._download_name(url)) is None:
+                leftover.append(url)
+                continue
+            started += 1
+
+        # Запущенные строки убираем из поля, проблемные оставляем на виду.
+        self.url_input.value = "\n".join(leftover)
+        self._on_url_change(None)
+        if started and not leftover:
+            self._show_status(s.fmt("batch_started", n=started), "ok")
+        elif started:
+            self._show_status(s.fmt("batch_skipped", n=started, m=len(leftover)), "warning")
+        else:
+            self._show_status(s.err_url_invalid, "error")
+        self._safe_update()
+
+    # ── Добавление файлов-заданий (.torrent / .metalink) ─────────────────────
+
+    async def _pick_task_files(self, _) -> None:
+        """Мультивыбор локальных .torrent/.metalink — пути добавляются строками
+        в поле URL (видно, что попадёт в очередь; запуск — кнопкой «Скачать»)."""
+        s = self._s()
+        files = await self._file_picker.pick_files(
+            dialog_title=s.files_select_text,
+            allow_multiple=True,
+            allowed_extensions=["torrent", "metalink"],
+        )
+        paths = [f.path for f in (files or []) if getattr(f, "path", None)]
+        if not paths:
+            return
+        lines = parse_url_lines(safe_str(self.url_input.value)) + paths
+        self.url_input.value = "\n".join(dict.fromkeys(lines))
+        self._on_url_change(None)
 
     def _confirm_redownload(self, url: str, tool: str, prev) -> None:
         s    = self._s()
@@ -655,10 +742,11 @@ class MainScreen(ThemeTarget):
         return task_id
 
     def _on_resume_download(self, e: ResumeDownloadEvent) -> None:
-        """Возобновление из истории. Если задача ещё жива в этой сессии (на паузе) —
-        просто снять с паузы; иначе реконструировать снимок и запустить заново
+        """Возобновление/повтор из истории. Если задача ещё жива в этой сессии
+        НА ПАУЗЕ — просто снять с паузы; иначе (включая ещё видимую карточку
+        только что упавшей загрузки) реконструировать снимок и запустить заново
         (докачка идёт через детерминированную .part)."""
-        if e.task_id in self._cards:
+        if e.task_id in self._paused and e.task_id in self._cards:
             self._paused.discard(e.task_id)
             self._dm.resume(e.task_id)
             self._cards[e.task_id].set_paused(False)

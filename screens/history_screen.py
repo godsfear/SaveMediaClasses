@@ -303,13 +303,25 @@ class HistoryScreen(ThemeTarget):
             tooltip=s.btn_delete_record,
             on_click=lambda _, tid=rec.task_id: self._delete_record(tid),
         )
-        # Возобновление незавершённой (приостановленной) загрузки.
-        btn_resume = ft.IconButton(
-            icon=ft.Icons.PLAY_ARROW_ROUNDED,
-            icon_color=hex_to_flet(t.status_ok_color), icon_size=16,
-            tooltip=s.btn_resume,
-            on_click=lambda _, r=rec: self._resume(r),
-        ) if rec.status == "incomplete" else None
+        # Возобновление незавершённой (приостановленной) загрузки — или повтор
+        # неудачной/отменённой. Обе кнопки идут одним путём (_resume →
+        # ResumeDownloadEvent): главный экран реконструирует снимок из params.
+        if rec.status == "incomplete":
+            btn_resume = ft.IconButton(
+                icon=ft.Icons.PLAY_ARROW_ROUNDED,
+                icon_color=hex_to_flet(t.status_ok_color), icon_size=16,
+                tooltip=s.btn_resume,
+                on_click=lambda _, r=rec: self._resume(r),
+            )
+        elif rec.status in ("failed", "cancelled"):
+            btn_resume = ft.IconButton(
+                icon=ft.Icons.REPLAY_ROUNDED,
+                icon_color=hex_to_flet(t.status_running_color), icon_size=16,
+                tooltip=s.btn_retry,
+                on_click=lambda _, r=rec: self._resume(r),
+            )
+        else:
+            btn_resume = None
         # Раздача (seed) — кнопка-тумблер. Для завершённого торрента (есть
         # content_hash) — «начать», для раздающегося — «остановить». Процесс
         # фоновый (через DownloadManager), без карточки на главном экране.
@@ -329,6 +341,13 @@ class HistoryScreen(ThemeTarget):
             )
         else:
             btn_seed = None
+        # Диагностика сбоя: показать сохранённый хвост вывода процесса.
+        btn_details = ft.IconButton(
+            icon=ft.Icons.RECEIPT_LONG_ROUNDED,
+            icon_color=muted_c, icon_size=16,
+            tooltip=s.btn_error_details,
+            on_click=lambda _, r=rec: self._show_error_details(r),
+        ) if (rec.status == "failed" and rec.error_output) else None
 
         title_short = (rec_title[:60] + "…") if len(rec_title) > 62 else rec_title
 
@@ -339,6 +358,7 @@ class HistoryScreen(ThemeTarget):
                         overflow=ft.TextOverflow.ELLIPSIS),
                 *([btn_resume] if btn_resume else []),
                 *([btn_seed] if btn_seed else []),
+                *([btn_details] if btn_details else []),
                 btn_folder, btn_delete,
             ], vertical_alignment=ft.CrossAxisAlignment.CENTER, spacing=2),
             ft.Text(url_short, size=11, color=muted_c,
@@ -357,10 +377,7 @@ class HistoryScreen(ThemeTarget):
                 ], spacing=4, tight=True),
             ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
                vertical_alignment=ft.CrossAxisAlignment.CENTER, wrap=True),
-            ft.Text(rec.error_message, size=10,
-                    color=hex_to_flet(t.status_error_color),
-                    visible=bool(rec.error_message),
-            ) if rec.error_message else ft.Container(height=0),
+            self._error_line(rec, s, t),
         ], spacing=3, tight=True, expand=True)
 
         body = info_column if thumbnail_widget is None else ft.Row(
@@ -373,13 +390,62 @@ class HistoryScreen(ThemeTarget):
             border_radius=6, padding=ft.Padding(left=10, right=10, top=8, bottom=8),
         )
 
+    def _error_line(self, rec: DownloadRecord, s, t) -> ft.Control:
+        """Строка ошибки на карточке. Если сохранён вывод процесса — сама строка
+        кликабельна (тот же диалог, что и иконка в ряду действий: текст ошибки
+        внизу карточки — естественная цель клика)."""
+        if not rec.error_message:
+            return ft.Container(height=0)
+        text = ft.Text(rec.error_message, size=10,
+                       color=hex_to_flet(t.status_error_color))
+        if not rec.error_output:
+            return text
+        return ft.Container(
+            content=text,
+            tooltip=s.btn_error_details,
+            ink=True, border_radius=4,
+            padding=ft.Padding.symmetric(horizontal=2, vertical=1),
+            on_click=lambda _, r=rec: self._show_error_details(r),
+        )
+
+    def _show_error_details(self, rec: DownloadRecord) -> None:
+        """Диалог с хвостом вывода упавшего процесса (последние строки —
+        DownloadManager собирает их в кольцевой буфер и отдаёт при сбое)."""
+        s = self._s()
+        t = self._state.theme
+        dlg = ft.AlertDialog(
+            modal=False,
+            bgcolor=hex_to_flet(t.card_color),
+            title=ft.Text(s.btn_error_details, size=16, weight=ft.FontWeight.W_600),
+            content=ft.Column([
+                ft.Text(rec.error_message or "", size=12,
+                        color=hex_to_flet(t.status_error_color),
+                        visible=bool(rec.error_message)),
+                ft.Container(
+                    content=ft.Text(
+                        rec.error_output, size=11, selectable=True,
+                        font_family="Consolas, monospace",
+                        color=hex_to_flet(t.text_secondary_color),
+                    ),
+                    bgcolor=hex_to_flet(t.surface_color),
+                    border=ft.Border.all(1, hex_to_flet(t.border_color)),
+                    border_radius=6, padding=10,
+                ),
+            ], tight=True, spacing=10, width=560, scroll=ft.ScrollMode.AUTO),
+            actions=[ft.TextButton(s.btn_close,
+                                   on_click=lambda e: self._page.pop_dialog())],
+        )
+        self._page.show_dialog(dlg)
+
     def _delete_record(self, task_id: str) -> None:
         self._db.delete(task_id)
         self.refresh()
 
     def _resume(self, rec: DownloadRecord) -> None:
-        """Возобновить незавершённую загрузку: событие подхватит главный экран
-        (запустит/докачает) и навигация переключит на него."""
+        """Возобновить незавершённую (или повторить неудачную/отменённую)
+        загрузку: событие подхватит главный экран (запустит/докачает с теми же
+        параметрами), навигация переключит на него. Старая запись будет заменена
+        новой; partial у aria2c докачивается — .part/<id> детерминирована по URL."""
         title = (rec.meta or {}).get("title") or download_display_name(rec.url)
         self._bus.emit(ResumeDownloadEvent(
             task_id=rec.task_id, url=rec.url, source=rec.source,

@@ -617,6 +617,14 @@ def resolve_provider_for_url(url: str) -> str:
             else DEFAULT_PROVIDER)
 
 
+def extract_download_urls(text: str) -> list:
+    """Строки-ссылки из произвольного текста (буфер обмена): схема загрузки
+    (http/https/ftp/sftp/magnet/metalink) либо файл-задание (.torrent/.metalink).
+    Произвольный текст, числа, обрывки документов — отбрасываются."""
+    from config import parse_url_lines
+    return [u for u in parse_url_lines(text) if Aria2cProvider.is_valid_url(u)]
+
+
 def _bdecode(data: bytes, i: int = 0):
     """Минимальный bencode-декодер (int/str/list/dict). Возвращает (значение, next_i)."""
     t = data[i:i + 1]
