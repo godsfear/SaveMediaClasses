@@ -264,6 +264,7 @@ class DownloadManager:
             def on_line(line: str) -> None:
                 if task.cancelled:
                     return
+                provider.observe_line(line)   # провайдер собирает своё (финальный путь и т.п.)
                 pct = provider.parse_progress(line)
                 if pct is None:
                     # При раздаче aria2 сыплет строки-readout (~1/с): и SEED, и фаза
@@ -340,6 +341,7 @@ class DownloadManager:
                 task_id=task.task_id, success=success, message=message,
                 error_code=returncode if not success else None,
                 output_tail="" if success else "\n".join(task._tail),
+                file_path=provider.final_path() if success else "",
                 source=source,
             ))
 

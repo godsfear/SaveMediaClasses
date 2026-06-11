@@ -131,6 +131,7 @@
     "btn_resume": "Resume",
     "btn_retry": "Retry download",
     "btn_error_details": "Error details",
+    "btn_open_file": "Open file",
     "status_tools_ok": "All components are up to date",
     "status_tools_update": "Script updates available — go to Settings and click «Update scripts»",
     "status_ytdlp_missing": "yt-dlp not found — go to Settings and click «Update scripts»",

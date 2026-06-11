@@ -54,6 +54,16 @@ class DownloadProvider(Protocol):
         """Временная папка текущей загрузки ('' если провайдер её не использует)."""
         ...
 
+    def observe_line(self, line: str) -> None:
+        """Понаблюдать строку вывода (вызывается менеджером для КАЖДОЙ строки):
+        провайдер собирает из неё своё состояние (например, финальный путь файла)."""
+        ...
+
+    def final_path(self) -> str:
+        """Путь к скачанному файлу после успешного завершения ('' если неизвестен —
+        например, плейлист из многих файлов; тогда у пользователя остаётся папка)."""
+        ...
+
     async def run(self, cmd_args: list[str],
                   on_line: Callable[[str], None],
                   on_finish: Callable[[int], None]) -> None:
@@ -105,6 +115,13 @@ class _SubprocessProvider:
 
     def temp_dir(self) -> str:
         """По умолчанию провайдер качает сразу в папку назначения — temp-папки нет."""
+        return ""
+
+    def observe_line(self, line: str) -> None:
+        """По умолчанию провайдеру нечего собирать из вывода."""
+
+    def final_path(self) -> str:
+        """По умолчанию финальный путь неизвестен."""
         return ""
 
     @classmethod
@@ -189,7 +206,32 @@ class YtDlpProvider(_SubprocessProvider):
     SOURCE_NAME = "yt-dlp"
     _POST_TAGS = ["[Merger]", "[Metadata]", "[Thumbnails]", "[ExtractAudio]", "[Modify]"]
 
+    # Строки вывода, из которых извлекается путь итогового файла. Порядок фаз
+    # yt-dlp: download → merge → extract/convert → move; последнее совпадение
+    # и есть финальный файл (у плейлиста — последний из файлов).
+    _PATH_RES = (
+        re.compile(r"^\[download\] Destination: (.+)$"),
+        re.compile(r"^\[download\] (.+) has already been downloaded"),
+        re.compile(r'^\[Merger] Merging formats into "(.+)"$'),
+        re.compile(r"^\[ExtractAudio] Destination: (.+)$"),
+        re.compile(r'^\[MoveFiles] Moving file "(?:.+)" to "(.+)"$'),
+    )
+
+    def __init__(self, paths) -> None:
+        super().__init__(paths)
+        self._final_path = ""
+
     # ── DownloadProvider protocol ─────────────────────────────────────────────
+
+    def observe_line(self, line: str) -> None:
+        for rx in self._PATH_RES:
+            m = rx.match(line)
+            if m:
+                self._final_path = m.group(1).strip()
+                return
+
+    def final_path(self) -> str:
+        return self._final_path
 
     def resolve_exe(self) -> str:
         # Приоритет — наша tools_dir; фолбэк — yt-dlp, установленный в системе (PATH).
@@ -389,14 +431,18 @@ class Aria2cProvider(_SubprocessProvider):
         # aria2 пишет сразу в финальные имена. Чтобы папка загрузки не засорялась
         # недокачанным, качаем во временную <download>/.part/<id>, а по успеху
         # переносим содержимое в саму папку загрузки.
-        self._part_dir  = ""
-        self._final_dir = ""
+        self._part_dir   = ""
+        self._final_dir  = ""
+        self._final_path = ""   # заполняется в _move_to_final
 
     # ── DownloadProvider protocol ─────────────────────────────────────────────
 
     def temp_dir(self) -> str:
         """Временная папка <download>/.part/<id> текущей загрузки ('' для seed)."""
         return self._part_dir
+
+    def final_path(self) -> str:
+        return self._final_path
 
     def resolve_exe(self) -> str:
         # Приоритет — наша tools_dir; фолбэк — aria2c, установленный в системе (PATH).
@@ -481,6 +527,7 @@ class Aria2cProvider(_SubprocessProvider):
         перезаписываем (политика --allow-overwrite). В конце убираем временную
         подпапку и, если опустела, родительский .part."""
         os.makedirs(self._final_dir, exist_ok=True)
+        moved: list[str] = []
         for name in os.listdir(self._part_dir):
             if name.endswith(".aria2"):
                 continue
@@ -489,6 +536,9 @@ class Aria2cProvider(_SubprocessProvider):
             if os.path.exists(dst):
                 shutil.rmtree(dst, ignore_errors=True) if os.path.isdir(dst) else os.remove(dst)
             shutil.move(src, dst)
+            moved.append(dst)
+        # Один файл/папка торрента → это и есть результат; несколько — папка.
+        self._final_path = moved[0] if len(moved) == 1 else (self._final_dir if moved else "")
         shutil.rmtree(self._part_dir, ignore_errors=True)
         try:
             os.rmdir(os.path.dirname(self._part_dir))   # .part — только если пуста

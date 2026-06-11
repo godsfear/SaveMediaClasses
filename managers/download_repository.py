@@ -54,7 +54,8 @@ CREATE TABLE IF NOT EXISTS downloads (
     thumbnail     BLOB,
     meta          TEXT,
     content_hash  TEXT,
-    error_output  TEXT
+    error_output  TEXT,
+    file_path     TEXT
 );
 """
 
@@ -74,6 +75,10 @@ _MIGRATE_ERROR_OUTPUT = """
 ALTER TABLE downloads ADD COLUMN error_output TEXT;
 """
 
+_MIGRATE_FILE_PATH = """
+ALTER TABLE downloads ADD COLUMN file_path TEXT;
+"""
+
 _CREATE_INDEXES = [
     "CREATE INDEX IF NOT EXISTS idx_downloads_status       ON downloads (status);",
     "CREATE INDEX IF NOT EXISTS idx_downloads_url          ON downloads (url);",
@@ -89,7 +94,8 @@ VALUES (:task_id, :url, :source, 'running', :started_at, :params, :content_hash)
 _UPDATE_FINISHED = """
 UPDATE downloads
 SET status = :status, finished_at = :finished_at,
-    error_message = :error_message, error_output = :error_output
+    error_message = :error_message, error_output = :error_output,
+    file_path = :file_path
 WHERE task_id = :task_id;
 """
 
@@ -123,16 +129,18 @@ class DownloadRecord:
     __slots__ = (
         "task_id", "url", "source", "status",
         "started_at", "finished_at", "error_message",
-        "params", "thumbnail", "meta", "content_hash", "error_output",
+        "params", "thumbnail", "meta", "content_hash", "error_output", "file_path",
     )
 
     def __init__(self, params: str = "{}", thumbnail: Optional[bytes] = None,
                  meta: Optional[str] = None, content_hash: Optional[str] = None,
-                 error_output: Optional[str] = None, **kwargs):
+                 error_output: Optional[str] = None, file_path: Optional[str] = None,
+                 **kwargs):
         for k, v in kwargs.items():
             if k in self.__slots__:
                 setattr(self, k, v)
         self.error_output: str = error_output or ""
+        self.file_path:    str = file_path or ""
         try:
             self.params: Dict[str, Any] = json.loads(params) if isinstance(params, str) else params
         except (json.JSONDecodeError, TypeError):
@@ -167,7 +175,8 @@ class DownloadRepository:
             conn.execute(_CREATE_TABLE)
             # Миграции — ДО индексов: индекс по content_hash требует наличия колонки.
             for migration in (_MIGRATE_THUMBNAIL, _MIGRATE_META,
-                              _MIGRATE_CONTENT_HASH, _MIGRATE_ERROR_OUTPUT):
+                              _MIGRATE_CONTENT_HASH, _MIGRATE_ERROR_OUTPUT,
+                              _MIGRATE_FILE_PATH):
                 try:
                     conn.execute(migration)
                 except sqlite3.OperationalError as err:
@@ -241,7 +250,8 @@ class DownloadRepository:
     def _on_completed(self, e: DownloadCompletedEvent) -> None:
         self._finish(e.task_id, "completed" if e.success else "failed",
                      None if e.success else e.message,
-                     None if e.success else (e.output_tail or None))
+                     None if e.success else (e.output_tail or None),
+                     (e.file_path or None) if e.success else None)
 
     def _on_cancelled(self, e: DownloadCancelledEvent) -> None:
         self._finish(e.task_id, "cancelled", None)
@@ -271,7 +281,8 @@ class DownloadRepository:
             self._log.exception("Failed to set status %s for %s", status, task_id)
 
     def _finish(self, task_id: str, status: str, error: Optional[str],
-                error_output: Optional[str] = None) -> None:
+                error_output: Optional[str] = None,
+                file_path: Optional[str] = None) -> None:
         try:
             with self._connect() as conn:
                 conn.execute(_UPDATE_FINISHED, {
@@ -280,6 +291,7 @@ class DownloadRepository:
                     "finished_at":   time.time(),
                     "error_message": error,
                     "error_output":  error_output,
+                    "file_path":     file_path,
                 })
         except Exception:
             self._log.exception("Failed to update download record: %s", task_id)
