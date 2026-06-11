@@ -117,5 +117,10 @@ class AppPaths:
         return self.app_dir / "SaveMedia.png"
 
     @property
+    def app_icon_ico(self) -> Path:
+        """Windows-иконка (.ico) — для реестра уведомлений (IconUri)."""
+        return self.app_dir / "SaveMedia.ico"
+
+    @property
     def pyproject(self) -> Path:
         return self.app_dir / "pyproject.toml"

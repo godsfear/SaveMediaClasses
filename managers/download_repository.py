@@ -309,6 +309,11 @@ class DownloadRepository:
         params.append(limit)
         return self._fetch(query, params)
 
+    def get(self, task_id: str) -> Optional[DownloadRecord]:
+        """Запись по task_id (для уведомлений: имя из meta.title)."""
+        rows = self._fetch("SELECT * FROM downloads WHERE task_id = ?", [task_id])
+        return rows[0] if rows else None
+
     def get_by_url(self, url: str) -> Optional[DownloadRecord]:
         rows = self._fetch(
             "SELECT * FROM downloads WHERE url = ? ORDER BY started_at DESC LIMIT 1",
