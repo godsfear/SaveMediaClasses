@@ -52,7 +52,8 @@ class ThumbnailService:
             to        = st.timeouts
             thumb_data, meta = await provider.fetch_thumbnail(
                 exe, url, proxy_url=proxy_url,
-                connect_timeout=to.thumbnail_connect, read_timeout=to.thumbnail_read)
+                connect_timeout=to.thumbnail_connect, read_timeout=to.thumbnail_read,
+                meta_timeout=to.thumbnail_meta)
             if self._db is not None:
                 if thumb_data:
                     self._db.save_thumbnail(task_id, thumb_data)

@@ -198,6 +198,7 @@ class TimeoutsConfig:
     tool_download:     float = 30.0   # общий таймаут скачивания инструментов
     thumbnail_connect: float = THUMBNAIL_SOCK_TIMEOUT   # connect при загрузке превью
     thumbnail_read:    float = THUMBNAIL_TIMEOUT        # read при загрузке превью
+    thumbnail_meta:    float = 20.0   # таймаут yt-dlp --dump-single-json (метаданные превью)
     card_fade:         float = CARD_LINGER_SECONDS      # задержка карточки до удаления (0 = сразу)
 
     def to_dict(self) -> Dict[str, float]:
@@ -207,6 +208,7 @@ class TimeoutsConfig:
             "tool_download":     self.tool_download,
             "thumbnail_connect": self.thumbnail_connect,
             "thumbnail_read":    self.thumbnail_read,
+            "thumbnail_meta":    self.thumbnail_meta,
             "card_fade":         self.card_fade,
         }
 
@@ -226,6 +228,7 @@ class TimeoutsConfig:
             tool_download     = _f("tool_download",     r.tool_download),
             thumbnail_connect = _f("thumbnail_connect", r.thumbnail_connect),
             thumbnail_read    = _f("thumbnail_read",    r.thumbnail_read),
+            thumbnail_meta    = _f("thumbnail_meta",    r.thumbnail_meta),
             card_fade         = _f("card_fade",         r.card_fade, allow_zero=True),
         )
 
