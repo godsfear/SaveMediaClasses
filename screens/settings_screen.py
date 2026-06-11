@@ -74,6 +74,7 @@ class SettingsScreen(ThemeTarget):
         self._state       = svc.state
         self._bus         = svc.bus
         self._dm          = svc.dm
+        self._db          = svc.db
 
         self._s: Strings = Locale.load(self._state.language)
         # Последнее ToolsRestoredEvent — повторно показывается при входе в
@@ -108,6 +109,7 @@ class SettingsScreen(ThemeTarget):
         p = s.ytdlp.parameters
         self.proxy_input.value                 = s.proxy_address
         self.max_parallel_dropdown.value       = str(s.max_parallel)
+        self.history_keep_dropdown.value       = str(s.history_keep_days)
         self.yt_args_input.value               = p.extra_args.value
         self.clean_titles_switch.value         = p.clean_titles.state
         self.playlist_switch.value             = p.playlist.state
@@ -129,6 +131,9 @@ class SettingsScreen(ThemeTarget):
         parallel = self.max_parallel_dropdown.value
         if parallel and str(parallel).isdigit():
             s.max_parallel = max(1, int(parallel))
+        keep = self.history_keep_dropdown.value
+        if keep is not None and str(keep).isdigit():
+            s.history_keep_days = max(0, int(keep))
         p.extra_args.value           = safe_str(self.yt_args_input.value)
         p.clean_titles.state         = bool(self.clean_titles_switch.value)
         p.playlist.state             = bool(self.playlist_switch.value)
@@ -195,6 +200,16 @@ class SettingsScreen(ThemeTarget):
                 ft.dropdown.Option("opera",   s.cookies_opera),
             ],
             on_select=self._on_browser_dropdown_change,
+        ))
+
+        # Срок хранения истории; чистка — при старте и при смене значения.
+        self.history_keep_dropdown = self.register_accents(ft.Dropdown(
+            label=s.history_keep_label,
+            border_radius=8, width=220,
+            focused_border_color=ft.Colors.BLUE,
+            options=self._history_keep_options(s),
+            value=str(self._state.history_keep_days),
+            on_select=self._on_history_keep_change,
         ))
 
         self.language_dropdown = self.register_accents(ft.Dropdown(
@@ -267,11 +282,26 @@ class SettingsScreen(ThemeTarget):
         self.header_aria2_urls    = self.register_muted_text(ft.Text(s.section_aria2_urls,  size=12, weight=ft.FontWeight.W_500, color=ft.Colors.GREY_400))
         self.header_deps          = self.register_headers(ft.Text(s.section_deps,        size=14, weight=ft.FontWeight.BOLD,  color=ft.Colors.CYAN_400))
         self.header_deps_urls     = self.register_muted_text(ft.Text(s.section_deps_urls,   size=12, weight=ft.FontWeight.W_500, color=ft.Colors.GREY_400))
+        self.header_history_set   = self.register_headers(ft.Text(s.section_history,     size=14, weight=ft.FontWeight.BOLD,  color=ft.Colors.CYAN_400))
         self.header_theme         = self.register_headers(ft.Text(s.section_theme,       size=14, weight=ft.FontWeight.BOLD,  color=ft.Colors.CYAN_400))
         self.header_modes         = self.register_headers(ft.Text(s.section_modes,       size=14, weight=ft.FontWeight.BOLD,  color=ft.Colors.CYAN_400))
         self.header_appearance    = self.register_headers(ft.Text(s.section_appearance, size=14, weight=ft.FontWeight.BOLD,  color=ft.Colors.CYAN_400))
 
     # ── Куки UI ───────────────────────────────────────────────────────────────
+
+    def _history_keep_options(self, s: Strings) -> list:
+        """«Всегда» + стандартные сроки + текущее значение (если задано вручную)."""
+        days = sorted({30, 90, 180, 365, self._state.history_keep_days} - {0})
+        return [ft.dropdown.Option("0", s.history_keep_forever)] + [
+            ft.dropdown.Option(str(d), s.fmt("history_keep_n_days", n=d)) for d in days
+        ]
+
+    def _on_history_keep_change(self, _) -> None:
+        self.sync_to_state()
+        # Применяем сразу: старые финальные записи удаляются, не дожидаясь рестарта.
+        self._db.purge_older_than(self._state.history_keep_days)
+        self._bus.emit(SettingsChangedEvent())
+        self._safe_update()
 
     def _max_parallel_options(self) -> list:
         """1..10 + текущее значение из конфига (если задано больше вручную)."""
@@ -533,6 +563,9 @@ class SettingsScreen(ThemeTarget):
         self.yt_args_input.label  = s.yt_args_label;  self.yt_args_input.update()
         self.max_parallel_dropdown.label = s.max_parallel_label
         self.max_parallel_dropdown.update()
+        self.history_keep_dropdown.label   = s.history_keep_label
+        self.history_keep_dropdown.options = self._history_keep_options(s)
+        self.history_keep_dropdown.update()
 
         # Переключатели
         self.clean_titles_switch.label   = s.switch_clean;    self.clean_titles_switch.update()
@@ -572,6 +605,7 @@ class SettingsScreen(ThemeTarget):
         self.header_aria2_urls.value    = s.section_aria2_urls;  self.header_aria2_urls.update()
         self.header_deps.value          = s.section_deps;        self.header_deps.update()
         self.header_deps_urls.value     = s.section_deps_urls;   self.header_deps_urls.update()
+        self.header_history_set.value   = s.section_history;     self.header_history_set.update()
         self.header_theme.value         = s.section_theme;       self.header_theme.update()
         self.header_modes.value         = s.section_modes;       self.header_modes.update()
         self.header_appearance.value    = s.section_appearance;  self.header_appearance.update()
@@ -811,6 +845,13 @@ class SettingsScreen(ThemeTarget):
             ], spacing=12, horizontal_alignment=ft.CrossAxisAlignment.STRETCH),
             bgcolor="#161616", border_radius=8, padding=15,
         ))
+        self._card_history = self.register_cards(ft.Container(
+            content=ft.Column([
+                self.header_history_set,
+                self.history_keep_dropdown,
+            ], spacing=12, horizontal_alignment=ft.CrossAxisAlignment.STRETCH),
+            bgcolor="#161616", border_radius=8, padding=15,
+        ))
         self._card_appearance = self.register_cards(ft.Container(
             content=ft.Column([
                 self.header_appearance,
@@ -823,6 +864,7 @@ class SettingsScreen(ThemeTarget):
             self._card_net,
             self._card_downloaders,
             self._card_deps,
+            self._card_history,
             self.theme_sets_section,
             self.theme_section,
             self._card_appearance,

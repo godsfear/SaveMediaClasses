@@ -50,6 +50,24 @@ def _status_color(status: str, t) -> str:
     return hex_to_flet(getattr(t, _STATUS_TOKEN.get(status, "text_muted_color")))
 
 
+# Сколько записей тянуть из БД, когда активен поиск (шире обычной страницы).
+_SEARCH_FETCH_LIMIT = 500
+
+
+def record_search_text(rec) -> str:
+    """Поисковый текст записи: URL + название из метаданных + текст ошибки.
+    Фильтрация в Python (casefold), а не SQL LIKE: SQLite не умеет
+    регистронезависимое сравнение для кириллицы."""
+    meta = rec.meta or {}
+    parts = [
+        rec.url,
+        str(meta.get("title") or ""),
+        str(meta.get("fulltitle") or ""),
+        rec.error_message or "",
+    ]
+    return " ".join(p for p in parts if p).casefold()
+
+
 class HistoryScreen(ThemeTarget):
 
     def __init__(self, page: ft.Page, svc: Services) -> None:
@@ -96,6 +114,13 @@ class HistoryScreen(ThemeTarget):
             weight=ft.FontWeight.BOLD, color=ft.Colors.CYAN_400
         ))
         self._filter_row = ft.Row(spacing=6, wrap=True)
+        self._search_input = self.register_accents(ft.TextField(
+            hint_text=s.history_search_hint,
+            prefix_icon=ft.Icons.SEARCH_ROUNDED,
+            border_radius=8, text_size=13, dense=True,
+            content_padding=ft.Padding.symmetric(horizontal=10, vertical=8),
+            on_change=lambda _: self.refresh(),
+        ))
         self._stats_text = self.register_muted_text(ft.Text("", size=12, color=ft.Colors.GREY_500))
         self._list       = ft.Column(spacing=6)
         self._empty      = self.register_muted_text(ft.Text(
@@ -153,6 +178,7 @@ class HistoryScreen(ThemeTarget):
                 ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
                    vertical_alignment=ft.CrossAxisAlignment.CENTER),
                 self._filter_row,
+                self._search_input,
                 self._stats_text,
             ], spacing=10, horizontal_alignment=ft.CrossAxisAlignment.STRETCH),
             border_radius=8, padding=15,
@@ -186,7 +212,11 @@ class HistoryScreen(ThemeTarget):
     # ── Публичный API ─────────────────────────────────────────────────────────
 
     def refresh(self) -> None:
-        records = self._db.get_history(limit=200, status=self._current_filter)
+        query   = (self._search_input.value or "").strip().casefold()
+        limit   = _SEARCH_FETCH_LIMIT if query else 200
+        records = self._db.get_history(limit=limit, status=self._current_filter)
+        if query:
+            records = [r for r in records if query in record_search_text(r)]
         self._render_list(records)
         self._render_stats()
         self._safe_update()
@@ -195,6 +225,8 @@ class HistoryScreen(ThemeTarget):
         s = self._s()
         self.header.value   = s.header_history;  self.header.update()
         self._empty.value   = s.history_empty;   self._empty.update()
+        self._search_input.hint_text = s.history_search_hint
+        self._search_input.update()
         self._rebuild_filter_buttons()
         self._filter_row.update()
         self._render_stats()

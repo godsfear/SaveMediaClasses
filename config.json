@@ -6,7 +6,8 @@
         "download_tool": "auto",
         "max_parallel": 5,
         "clipboard_watch": false,
-        "last_check_time": 1781193314.2707274,
+        "history_keep_days": 0,
+        "last_check_time": 1781193906.746378,
         "last_needs_update": false
     },
     "tools": {
@@ -146,8 +147,8 @@
     "window": {
         "width": 778,
         "height": 991,
-        "left": 3882,
-        "top": 280
+        "left": 3196,
+        "top": 208
     },
     "timeouts": {
         "connect": 5.0,

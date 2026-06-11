@@ -51,6 +51,9 @@ class SaveMediaApp:
         # ── DI ────────────────────────────────────────────────────────────────
         svc = Services.create(safe_update, page.run_task)
 
+        # Срок хранения истории: чистим финальные записи старше лимита при старте.
+        svc.db.purge_older_than(svc.state.history_keep_days)
+
         # ── Экраны ────────────────────────────────────────────────────────────
         main_screen     = MainScreen(page, svc)
         settings_screen = SettingsScreen(page, svc)

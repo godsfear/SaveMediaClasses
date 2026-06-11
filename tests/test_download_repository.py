@@ -77,6 +77,28 @@ def test_migration_adds_error_output_to_old_db(tmp_path, bus):
     assert repo.get_history()[0].error_output == "boom"
 
 
+def test_purge_older_than(repo, bus, tmp_path):
+    import time as _time
+    for tid, status in (("done", True), ("bad", False)):
+        _start(bus, tid, f"https://{tid}")
+        bus.emit(DownloadCompletedEvent(task_id=tid, success=status, message="",
+                                        output_tail="" if status else "x"))
+    _start(bus, "active", "https://active")          # running — не трогается
+
+    # Состарим финальные записи напрямую в БД (события пишут текущее время)
+    old = _time.time() - 90 * 86_400
+    conn = sqlite3.connect(str(tmp_path / "test.db"))
+    conn.execute("UPDATE downloads SET started_at = ?, finished_at = ? "
+                 "WHERE task_id IN ('done', 'bad')", (old, old))
+    conn.commit(); conn.close()
+
+    assert repo.purge_older_than(0) == 0             # 0 = хранить всё
+    assert repo.purge_older_than(365) == 0           # моложе года
+    assert repo.purge_older_than(30) == 2            # старше месяца — удалены
+    left = {r.task_id for r in repo.get_history()}
+    assert left == {"active"}                        # running пережил чистку
+
+
 def test_history_filter_and_find_completed(repo, bus):
     _start(bus, "a", "https://a")
     bus.emit(DownloadCompletedEvent(task_id="a", success=True, message=""))
@@ -86,3 +108,23 @@ def test_history_filter_and_find_completed(repo, bus):
     assert {r.task_id for r in repo.get_history(status="failed")} == {"b"}
     assert repo.find_completed("https://a") is not None
     assert repo.find_completed("https://b") is None   # failed не считается завершённой
+
+
+# ── Поиск (Python-фильтр поверх выборки) ──────────────────────────────────────
+
+def test_record_search_text_casefold():
+    from types import SimpleNamespace
+    from screens.history_screen import record_search_text
+
+    rec = SimpleNamespace(
+        url="https://youtube.com/watch?v=ABC",
+        meta={"title": "Моё Видео Про Кошек"},
+        error_message="ERROR: Sign in required",
+    )
+    blob = record_search_text(rec)
+    assert "моё видео про кошек" in blob              # кириллица сложена casefold
+    assert "youtube.com" in blob
+    assert "sign in required" in blob
+
+    bare = SimpleNamespace(url="https://x", meta=None, error_message=None)
+    assert record_search_text(bare) == "https://x"

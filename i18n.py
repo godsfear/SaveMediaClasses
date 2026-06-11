@@ -172,6 +172,13 @@ class Strings:
     clipboard_off:       str = ""
     clipboard_added:     str = ""
 
+    # История: поиск и срок хранения
+    history_search_hint: str = ""
+    section_history:     str = ""
+    history_keep_label:  str = ""
+    history_keep_forever: str = ""
+    history_keep_n_days: str = ""   # {n}
+
     # Очистка временных папок aria2c
     btn_clean_temp:      str = ""
     clean_temp_confirm:  str = ""

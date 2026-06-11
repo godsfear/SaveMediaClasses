@@ -50,6 +50,9 @@ class AppState:
     max_parallel:  int  = DEFAULT_MAX_PARALLEL
     # Слежение за буфером обмена: скопированные ссылки добавляются в поле URL.
     clipboard_watch: bool = False
+    # Срок хранения истории, дней; 0 = хранить всё. Чистка — при старте и при
+    # смене настройки; статусы incomplete/running/seeding не удаляются.
+    history_keep_days: int = 0
 
     # ── Мета-состояние ────────────────────────────────────────────────────────
     last_check_time:   float = 0.0
