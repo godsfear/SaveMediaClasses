@@ -203,6 +203,50 @@ def test_aria2_is_valid_url(url, valid):
     assert Aria2cProvider.is_valid_url(url) is valid
 
 
+# ── Финальный путь файла ──────────────────────────────────────────────────────
+
+def test_ytdlp_observe_line_tracks_final_path(paths):
+    p = YtDlpProvider(paths)
+    assert p.final_path() == ""
+    p.observe_line(r"[download] Destination: C:\dl\video.f137.mp4")
+    p.observe_line("[download]  45.0% of 10MiB")              # прогресс не путает
+    p.observe_line(r'[Merger] Merging formats into "C:\dl\video.mp4"')
+    assert p.final_path() == r"C:\dl\video.mp4"               # последняя фаза побеждает
+
+
+def test_ytdlp_observe_line_audio_and_existing(paths):
+    p = YtDlpProvider(paths)
+    p.observe_line(r"[ExtractAudio] Destination: C:\dl\song.mp3")
+    assert p.final_path() == r"C:\dl\song.mp3"
+    p2 = YtDlpProvider(paths)
+    p2.observe_line(r"[download] C:\dl\old.mp4 has already been downloaded")
+    assert p2.final_path() == r"C:\dl\old.mp4"
+
+
+def test_aria2_move_to_final_sets_path(paths, tmp_path):
+    p = Aria2cProvider(paths)
+    part  = tmp_path / "part"; part.mkdir()
+    final = tmp_path / "dl";   final.mkdir()
+    (part / "movie.mkv").write_bytes(b"data")
+    (part / "movie.mkv.aria2").write_bytes(b"ctrl")           # контрольный пропускается
+    p._part_dir, p._final_dir = str(part), str(final)
+    p._move_to_final()
+    assert p.final_path() == str(final / "movie.mkv")
+    assert (final / "movie.mkv").exists()
+    assert not (final / "movie.mkv.aria2").exists()
+
+
+def test_aria2_move_multiple_files_points_to_dir(paths, tmp_path):
+    p = Aria2cProvider(paths)
+    part  = tmp_path / "part"; part.mkdir()
+    final = tmp_path / "dl";   final.mkdir()
+    (part / "a.bin").write_bytes(b"1")
+    (part / "b.bin").write_bytes(b"2")
+    p._part_dir, p._final_dir = str(part), str(final)
+    p._move_to_final()
+    assert p.final_path() == str(final)                       # несколько → папка
+
+
 # ── Торрент-утилиты ───────────────────────────────────────────────────────────
 
 def test_bdecode_roundtrip():

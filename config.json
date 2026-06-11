@@ -7,7 +7,7 @@
         "max_parallel": 5,
         "clipboard_watch": false,
         "history_keep_days": 0,
-        "last_check_time": 1781193906.746378,
+        "last_check_time": 1781194479.0688837,
         "last_needs_update": false
     },
     "tools": {
@@ -147,8 +147,8 @@
     "window": {
         "width": 778,
         "height": 991,
-        "left": 3196,
-        "top": 208
+        "left": 2742,
+        "top": 194
     },
     "timeouts": {
         "connect": 5.0,

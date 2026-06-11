@@ -323,6 +323,15 @@ class HistoryScreen(ThemeTarget):
             if save_to_source and rec_extractor and base_folder else base_folder
 
         # Кнопки
+        # Открыть сам файл (только если он всё ещё на диске; иначе остаётся папка).
+        file_path = rec.file_path or ""
+        btn_file = ft.IconButton(
+            icon=ft.Icons.PLAY_CIRCLE_OUTLINE_ROUNDED,
+            icon_color=hex_to_flet(t.status_ok_color), icon_size=16,
+            tooltip=s.btn_open_file,
+            on_click=lambda _, f=file_path: _open_folder(f),
+        ) if (rec.status == "completed" and file_path
+              and os.path.exists(file_path)) else None
         btn_folder = ft.IconButton(
             icon=ft.Icons.FOLDER_OPEN_OUTLINED,
             icon_color=muted_c, icon_size=16,
@@ -391,6 +400,7 @@ class HistoryScreen(ThemeTarget):
                 *([btn_resume] if btn_resume else []),
                 *([btn_seed] if btn_seed else []),
                 *([btn_details] if btn_details else []),
+                *([btn_file] if btn_file else []),
                 btn_folder, btn_delete,
             ], vertical_alignment=ft.CrossAxisAlignment.CENTER, spacing=2),
             ft.Text(url_short, size=11, color=muted_c,
@@ -516,6 +526,8 @@ class HistoryScreen(ThemeTarget):
 # ── Утилиты ───────────────────────────────────────────────────────────────────
 
 def _open_folder(path: str) -> None:
+    """Открыть путь системным способом: для папки — проводник, для файла —
+    ассоциированное приложение (плеер и т.п.)."""
     try:
         if sys.platform == "win32":
             os.startfile(path)

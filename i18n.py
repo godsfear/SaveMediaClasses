@@ -205,6 +205,7 @@ class Strings:
     btn_resume:           str = ""
     btn_retry:            str = ""
     btn_error_details:    str = ""
+    btn_open_file:        str = ""
     status_tools_ok:      str = ""
     status_tools_update:  str = ""
     status_ytdlp_missing: str = ""

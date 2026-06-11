@@ -39,10 +39,19 @@ def test_failed_download_stores_error_output(repo, bus):
 
 def test_successful_download_has_no_error_output(repo, bus):
     _start(bus)
-    bus.emit(DownloadCompletedEvent(task_id="t1", success=True, message=""))
+    bus.emit(DownloadCompletedEvent(task_id="t1", success=True, message="",
+                                    file_path=r"C:\dl\video.mp4"))
     rec = repo.get_history()[0]
     assert rec.status == "completed"
     assert rec.error_output == ""           # DownloadRecord нормализует None → ""
+    assert rec.file_path == r"C:\dl\video.mp4"
+
+
+def test_failed_download_does_not_store_file_path(repo, bus):
+    _start(bus)
+    bus.emit(DownloadCompletedEvent(task_id="t1", success=False, message="Exit code 1",
+                                    file_path="ignored"))
+    assert repo.get_history()[0].file_path == ""
 
 
 def test_migration_adds_error_output_to_old_db(tmp_path, bus):

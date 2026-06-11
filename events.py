@@ -46,6 +46,7 @@ class DownloadCompletedEvent:
     error_code:   int | None = None  # код возврата процесса (только при success=False)
     error_detail: str = ""           # текст ошибки ОС (только при сбое запуска)
     output_tail:  str = ""           # последние строки вывода процесса (только при сбое)
+    file_path:    str = ""           # путь к скачанному файлу (только при success=True)
 
 @dataclass(frozen=True)
 class DownloadStartedEvent:
