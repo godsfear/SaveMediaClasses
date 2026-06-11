@@ -369,6 +369,31 @@ class DownloadRepository:
         except Exception:
             self._log.exception("Failed to delete download record: %s", task_id)
 
+    def purge_older_than(self, days: int) -> int:
+        """Удалить ФИНАЛЬНЫЕ записи (completed/failed/cancelled) старше days дней.
+        Возобновляемые статусы (incomplete) и активные (running/seeding) не
+        трогаем независимо от возраста. days <= 0 — хранить всё. Возвращает
+        число удалённых записей. Вызывается при старте и при смене настройки."""
+        if days <= 0:
+            return 0
+        cutoff = time.time() - days * 86_400
+        try:
+            with self._connect() as conn:
+                cur = conn.execute(
+                    "DELETE FROM downloads "
+                    "WHERE status IN ('completed', 'failed', 'cancelled') "
+                    "AND IFNULL(finished_at, started_at) < ?",
+                    (cutoff,),
+                )
+                removed = cur.rowcount or 0
+            if removed:
+                self._log.info("History purge: removed %d records older than %d days",
+                               removed, days)
+            return removed
+        except Exception:
+            self._log.exception("History purge failed")
+            return 0
+
     # ── Приватное ─────────────────────────────────────────────────────────────
 
     def _fetch(self, query: str, params: list) -> List[DownloadRecord]:
