@@ -110,6 +110,7 @@ class SettingsScreen(ThemeTarget):
         self.proxy_input.value                 = s.proxy_address
         self.max_parallel_dropdown.value       = str(s.max_parallel)
         self.history_keep_dropdown.value       = str(s.history_keep_days)
+        self.notify_switch.value               = s.notify_on_complete
         self.yt_args_input.value               = p.extra_args.value
         self.clean_titles_switch.value         = p.clean_titles.state
         self.playlist_switch.value             = p.playlist.state
@@ -134,6 +135,7 @@ class SettingsScreen(ThemeTarget):
         keep = self.history_keep_dropdown.value
         if keep is not None and str(keep).isdigit():
             s.history_keep_days = max(0, int(keep))
+        s.notify_on_complete = bool(self.notify_switch.value)
         p.extra_args.value           = safe_str(self.yt_args_input.value)
         p.clean_titles.state         = bool(self.clean_titles_switch.value)
         p.playlist.state             = bool(self.playlist_switch.value)
@@ -200,6 +202,11 @@ class SettingsScreen(ThemeTarget):
                 ft.dropdown.Option("opera",   s.cookies_opera),
             ],
             on_select=self._on_browser_dropdown_change,
+        ))
+
+        # Уведомления о завершении (показываются при свёрнутом/неактивном окне).
+        self.notify_switch = self.register_switches(ft.Switch(
+            label=s.notify_label, active_color=ft.Colors.GREEN,
         ))
 
         # Срок хранения истории; чистка — при старте и при смене значения.
@@ -572,6 +579,7 @@ class SettingsScreen(ThemeTarget):
         self.playlist_switch.label       = s.switch_playlist; self.playlist_switch.update()
         self.embed_metadata_switch.label = s.switch_metadata; self.embed_metadata_switch.update()
         self.save_to_source_switch.label = s.switch_source;   self.save_to_source_switch.update()
+        self.notify_switch.label         = s.notify_label;    self.notify_switch.update()
 
         # Куки
         self.cookies_browser_dropdown.label = s.cookies_label
@@ -856,6 +864,7 @@ class SettingsScreen(ThemeTarget):
             content=ft.Column([
                 self.header_appearance,
                 self.language_dropdown,
+                self.notify_switch,
             ], spacing=12, horizontal_alignment=ft.CrossAxisAlignment.STRETCH),
             bgcolor="#161616", border_radius=8, padding=15,
         ))

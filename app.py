@@ -5,8 +5,8 @@ import flet as ft
 from app_logging import get_logger
 from config import CHECK_INTERVAL_SECONDS, hex_to_flet
 from controllers import (
-    ClipboardController, NavigationController, ThemeController,
-    ToolsController, WindowController,
+    ClipboardController, NavigationController, NotificationController,
+    ThemeController, ToolsController, WindowController,
 )
 from events import (
     ToolsCheckedEvent, ToolsRestoredEvent,
@@ -87,6 +87,7 @@ class SaveMediaApp:
 
         tools_ctrl     = ToolsController(svc, task_runner=page.run_task)
         clipboard_ctrl = ClipboardController(page, svc)
+        NotificationController(page, svc)   # живёт подпиской на шину
 
         nav_ctrl = NavigationController(
             page, svc,

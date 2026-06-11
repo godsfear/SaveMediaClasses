@@ -209,6 +209,15 @@ class CookiesChangedEvent:
     pass
 
 @dataclass(frozen=True)
+class WindowStateEvent:
+    """Окно стало видимым (фокус/разворачивание) или ушло с глаз (свёрнуто/
+    потеряло фокус). Источник — WindowController (он владеет window.on_event);
+    потребитель — уведомления: тост не нужен, когда окно и так перед глазами.
+    ВАЖНО: свойства window.focused/minimized во Flet статичны (не обновляются
+    с Flutter-стороны) — единственный надёжный источник состояния это события."""
+    in_view: bool
+
+@dataclass(frozen=True)
 class AppClosingEvent:
     """Окно закрывается — подписчикам пора освободить ресурсы (dispose)."""
     pass

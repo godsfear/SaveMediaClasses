@@ -18,10 +18,21 @@ from typing import TYPE_CHECKING
 import flet as ft
 
 from app_logging import get_logger
-from events import SettingsChangedEvent, AppClosingEvent
+from events import SettingsChangedEvent, AppClosingEvent, WindowStateEvent
 
 if TYPE_CHECKING:
     from services import Services
+
+
+def window_event_visibility(ev: str) -> "bool | None":
+    """Видимость окна по имени события: True — на виду, False — скрыто/без
+    фокуса, None — событие не про видимость (resize/move/close...).
+    Скрывающие маркеры проверяются первыми: "unmaximize" содержит "maximize"."""
+    if any(m in ev for m in ("blur", "minimize", "hide")):
+        return False
+    if any(m in ev for m in ("focus", "restore", "show", "maximize")):
+        return True
+    return None
 
 
 class WindowController:
@@ -98,8 +109,12 @@ class WindowController:
         await self._page.window.destroy()
 
     async def _handle_window_event(self, e) -> None:
-        """Перехватчик системного закрытия окна (крестик / Alt+F4)."""
+        """Перехватчик событий окна: закрытие (крестик / Alt+F4) + трансляция
+        видимости в шину (WindowStateEvent — для подавления уведомлений)."""
         ev = str(getattr(e, "type", None) or getattr(e, "data", None)).lower()
+        visibility = window_event_visibility(ev)
+        if visibility is not None:
+            self._svc.bus.emit(WindowStateEvent(in_view=visibility))
         if "close" in ev:
             try:
                 self.save()

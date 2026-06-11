@@ -179,6 +179,11 @@ class Strings:
     history_keep_forever: str = ""
     history_keep_n_days: str = ""   # {n}
 
+    # Системные уведомления о финале загрузки
+    notify_label:        str = ""
+    notify_done:         str = ""   # {name}
+    notify_failed:       str = ""   # {name}
+
     # Очистка временных папок aria2c
     btn_clean_temp:      str = ""
     clean_temp_confirm:  str = ""

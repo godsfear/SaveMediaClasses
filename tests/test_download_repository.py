@@ -86,6 +86,13 @@ def test_migration_adds_error_output_to_old_db(tmp_path, bus):
     assert repo.get_history()[0].error_output == "boom"
 
 
+def test_get_by_task_id(repo, bus):
+    _start(bus, "t9", "https://nine")
+    rec = repo.get("t9")
+    assert rec is not None and rec.url == "https://nine"
+    assert repo.get("missing") is None
+
+
 def test_purge_older_than(repo, bus, tmp_path):
     import time as _time
     for tid, status in (("done", True), ("bad", False)):
