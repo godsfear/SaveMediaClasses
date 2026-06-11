@@ -3,7 +3,7 @@ import flet as ft
 
 from config import (
     THEME_FIELDS, THEME_GROUPS, ThemeConfig, NamedTheme,
-    hex_to_flet, safe_str
+    hex_to_flet, safe_str, severity_color,
 )
 from managers.tools_manager import (
     TOOL_VERSION_MISSING, TOOL_VERSION_CALL_ERROR,
@@ -51,13 +51,19 @@ def _fmt_size(num: int) -> str:
     return f"{int(num)} B"
 
 
-# Единая карта статус → цвет (используется и при проверке, и при восстановлении).
-_STATUS_COLOR = {
-    "ok":       ft.Colors.GREEN_400,
-    "outdated": ft.Colors.ORANGE_400,
-    "missing":  ft.Colors.RED_400,
-    "error":    ft.Colors.AMBER,
+# Единая карта: статус проверки версии → токен темы (используется и при
+# проверке, и при восстановлении). Цвет вычисляется по активной палитре.
+_STATUS_TOKEN = {
+    "ok":       "status_ok_color",
+    "outdated": "status_warning_color",
+    "missing":  "status_error_color",
+    "error":    "status_warning_color",
 }
+
+
+def _status_color(status: str, t: ThemeConfig) -> str:
+    """Flet-цвет статуса инструмента из активной темы (фолбэк — приглушённый текст)."""
+    return hex_to_flet(getattr(t, _STATUS_TOKEN.get(status, "text_muted_color")))
 
 
 class SettingsScreen(ThemeTarget):
@@ -142,6 +148,8 @@ class SettingsScreen(ThemeTarget):
     def apply_theme(self, t) -> None:
         """Применить ThemeConfig к виджетам экрана."""
         super().apply_theme(t)
+        # Подложка прогресс-бара (register_progress красит только .color).
+        self.progress_bar.bgcolor = hex_to_flet(t.border_color)
 
     # ── Виджеты ───────────────────────────────────────────────────────────────
 
@@ -176,7 +184,7 @@ class SettingsScreen(ThemeTarget):
             on_select=self._on_browser_dropdown_change,
         ))
 
-        self.language_dropdown = ft.Dropdown(
+        self.language_dropdown = self.register_accents(ft.Dropdown(
             label=s.language_label,
             border_radius=8,
             focused_border_color=ft.Colors.BLUE,
@@ -187,7 +195,7 @@ class SettingsScreen(ThemeTarget):
             ],
             value=self._state.language,
             on_select=self._on_language_change,
-        )
+        ))
 
         # Статусные строки инструментов строятся из реестра — добавление
         # нового инструмента автоматически добавляет его строку, без правок здесь.
@@ -196,13 +204,19 @@ class SettingsScreen(ThemeTarget):
             for b in spec.binaries(self._state):
                 self._tool_status[b.name] = ft.Text(
                     s.fmt("tool_dash", name=b.name),
-                    color=ft.Colors.GREY_600, size=13, weight=ft.FontWeight.BOLD,
+                    color=hex_to_flet(self._state.theme.text_muted_color),
+                    size=13, weight=ft.FontWeight.BOLD,
                 )
 
-        self.progress_text = self.register_progress(ft.Text(s.status_waiting, size=12, color=ft.Colors.GREEN_400))
+        self.progress_text = self.register_progress(ft.Text(
+            s.status_waiting, size=12,
+            color=severity_color(self._state.theme, "ok"),
+        ))
         self.progress_bar  = self.register_progress(ft.ProgressBar(
-            value=0.0, color=ft.Colors.GREEN_400,
-            bgcolor=ft.Colors.SURFACE_CONTAINER_HIGHEST, visible=False,
+            value=0.0,
+            color=hex_to_flet(self._state.theme.progress_color),
+            bgcolor=hex_to_flet(self._state.theme.border_color),
+            visible=False,
         ))
 
         self.yt_api_input          = self.register_accents(ft.TextField(label=s.url_yt_api,          border_radius=8, focused_border_color=ft.Colors.BLUE))
@@ -272,6 +286,7 @@ class SettingsScreen(ThemeTarget):
                    if removed else s.clean_temp_empty)
             self._page.show_dialog(ft.AlertDialog(
                 modal=True, title=ft.Text(s.btn_clean_temp), content=ft.Text(msg),
+                bgcolor=hex_to_flet(self._state.theme.card_color),
                 actions=[ft.TextButton(s.btn_close, on_click=lambda e: self._page.pop_dialog())],
             ))
             self._safe_update()
@@ -279,6 +294,7 @@ class SettingsScreen(ThemeTarget):
         self._page.show_dialog(ft.AlertDialog(
             modal=True, title=ft.Text(s.btn_clean_temp),
             content=ft.Text(s.clean_temp_confirm),
+            bgcolor=hex_to_flet(self._state.theme.card_color),
             actions=[
                 ft.TextButton(s.btn_cancel,     on_click=lambda e: self._page.pop_dialog()),
                 ft.TextButton(s.btn_clean_temp, on_click=do_clean),
@@ -443,7 +459,7 @@ class SettingsScreen(ThemeTarget):
         def do_save(_e) -> None:
             name = safe_str(name_field.value).strip()
             if not name:
-                name_field.border_color = ft.Colors.RED_400
+                name_field.border_color = hex_to_flet(self._state.theme.status_error_color)
                 name_field.update()
                 return
             self._state.saved_themes[name] = NamedTheme(
@@ -460,6 +476,7 @@ class SettingsScreen(ThemeTarget):
             modal=True,
             title=ft.Text(s.theme_save_dialog_title),
             content=name_field,
+            bgcolor=hex_to_flet(self._state.theme.card_color),
             actions=[
                 ft.TextButton(s.btn_cancel, on_click=lambda e: self._page.pop_dialog()),
                 ft.TextButton(s.btn_ok, on_click=do_save),
@@ -556,6 +573,7 @@ class SettingsScreen(ThemeTarget):
 
     def on_tools_restored(self, e: ToolsRestoredEvent) -> None:
         s = self._s
+        t = self._state.theme
         for name, widget in self._tool_status.items():
             info = e.versions.get(name)
             if info:
@@ -563,21 +581,21 @@ class SettingsScreen(ThemeTarget):
                                      name=name,
                                      loc=_resolve_version(info.current, s),
                                      rem=_resolve_version(info.latest, s))
-                widget.color = _STATUS_COLOR.get(info.status, ft.Colors.GREY_600)
+                widget.color = _status_color(info.status, t)
             else:
                 widget.value = s.fmt("tool_dash", name=name)
-                widget.color = ft.Colors.GREY_600
+                widget.color = hex_to_flet(t.text_muted_color)
 
         if e.needs_update:
             self.update_btn_text.value = s.btn_update
             self.update_btn_icon.name  = ft.Icons.DOWNLOAD_ROUNDED
             self.progress_text.value   = s.fmt("status_has_updates", mins=e.mins_until_check)
-            self.progress_text.color   = ft.Colors.ORANGE_400
+            self.progress_text.color   = severity_color(t, "warning")
         else:
             self.update_btn_text.value = s.btn_check
             self.update_btn_icon.name  = ft.Icons.REFRESH_ROUNDED
             self.progress_text.value   = s.fmt("status_all_ok", mins=e.mins_until_check)
-            self.progress_text.color   = ft.Colors.GREEN_400
+            self.progress_text.color   = severity_color(t, "ok")
         self._safe_update()
 
     # ── Обработчики событий шины (инструменты) ───────────────────────────────
@@ -588,7 +606,7 @@ class SettingsScreen(ThemeTarget):
         if widget is None:
             return
         widget.value = s.fmt("tool_querying", name=e.tool_name, loc=_resolve_version(e.local_version, s))
-        widget.color = ft.Colors.GREY_500
+        widget.color = hex_to_flet(self._state.theme.text_muted_color)
         widget.update()
 
     def _on_tool_remote(self, e: ToolVersionRemoteEvent) -> None:
@@ -599,7 +617,7 @@ class SettingsScreen(ThemeTarget):
         widget.value = s.fmt("tool_versions", name=e.tool_name,
                              loc=_resolve_version(e.local_version, s),
                              rem=_resolve_version(e.remote_version, s))
-        widget.color = _STATUS_COLOR.get(e.status, ft.Colors.GREY_600)
+        widget.color = _status_color(e.status, self._state.theme)
         widget.update()
 
     def _on_btn_state(self, e: ToolButtonStateEvent) -> None:
@@ -630,42 +648,43 @@ class SettingsScreen(ThemeTarget):
 
     def _on_progress_msg(self, e: ToolProgressMessageEvent) -> None:
         s = self._s
+        # Текст — перевод ключа; цвет — severity события через токены темы.
         msg_map = {
-            "checking":    (s.status_checking,   ft.Colors.GREEN_400),
-            "prep":        (s.status_prep,        ft.Colors.GREEN_400),
-            "updates":     (s.status_updates,     ft.Colors.ORANGE_400),
-            "ok":          (s.status_ok,          ft.Colors.GREEN_400),
-            "done_ok":     (s.status_done_ok,     ft.Colors.GREEN_400),
-            "done_errors": (s.status_done_errors, ft.Colors.RED_400),
+            "checking":    s.status_checking,
+            "prep":        s.status_prep,
+            "updates":     s.status_updates,
+            "ok":          s.status_ok,
+            "done_ok":     s.status_done_ok,
+            "done_errors": s.status_done_errors,
         }
         if e.key in msg_map:
-            text, clr = msg_map[e.key]
+            text = msg_map[e.key]
         elif e.key.startswith("critical:"):
             text = s.fmt("status_critical", err=e.key[len("critical:"):])
-            clr  = ft.Colors.RED_400
         else:
-            text, clr = e.key, e.color
+            text = e.key
         self.progress_text.value = text
-        self.progress_text.color = clr
+        self.progress_text.color = severity_color(self._state.theme, e.severity)
         self.progress_text.update()
 
     def _on_install_status(self, e: ToolInstallStatusEvent) -> None:
         s = self._s
+        t = self._state.theme
         widget = self._tool_widget(e.tool_name)
         if widget is None:
             return
         if e.code == "downloading":
             widget.value = f"{e.tool_name}: {s.tool_update_downloading}"
-            widget.color = ft.Colors.ORANGE_400
+            widget.color = severity_color(t, "warning")
         elif e.code == "ok":
             widget.value = f"{e.tool_name}: {s.tool_update_ok}"
-            widget.color = ft.Colors.GREEN_400
+            widget.color = severity_color(t, "ok")
         elif e.code == "manual":
             widget.value = f"{e.tool_name}: {s.fmt('tool_update_manual', hint=e.detail)}"
-            widget.color = ft.Colors.AMBER
+            widget.color = severity_color(t, "warning")
         else:
             widget.value = f"{e.tool_name}: {s.fmt('tool_update_error', detail=e.detail)}"
-            widget.color = ft.Colors.RED_400
+            widget.color = severity_color(t, "error")
         self._safe_update()
 
     def _tool_widget(self, name: str) -> ft.Text | None:

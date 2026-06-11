@@ -64,7 +64,7 @@ class DownloadCard:
         self._pct_text = ft.Text("0%", size=11, color=hex_to_flet(t.text_secondary_color),
                                  width=36, text_align=ft.TextAlign.RIGHT)
         self._bar      = ft.ProgressBar(value=0.0, color=hex_to_flet(t.progress_color),
-                                        bgcolor=ft.Colors.SURFACE_CONTAINER_HIGHEST, expand=True)
+                                        bgcolor=hex_to_flet(t.border_color), expand=True)
         # Имя загрузки — фиксированная строка (не затирается прогрессом).
         self._title    = ft.Text(self._short(title), size=12, weight=ft.FontWeight.W_500,
                                  color=hex_to_flet(t.text_color),
@@ -109,6 +109,7 @@ class DownloadCard:
         self._t = t
         self.container.bgcolor = hex_to_flet(t.surface_color)
         self.container.border  = ft.Border.all(1, hex_to_flet(t.border_color))
+        self._bar.bgcolor      = hex_to_flet(t.border_color)
         self._title.color      = hex_to_flet(t.text_color)
         self._status.color     = hex_to_flet(t.text_secondary_color)
         self._pct_text.color   = hex_to_flet(t.text_secondary_color)
@@ -243,7 +244,7 @@ class MainScreen(ThemeTarget):
         # При ошибке подсказываем проверить выбор загрузчика (ссылка могла уйти
         # не тому инструменту — особенно в auto).
         if not e.success:
-            self._show_status(self._s().err_check_downloader, ft.Colors.ORANGE)
+            self._show_status(self._s().err_check_downloader, "warning")
 
     def _on_cancelled(self, e: DownloadCancelledEvent) -> None:
         card = self._cards.get(e.task_id)
@@ -255,9 +256,9 @@ class MainScreen(ThemeTarget):
     def _on_tools_checked(self, e: ToolsCheckedEvent) -> None:
         s = self._s()
         if e.needs_update:
-            self._show_status(s.status_tools_update, ft.Colors.ORANGE)
+            self._show_status(s.status_tools_update, "warning")
         else:
-            self._show_status(s.status_tools_ok, ft.Colors.GREEN_400)
+            self._show_status(s.status_tools_ok, "ok")
 
     def _on_cookies_changed(self, _e: CookiesChangedEvent) -> None:
         self.update_cookies_ui()
@@ -459,13 +460,14 @@ class MainScreen(ThemeTarget):
     # ── Валидация URL ─────────────────────────────────────────────────────────
 
     def _on_url_change(self, _) -> None:
+        t   = self._state.theme
         val = safe_str(self.url_input.value).strip()
         if not val:
             self.url_input.border_color = None
         elif _PROVIDER_CLASSES[self._resolve_tool(val)].is_valid_url(val):
-            self.url_input.border_color = ft.Colors.GREEN_400
+            self.url_input.border_color = hex_to_flet(t.status_ok_color)
         else:
-            self.url_input.border_color = ft.Colors.RED_400
+            self.url_input.border_color = hex_to_flet(t.status_error_color)
         self._safe_update()
 
     # ── Нажатие «Скачать» ────────────────────────────────────────────────────
@@ -475,19 +477,19 @@ class MainScreen(ThemeTarget):
         url  = safe_str(self.url_input.value).strip()
 
         if not url:
-            self._show_status(s.err_url_empty, ft.Colors.RED)
+            self._show_status(s.err_url_empty, "error")
             return
         tool = self._resolve_tool(url)   # в auto — выбор провайдера по ссылке
         if not _PROVIDER_CLASSES[tool].is_valid_url(url):
-            self._show_status(s.err_url_invalid, ft.Colors.RED)
-            self.url_input.border_color = ft.Colors.RED_400
+            self._show_status(s.err_url_invalid, "error")
+            self.url_input.border_color = hex_to_flet(self._state.theme.status_error_color)
             self._safe_update()
             return
         if self._dm.at_capacity:
-            self._show_status(s.fmt("err_max_parallel", n=MAX_PARALLEL), ft.Colors.ORANGE)
+            self._show_status(s.fmt("err_max_parallel", n=MAX_PARALLEL), "warning")
             return
         if self._dm.is_active_url(url):
-            self._show_status(s.err_already_active, ft.Colors.ORANGE)
+            self._show_status(s.err_already_active, "warning")
             return
 
         # Предупреждение о повторе: эта ссылка уже была успешно загружена (любым
@@ -511,6 +513,7 @@ class MainScreen(ThemeTarget):
             modal=True,
             title=ft.Text(s.dup_warning_title),
             content=ft.Text(s.fmt("dup_warning", when=when)),
+            bgcolor=hex_to_flet(self._state.theme.card_color),
             actions=[
                 ft.TextButton(s.btn_cancel,   on_click=lambda e: self._page.pop_dialog()),
                 ft.TextButton(s.btn_download, on_click=proceed),
@@ -531,7 +534,7 @@ class MainScreen(ThemeTarget):
         s = self._s()
         task_id = self._dm.add(snapshot, provider_key=tool)
         if task_id is None:
-            self._show_status(s.status_ytdlp_missing, ft.Colors.ORANGE)
+            self._show_status(s.status_ytdlp_missing, "warning")
             return None
         pausable = getattr(_PROVIDER_CLASSES.get(tool), "SUPPORTS_PAUSE", False)
         self._add_card(task_id, title, pausable=pausable)
@@ -652,8 +655,8 @@ class MainScreen(ThemeTarget):
         except Exception:
             self._log.warning("Failed to fetch thumbnail for %s", url, exc_info=True)
 
-    def _show_status(self, message: str, color) -> None:
-        self._bus.emit(StatusMessageEvent(message=message, color=color))
+    def _show_status(self, message: str, severity: str) -> None:
+        self._bus.emit(StatusMessageEvent(message=message, severity=severity))
 
     @staticmethod
     def _open_log(path: str) -> None:

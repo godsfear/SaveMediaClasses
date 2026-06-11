@@ -39,7 +39,7 @@ class ColorRow:
             getattr(owner._s, label_key, label_key),
             size=12, expand=True, color=ft.Colors.GREY_300,
         ))
-        self._field = ft.TextField(
+        self._field = owner.register_accents(ft.TextField(
             value=current.upper().lstrip("#"),
             width=100, border_radius=6, text_size=13,
             capitalization=ft.TextCapitalization.CHARACTERS,
@@ -47,13 +47,13 @@ class ColorRow:
             content_padding=ft.Padding.symmetric(horizontal=8, vertical=6),
             hint_text="RRGGBB",
             on_change=self._on_field_change,
-        )
-        self._preview = ft.Container(
+        ))
+        self._preview = owner.register_borders(ft.Container(
             width=28, height=28, border_radius=6,
             bgcolor=hex_to_flet(current),
-            border=ft.Border.all(1, "#555555"),
+            border=ft.Border.all(1, hex_to_flet(owner._state.theme.border_color)),
             on_click=self._toggle_palette,
-        )
+        ))
 
         palette_grid = ft.Row(wrap=True, spacing=4, run_spacing=4, width=280)
         for c in PALETTE:
@@ -95,7 +95,8 @@ class ColorRow:
             self._owner._bus.emit(ThemeChangedEvent())
             self._owner._bus.emit(SettingsChangedEvent())
         else:
-            self._field.border_color = ft.Colors.RED_400
+            self._field.border_color = hex_to_flet(
+                self._owner._state.theme.status_error_color)
             self._owner._safe_update()
 
     def _toggle_palette(self, _e) -> None:

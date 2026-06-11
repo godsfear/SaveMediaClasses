@@ -640,6 +640,22 @@ PALETTE = [
 
 # ── Утилиты ───────────────────────────────────────────────────────────────────
 
+# Семантика статусных событий (severity) → токен ThemeConfig.
+# События шины несут только семантику ("ok"|"warning"|"error"|"info");
+# в конкретный цвет её переводит UI-слой по активной теме.
+SEVERITY_TOKENS = {
+    "ok":      "status_ok_color",
+    "warning": "status_warning_color",
+    "error":   "status_error_color",
+    "info":    "text_secondary_color",
+}
+
+
+def severity_color(t: ThemeConfig, severity: str) -> str:
+    """Flet-цвет для severity события из токенов активной темы."""
+    return hex_to_flet(getattr(t, SEVERITY_TOKENS.get(severity, "text_secondary_color")))
+
+
 def hex_to_flet(hex_str: str) -> str:
     h = hex_str.strip().lstrip("#").upper()
     if len(h) == 6 and all(c in "0123456789ABCDEF" for c in h):
