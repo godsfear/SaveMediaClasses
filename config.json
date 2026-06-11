@@ -4,7 +4,8 @@
         "proxy_address": "socks5://127.0.0.1:9050",
         "proxy_enabled": false,
         "download_tool": "auto",
-        "last_check_time": 1781190122.8137958,
+        "max_parallel": 5,
+        "last_check_time": 1781190587.326186,
         "last_needs_update": false
     },
     "tools": {

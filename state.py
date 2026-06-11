@@ -13,7 +13,7 @@ from typing import Dict
 from config import (
     ThemeConfig, NamedTheme, WindowConfig, TimeoutsConfig,
     ToolConfig, YtDlpConfig, Aria2cConfig, VersionState,
-    DEFAULT_DOWNLOAD_PATH, DEFAULT_PROXY_ADDRESS,
+    DEFAULT_DOWNLOAD_PATH, DEFAULT_PROXY_ADDRESS, DEFAULT_MAX_PARALLEL,
 )
 from i18n import Locale
 
@@ -45,6 +45,9 @@ class AppState:
     proxy_address: str  = field(default_factory=lambda: DEFAULT_PROXY_ADDRESS)
     # Выбранный загрузчик: "auto" (по типу ссылки) | "yt-dlp" | "aria2c". Запоминается.
     download_tool: str  = "auto"
+    # Лимит одновременных загрузок; применяется на лету (DownloadManager читает
+    # его динамически). Персистится в settings.max_parallel.
+    max_parallel:  int  = DEFAULT_MAX_PARALLEL
 
     # ── Мета-состояние ────────────────────────────────────────────────────────
     last_check_time:   float = 0.0

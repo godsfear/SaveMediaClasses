@@ -26,7 +26,7 @@ from events import (
     AppClosingEvent,
 )
 from i18n import Locale, Strings
-from managers.download_manager import DownloadManager, MAX_PARALLEL
+from managers.download_manager import DownloadManager
 from managers.snapshot import DownloadSnapshot
 from services import Services
 from managers.providers import (
@@ -205,6 +205,8 @@ class MainScreen(ThemeTarget):
             self._bus.on(ToolsCheckedEvent,           self._on_tools_checked),
             self._bus.on(CookiesChangedEvent,         self._on_cookies_changed),
             self._bus.on(DownloadPathChangedEvent,    self._on_path_changed),
+            # Лимит параллельных мог измениться в настройках — переоценить кнопку.
+            self._bus.on(SettingsChangedEvent,        lambda e: self._update_download_btn()),
             self._bus.on(ResumeDownloadEvent,         self._on_resume_download),
             self._bus.on(ThumbnailReadyEvent,         self._on_thumbnail_ready),
             self._bus.on(AppClosingEvent,             lambda e: self.dispose()),
@@ -590,7 +592,7 @@ class MainScreen(ThemeTarget):
             self._safe_update()
             return
         if self._dm.at_capacity:
-            self._show_status(s.fmt("err_max_parallel", n=MAX_PARALLEL), "warning")
+            self._show_status(s.fmt("err_max_parallel", n=self._dm.max_parallel), "warning")
             return
         if self._dm.is_active_url(url):
             self._show_status(s.err_already_active, "warning")
@@ -727,7 +729,7 @@ class MainScreen(ThemeTarget):
         s = self._s()
         if self._dm.at_capacity:
             self.download_btn.disabled = True
-            self.download_btn.tooltip  = s.fmt("err_max_parallel", n=MAX_PARALLEL)
+            self.download_btn.tooltip  = s.fmt("err_max_parallel", n=self._dm.max_parallel)
         else:
             self.download_btn.disabled = False
             self.download_btn.tooltip  = s.btn_download_tooltip

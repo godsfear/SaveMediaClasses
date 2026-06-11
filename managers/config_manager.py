@@ -5,6 +5,7 @@ from typing import Any, Dict
 from app_logging import get_logger
 from config import (
     ThemeConfig, NamedTheme, WindowConfig, TimeoutsConfig, ToolConfig, VersionState,
+    MAX_PARALLEL_CEILING,
     safe_str, safe_int, get_fallback_bool,
 )
 from i18n import Locale
@@ -58,6 +59,8 @@ class ConfigManager:
             proxy_enabled     = fb_bool(cfg, "proxy_enabled", defaults.proxy_enabled),
             proxy_address     = fb_str(cfg,  "proxy_address",  defaults.proxy_address),
             download_tool     = fb_str(cfg,  "download_tool",  defaults.download_tool),
+            max_parallel      = max(1, min(MAX_PARALLEL_CEILING,
+                                           safe_int(cfg.get("max_parallel"), defaults.max_parallel))),
             last_check_time   = float(cfg.get("last_check_time",  defaults.last_check_time)),
             last_needs_update = bool(cfg.get("last_needs_update",  defaults.last_needs_update)),
             tools         = tools,
@@ -156,6 +159,7 @@ class ConfigManager:
                 "proxy_address":     state.proxy_address,
                 "proxy_enabled":     state.proxy_enabled,
                 "download_tool":     state.download_tool,
+                "max_parallel":      state.max_parallel,
                 "last_check_time":   state.last_check_time,
                 "last_needs_update": state.last_needs_update,
             },
