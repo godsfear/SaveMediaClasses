@@ -21,6 +21,25 @@ def test_from_state_defaults():
     assert snap.seed is False
 
 
+def test_from_state_resolves_quality_args():
+    st = AppState()
+    assert DownloadSnapshot.from_state(st, "https://x").quality_args == ""   # best
+    st.ytdlp.parameters.quality.value = "1080p"
+    snap = DownloadSnapshot.from_state(st, "https://x")
+    assert "height<=1080" in snap.quality_args
+
+
+def test_from_state_resolves_subtitles_args():
+    st = AppState()
+    assert DownloadSnapshot.from_state(st, "https://x").subtitles_args == ""   # off
+    st.ytdlp.parameters.subtitles.value = "ru"
+    assert "--sub-langs ru.*" in DownloadSnapshot.from_state(st, "https://x").subtitles_args
+    st.ytdlp.parameters.subtitles.value = "auto"
+    st.language = "ru"
+    snap = DownloadSnapshot.from_state(st, "https://x")
+    assert "--write-auto-subs" in snap.subtitles_args and "ru.*" in snap.subtitles_args
+
+
 def test_from_params_filters_unknown_keys():
     snap = DownloadSnapshot.from_params(
         "magnet:?xt=urn:btih:abc",

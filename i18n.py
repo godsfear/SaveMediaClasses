@@ -150,6 +150,16 @@ class Strings:
     # Выбор загрузчика на главном экране (yt-dlp / aria2c)
     downloader_label:    str = ""
 
+    # Качество видео (пресеты yt-dlp); ключи пресетов (1080p и т.п.) не переводятся
+    quality_label:       str = ""
+    quality_best:        str = ""
+
+    # Субтитры (дропдаун на главном экране); пункты-языки берут имена из локалей
+    subs_label:          str = ""
+    subs_off:            str = ""
+    subs_auto:           str = ""
+    subs_all:            str = ""
+
     # Очистка временных папок aria2c
     btn_clean_temp:      str = ""
     clean_temp_confirm:  str = ""

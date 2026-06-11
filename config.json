@@ -4,7 +4,7 @@
         "proxy_address": "socks5://127.0.0.1:9050",
         "proxy_enabled": false,
         "download_tool": "auto",
-        "last_check_time": 1781161514.4797044,
+        "last_check_time": 1781190122.8137958,
         "last_needs_update": false
     },
     "tools": {
@@ -24,6 +24,26 @@
                     "state": false,
                     "args": "-x --audio-format mp3 --audio-quality 0"
                 },
+                "quality": {
+                    "value": "best",
+                    "presets": {
+                        "best": "",
+                        "2160p": "-f bestvideo[height<=2160]+bestaudio/best[height<=2160]",
+                        "1440p": "-f bestvideo[height<=1440]+bestaudio/best[height<=1440]",
+                        "1080p": "-f bestvideo[height<=1080]+bestaudio/best[height<=1080]",
+                        "720p": "-f bestvideo[height<=720]+bestaudio/best[height<=720]",
+                        "480p": "-f bestvideo[height<=480]+bestaudio/best[height<=480]"
+                    }
+                },
+                "subtitles": {
+                    "value": "off",
+                    "presets": {
+                        "off": "",
+                        "lang": "--embed-subs --sub-langs {lang}.*",
+                        "auto": "--embed-subs --write-auto-subs --sub-langs {lang}.*",
+                        "all": "--embed-subs --sub-langs all"
+                    }
+                },
                 "cookies": {
                     "state": false,
                     "browser": "yandex",
@@ -41,7 +61,7 @@
                     "args": "--embed-metadata --embed-thumbnail"
                 },
                 "extra_args": {
-                    "value": "-f bestvideo+bestaudio/best --merge-output-format mp4"
+                    "value": "--merge-output-format mp4"
                 },
                 "clean_titles": {
                     "state": true,
@@ -124,8 +144,8 @@
     "window": {
         "width": 778,
         "height": 991,
-        "left": 3620,
-        "top": 267
+        "left": 3531,
+        "top": 302
     },
     "timeouts": {
         "connect": 5.0,

@@ -93,6 +93,56 @@ def test_ytdlp_build_command_proxy_cookies_audio(paths):
     assert "bestvideo+bestaudio/best" not in cmd
 
 
+def test_ytdlp_quality_preset_appended_after_extra_args(paths):
+    """Пресет качества идёт ПОСЛЕ extra_args — его -f переопределяет формат."""
+    p = YtDlpProvider(paths)
+    s = snap("https://youtu.be/x",
+             yt_dlp_args="-f bestvideo+bestaudio/best --merge-output-format mp4",
+             quality_args="-f bestvideo[height<=1080]+bestaudio/best[height<=1080]")
+    cmd = p.build_command("yt-dlp.exe", s)
+    f_positions = [i for i, a in enumerate(cmd) if a == "-f"]
+    assert len(f_positions) == 2
+    assert cmd[f_positions[-1] + 1].startswith("bestvideo[height<=1080]")  # последний -f — пресет
+    assert "--merge-output-format" in cmd                                  # extra_args действуют
+
+
+def test_ytdlp_best_preserves_custom_format(paths):
+    """Пресет "best" (пустые args) не перебивает пользовательский -f из extra_args."""
+    p = YtDlpProvider(paths)
+    s = snap("https://youtu.be/x", yt_dlp_args="-f mycustom", quality_args="")
+    cmd = p.build_command("yt-dlp.exe", s)
+    assert cmd.count("-f") == 1
+    assert cmd[cmd.index("-f") + 1] == "mycustom"
+
+
+def test_ytdlp_default_command_has_single_format_source(paths):
+    """С дефолтными настройками формат не задаётся вовсе (yt-dlp сам берёт best)."""
+    p = YtDlpProvider(paths)
+    cmd = p.build_command("yt-dlp.exe", snap("https://youtu.be/x"))
+    assert "-f" not in cmd
+    assert "--merge-output-format" in cmd
+
+
+def test_ytdlp_quality_ignored_in_audio_mode(paths):
+    p = YtDlpProvider(paths)
+    s = snap("https://youtu.be/x", audio_only=True,
+             quality_args="-f bestvideo[height<=1080]")
+    cmd = p.build_command("yt-dlp.exe", s)
+    assert not any("height<=1080" in a for a in cmd)
+    assert "-x" in cmd
+
+
+def test_ytdlp_subtitles_in_video_mode_only(paths):
+    p = YtDlpProvider(paths)
+    subs = "--embed-subs --sub-langs ru.*"
+    cmd = p.build_command("yt-dlp.exe", snap("https://youtu.be/x", subtitles_args=subs))
+    assert "--embed-subs" in cmd and "ru.*" in cmd
+    # В аудио-режиме субтитры не передаются
+    cmd_audio = p.build_command(
+        "yt-dlp.exe", snap("https://youtu.be/x", audio_only=True, subtitles_args=subs))
+    assert "--embed-subs" not in cmd_audio
+
+
 def test_ytdlp_output_template_respects_download_path(paths):
     p = YtDlpProvider(paths)
     s = snap("https://youtu.be/x", download_path="C:/dl", clean_titles=True)

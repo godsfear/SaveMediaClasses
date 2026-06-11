@@ -359,7 +359,31 @@ class MainScreen(ThemeTarget):
             value=self._state.download_tool,
             on_select=self._on_downloader_change,
         ))
-        self.audio_only_switch      = self.register_switches(ft.Switch(label=s.switch_audio_only, active_color=ft.Colors.GREEN))
+        # Пресет качества видео (yt-dlp). При «Только аудио» не участвует —
+        # дропдаун блокируется обработчиком переключателя.
+        self.quality_dropdown = self.register_accents(ft.Dropdown(
+            label=s.quality_label,
+            border_radius=8, width=130,
+            focused_border_color=ft.Colors.BLUE,
+            options=self._quality_options(s),
+            value=self._state.ytdlp.parameters.quality.value,
+            on_select=self._on_quality_change,
+        ))
+        # Субтитры (yt-dlp): без / язык из локализации / автоматические / все.
+        # Список языков знать заранее не нужно — yt-dlp пересекает запрошенное
+        # с доступным, отсутствующие пропускаются без ошибки.
+        self.subtitles_dropdown = self.register_accents(ft.Dropdown(
+            label=s.subs_label,
+            border_radius=8, width=160,
+            focused_border_color=ft.Colors.BLUE,
+            options=self._subs_options(s),
+            value=self._state.ytdlp.parameters.subtitles.value,
+            on_select=self._on_subtitles_change,
+        ))
+        self.audio_only_switch      = self.register_switches(ft.Switch(
+            label=s.switch_audio_only, active_color=ft.Colors.GREEN,
+            on_change=self._on_audio_only_change,
+        ))
         self.cookies_enabled_switch = self.register_switches(ft.Switch(label=s.switch_cookies,    active_color=ft.Colors.GREEN, value=False))
 
         self._btn_icon = self.register_button_texts(ft.Icon(ft.Icons.DOWNLOAD_ROUNDED, color=ft.Colors.WHITE))
@@ -394,7 +418,12 @@ class MainScreen(ThemeTarget):
                 self.header_main,
                 ft.Row([self.url_input, self.downloader_dropdown, self.download_btn],
                        vertical_alignment=ft.CrossAxisAlignment.CENTER, spacing=15),
-                ft.Column([self.audio_only_switch, self.cookies_enabled_switch], spacing=10)
+                ft.Column([
+                    ft.Row([self.audio_only_switch, self.quality_dropdown],
+                           vertical_alignment=ft.CrossAxisAlignment.CENTER, spacing=15),
+                    ft.Row([self.cookies_enabled_switch, self.subtitles_dropdown],
+                           vertical_alignment=ft.CrossAxisAlignment.CENTER, spacing=15),
+                ], spacing=10)
             ], spacing=12, horizontal_alignment=ft.CrossAxisAlignment.STRETCH),
             bgcolor="#161616", border_radius=8, padding=15
         ))
@@ -420,12 +449,23 @@ class MainScreen(ThemeTarget):
         self.audio_only_switch.value      = p.audio_only.state
         self.cookies_enabled_switch.value = p.cookies.state
         self.downloader_dropdown.value    = self._selected_tool()
+        self.quality_dropdown.value       = p.quality.value
+        self.quality_dropdown.disabled    = p.audio_only.state
+        subs = p.subtitles.value
+        self.subtitles_dropdown.value     = subs if subs in self._subs_option_keys() else "off"
+        self.subtitles_dropdown.disabled  = p.audio_only.state
         self.update_folder_ui()
 
     def sync_to_state(self) -> None:
         p = self._state.ytdlp.parameters
         p.audio_only.state = bool(self.audio_only_switch.value)
         p.cookies.state    = bool(self.cookies_enabled_switch.value)
+        quality = safe_str(self.quality_dropdown.value)
+        if quality in p.quality.presets:
+            p.quality.value = quality
+        subs = safe_str(self.subtitles_dropdown.value)
+        if subs in self._subs_option_keys():
+            p.subtitles.value = subs
         self._state.download_tool = self._selected_tool()
 
     # ── Выбор загрузчика ──────────────────────────────────────────────────────
@@ -445,6 +485,46 @@ class MainScreen(ThemeTarget):
         self.sync_to_state()
         self._on_url_change(None)          # перепроверить URL под новый загрузчик
         self._bus.emit(SettingsChangedEvent())
+
+    # ── Качество видео ────────────────────────────────────────────────────────
+
+    def _quality_options(self, s: Strings) -> list:
+        """Пункты дропдауна из карты пресетов; переводится только "best"."""
+        return [
+            ft.dropdown.Option(key, s.quality_best if key == "best" else key)
+            for key in self._state.ytdlp.parameters.quality.presets
+        ]
+
+    def _on_quality_change(self, _) -> None:
+        self.sync_to_state()
+        self._bus.emit(SettingsChangedEvent())   # выбор запоминается сразу
+
+    # ── Субтитры ──────────────────────────────────────────────────────────────
+
+    def _subs_option_keys(self) -> list:
+        """Ключи дропдауна: off + языки локализации + auto + all."""
+        return ["off", *(code for code, _ in Locale.available()), "auto", "all"]
+
+    def _subs_options(self, s: Strings) -> list:
+        """Пункты дропдауна; языки подписываются их именами из locale-файлов."""
+        names  = dict(Locale.available())
+        labels = {"off": s.subs_off, "auto": s.subs_auto, "all": s.subs_all}
+        return [
+            ft.dropdown.Option(key, labels.get(key) or names.get(key, key))
+            for key in self._subs_option_keys()
+        ]
+
+    def _on_subtitles_change(self, _) -> None:
+        self.sync_to_state()
+        self._bus.emit(SettingsChangedEvent())   # выбор запоминается сразу
+
+    def _on_audio_only_change(self, _) -> None:
+        # Только UI-реакция (в аудио не вшить ни качество видео, ни субтитры);
+        # state коммитится в точках сохранения, как и раньше.
+        audio = bool(self.audio_only_switch.value)
+        self.quality_dropdown.disabled   = audio
+        self.subtitles_dropdown.disabled = audio
+        self._safe_update()
 
     # ── Тема ─────────────────────────────────────────────────────────────────
 
@@ -469,6 +549,12 @@ class MainScreen(ThemeTarget):
         self.url_input.label      = s.url_label;       self.url_input.update()
         self.url_input.hint_text  = s.url_hint
         self.downloader_dropdown.label = s.downloader_label; self.downloader_dropdown.update()
+        self.quality_dropdown.label    = s.quality_label
+        self.quality_dropdown.options  = self._quality_options(s)
+        self.quality_dropdown.update()
+        self.subtitles_dropdown.label   = s.subs_label
+        self.subtitles_dropdown.options = self._subs_options(s)
+        self.subtitles_dropdown.update()
         self.audio_only_switch.label      = s.switch_audio_only; self.audio_only_switch.update()
         self.update_cookies_ui();                                self.cookies_enabled_switch.update()
         self._btn_text.value      = s.btn_download;    self._btn_text.update()

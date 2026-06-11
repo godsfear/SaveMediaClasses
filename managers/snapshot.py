@@ -41,6 +41,11 @@ class DownloadSnapshot:
     playlist_flag_off:     str = "--no-playlist"
     metadata_flags:        str = "--embed-metadata --embed-thumbnail"
     audio_flags:           str = "-x --audio-format mp3 --audio-quality 0"
+    # Аргументы выбранного пресета качества ('' = best, формат решает extra_args).
+    # Разрешаются в момент снимка: при возобновлении из истории качество то же.
+    quality_args:          str = ""
+    # Аргументы выбранного режима субтитров ('' = без субтитров).
+    subtitles_args:        str = ""
     clean_title_template:  str = "%(title)s.%(ext)s"
     title_id_template:     str = "%(title)s [%(id)s].%(ext)s"
     playlist_dir_template: str = "%(playlist_title)s"
@@ -79,6 +84,8 @@ class DownloadSnapshot:
             playlist_flag_off=p.playlist.flag_off,
             metadata_flags=p.embed_metadata.args,
             audio_flags=p.audio_only.args,
+            quality_args=p.quality.selected_args(),
+            subtitles_args=p.subtitles.selected_args(state.language),
             clean_title_template=p.clean_titles.template_on,
             title_id_template=p.clean_titles.template_off,
             playlist_dir_template=p.playlist.dir_template,
