@@ -72,8 +72,7 @@ class SaveMediaApp:
             screens=[main_screen, settings_screen, history_screen],
         )
 
-        tools_ctrl = ToolsController(svc)
-        settings_screen.set_tools_controller(tools_ctrl)
+        tools_ctrl = ToolsController(svc, task_runner=page.run_task)
 
         nav_ctrl = NavigationController(
             page, svc,
@@ -102,10 +101,7 @@ class SaveMediaApp:
             svc.state.last_needs_update = e.needs_update
             svc.bus.emit(SettingsChangedEvent())
 
-        def _on_tools_restored(e: ToolsRestoredEvent) -> None:
-            settings_screen.on_tools_restored(e)
-            nav_ctrl.on_tools_restored_pending(e)
-
+        # ToolsRestoredEvent обрабатывает сам SettingsScreen (подписан в конструкторе).
         # Возобновление из истории: главный экран сам запустит загрузку (он
         # подписан на ResumeDownloadEvent), а навигация переключит на него.
         svc.bus.on(ResumeDownloadEvent, lambda e: nav_ctrl.show_main())
@@ -113,7 +109,6 @@ class SaveMediaApp:
         svc.bus.on(LanguageChangedEvent, _on_language_changed)
         svc.bus.on(ThemeChangedEvent,    _on_theme_changed)
         svc.bus.on(ToolsCheckedEvent,    _on_tools_checked)
-        svc.bus.on(ToolsRestoredEvent,   _on_tools_restored)
 
         # ── Инициализация окна и AppBar ───────────────────────────────────────
         window_ctrl.apply_geometry()

@@ -87,6 +87,12 @@ class DownloadSeedingEvent:
     task_id: str
     source:  str = "aria2c"
 
+@dataclass(frozen=True)
+class ThumbnailReadyEvent:
+    """Превью загрузки получено (ThumbnailService) — карточка может показать картинку."""
+    task_id: str
+    data:    bytes
+
 
 # ── Инструменты (yt-dlp / ffmpeg) ─────────────────────────────────────────────
 
@@ -173,6 +179,18 @@ class ThemeChangedEvent:
 @dataclass(frozen=True)
 class LanguageChangedEvent:
     """Сменён язык — нужно перестроить все текстовые метки UI."""
+    pass
+
+@dataclass(frozen=True)
+class DownloadPathChangedEvent:
+    """Сменилась папка загрузки (выбор в диалоге). MainScreen перевыводит свою
+    метку из state — без прямого доступа контроллера к виджетам экрана."""
+    pass
+
+@dataclass(frozen=True)
+class ToolsActionRequestedEvent:
+    """Пользователь нажал кнопку Check/Update в настройках. Экран лишь сообщает
+    о намерении; маршрутизацию (check или update) выполняет ToolsController."""
     pass
 
 @dataclass(frozen=True)
