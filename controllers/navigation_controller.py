@@ -20,7 +20,7 @@ from typing import TYPE_CHECKING
 import flet as ft
 
 from app_logging import get_logger
-from config import hex_to_flet
+from config import hex_to_flet, severity_color
 from events import SettingsChangedEvent, StatusMessageEvent, ThemeChangedEvent
 from i18n import Locale
 
@@ -73,7 +73,8 @@ class NavigationController:
         self._bind_toolbar()
 
         # ── BottomAppBar контейнеры ───────────────────────────────────────────
-        status_bar_text = ft.Text("", size=12, color=ft.Colors.GREEN_400)
+        status_bar_text = ft.Text("", size=12,
+                                  color=severity_color(svc.state.theme, "ok"))
         self._status_bar_text = status_bar_text
 
         self.main_status_container = ft.Container(
@@ -92,7 +93,7 @@ class NavigationController:
 
     def _on_status_message(self, e: StatusMessageEvent) -> None:
         self._status_bar_text.value = e.message
-        self._status_bar_text.color = e.color
+        self._status_bar_text.color = severity_color(self._svc.state.theme, e.severity)
         self._svc.safe_update()
 
     # ── Публичный API ─────────────────────────────────────────────────────────
@@ -104,8 +105,9 @@ class NavigationController:
     # ── Тема AppBar ───────────────────────────────────────────────────────────
 
     def _appbar_fg(self) -> str:
-        """Цвет иконок/заголовка поверх шапки — контраст к режиму."""
-        return "#212121" if self._svc.state.theme_mode == "light" else ft.Colors.WHITE
+        """Цвет иконок/заголовка поверх шапки — основной текст активной палитры
+        (палитра выбирается режимом, поэтому контраст к шапке сохраняется)."""
+        return hex_to_flet(self._svc.state.theme.text_color)
 
     def _theme_icon(self) -> str:
         """Иконка переключателя: показываем целевой режим."""
@@ -119,6 +121,8 @@ class NavigationController:
         self.theme_btn.icon = self._theme_icon()
         for btn in (self.theme_btn, self.settings_btn, self.history_btn, self.folder_btn):
             btn.icon_color = fg
+        # Кнопка выхода — статусный цвет «ошибка» из активной палитры.
+        self.exit_btn.icon_color = hex_to_flet(self._svc.state.theme.status_error_color)
         self.update_proxy_ui()
         ab = self._page.appbar
         if ab is not None:
@@ -140,7 +144,7 @@ class NavigationController:
         s = Locale.load(self._svc.state.language)
         if self._svc.state.proxy_enabled:
             self.proxy_btn.icon       = ft.Icons.SHIELD_ROUNDED
-            self.proxy_btn.icon_color = ft.Colors.GREEN_400
+            self.proxy_btn.icon_color = severity_color(self._svc.state.theme, "ok")
             self.proxy_btn.tooltip    = s.proxy_on
         else:
             self.proxy_btn.icon       = ft.Icons.SHIELD_OUTLINED
@@ -181,7 +185,7 @@ class NavigationController:
             ]
         else:
             leading = ft.IconButton(
-                icon=ft.Icons.ARROW_BACK_IOS_NEW_ROUNDED, icon_color=ft.Colors.WHITE,
+                icon=ft.Icons.ARROW_BACK_IOS_NEW_ROUNDED, icon_color=self._appbar_fg(),
                 icon_size=16, on_click=self.show_main,
             )
             leading_width = None
@@ -277,6 +281,7 @@ class NavigationController:
         ]
         dlg = ft.AlertDialog(
             modal=False,
+            bgcolor=hex_to_flet(t.card_color),
             title=ft.Row(
                 [
                     ft.Image(

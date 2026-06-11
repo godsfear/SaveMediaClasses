@@ -20,8 +20,6 @@ from __future__ import annotations
 
 from typing import Literal
 
-import flet as ft
-
 from config import VersionState
 from events import (
     ToolsCheckedEvent,
@@ -62,7 +60,7 @@ class ToolsController:
             return
 
         self._bus.emit(ToolButtonStateEvent("checking"))
-        self._bus.emit(ToolProgressMessageEvent("checking", ft.Colors.GREEN_400))
+        self._bus.emit(ToolProgressMessageEvent("checking", "ok"))
 
         def on_local(binary: str, local: str) -> None:
             self._bus.emit(ToolVersionLocalEvent(binary, local))
@@ -86,11 +84,11 @@ class ToolsController:
         if needs:
             self._btn_mode = "update"
             self._bus.emit(ToolButtonStateEvent("update"))
-            self._bus.emit(ToolProgressMessageEvent("updates", ft.Colors.ORANGE_400))
+            self._bus.emit(ToolProgressMessageEvent("updates", "warning"))
         else:
             self._btn_mode = "check"
             self._bus.emit(ToolButtonStateEvent("check"))
-            self._bus.emit(ToolProgressMessageEvent("ok", ft.Colors.GREEN_400))
+            self._bus.emit(ToolProgressMessageEvent("ok", "ok"))
 
         self._bus.emit(ToolsCheckedEvent(needs_update=needs))
 
@@ -99,7 +97,7 @@ class ToolsController:
     async def _update_tools(self) -> None:
         self._bus.emit(ToolButtonStateEvent("updating"))
         self._bus.emit(ToolProgressEvent(0.0, True))
-        self._bus.emit(ToolProgressMessageEvent("prep", ft.Colors.GREEN_400))
+        self._bus.emit(ToolProgressMessageEvent("prep", "ok"))
 
         had_errors_box:   list[bool] = [False]
         critical_err_box: list[str]  = [""]
@@ -115,11 +113,11 @@ class ToolsController:
             critical_err_box[0] = critical_err
             self._bus.emit(ToolProgressEvent(None, False))
             if critical_err:
-                self._bus.emit(ToolProgressMessageEvent(f"critical:{critical_err}", ft.Colors.RED_400))
+                self._bus.emit(ToolProgressMessageEvent(f"critical:{critical_err}", "error"))
             elif had_errors:
-                self._bus.emit(ToolProgressMessageEvent("done_errors", ft.Colors.RED_400))
+                self._bus.emit(ToolProgressMessageEvent("done_errors", "error"))
             else:
-                self._bus.emit(ToolProgressMessageEvent("done_ok", ft.Colors.GREEN_400))
+                self._bus.emit(ToolProgressMessageEvent("done_ok", "ok"))
             self._btn_mode = "check"
             self._bus.emit(ToolButtonStateEvent("check"))
 

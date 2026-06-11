@@ -95,9 +95,10 @@ class ToolsCheckedEvent:
 @dataclass(frozen=True)
 class StatusMessageEvent:
     """Сообщение для нижнего статус-бара главного экрана (нейтральный канал:
-    статус инструментов, ошибки валидации URL, лимит параллельных загрузок и т.п.)."""
-    message: str
-    color:   str   # hex или ft.Colors.*
+    статус инструментов, ошибки валидации URL, лимит параллельных загрузок и т.п.).
+    Несёт только семантику; цвет выводит подписчик из токенов темы (severity_color)."""
+    message:  str
+    severity: str = "info"   # "ok" | "warning" | "error" | "info"
 
 
 @dataclass(frozen=True)
@@ -138,9 +139,10 @@ class ToolProgressEvent:
 
 @dataclass(frozen=True)
 class ToolProgressMessageEvent:
-    """Строка статуса операции с инструментами (для виджета progress_text)."""
-    key:   str   # "checking"|"prep"|"updates"|"ok"|"done_ok"|"done_errors"|"critical:<text>"
-    color: str   # hex или ft.Colors.*
+    """Строка статуса операции с инструментами (для виджета progress_text).
+    Несёт только семантику; цвет выводит подписчик из токенов темы (severity_color)."""
+    key:      str   # "checking"|"prep"|"updates"|"ok"|"done_ok"|"done_errors"|"critical:<text>"
+    severity: str = "info"   # "ok" | "warning" | "error" | "info"
 
 @dataclass(frozen=True)
 class ToolInstallStatusEvent:
