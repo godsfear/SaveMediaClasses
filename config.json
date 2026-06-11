@@ -5,7 +5,8 @@
         "proxy_enabled": false,
         "download_tool": "auto",
         "max_parallel": 5,
-        "last_check_time": 1781190587.326186,
+        "clipboard_watch": false,
+        "last_check_time": 1781193314.2707274,
         "last_needs_update": false
     },
     "tools": {
@@ -145,8 +146,8 @@
     "window": {
         "width": 778,
         "height": 991,
-        "left": 3531,
-        "top": 302
+        "left": 3882,
+        "top": 280
     },
     "timeouts": {
         "connect": 5.0,

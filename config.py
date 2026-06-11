@@ -7,6 +7,9 @@ from typing import Any, Dict
 CHECK_INTERVAL_SECONDS = 6 * 3600
 DEFAULT_MAX_PARALLEL   = 5       # одновременных загрузок по умолчанию (settings.max_parallel)
 MAX_PARALLEL_CEILING   = 50      # верхняя граница клампа (защита от опечатки в config.json)
+CLIPBOARD_POLL_SECONDS = 1.0     # период опроса буфера обмена (слежение за ссылками)
+CLIPBOARD_MAX_CHARS    = 4000    # длиннее — это документ, а не ссылки; игнорируем
+ERROR_TAIL_LINES       = 20      # сколько последних строк вывода хранить для диагностики ошибки
 CARD_LINGER_SECONDS    = 3       # сколько карточка висит после финала/паузы перед удалением
 SEED_LOG_INTERVAL_SECONDS = 600  # как часто логировать строку раздачи aria2 (SEED спамит ~1/с)
 
@@ -819,6 +822,21 @@ def magnet_btih(url: str) -> str:
     import re
     m = re.search(r"xt=urn:btih:([0-9a-zA-Z]+)", safe_str(url), re.IGNORECASE)
     return m.group(1).lower() if m else ""
+
+
+def parse_url_lines(raw: str) -> list:
+    """Разобрать многострочный текст в список ссылок: по строке на ссылку, без
+    пустых и дубликатов (порядок сохраняется). Разделитель — только перевод
+    строки: URL и пути к .torrent-файлам могут содержать пробелы.
+    Используется полем URL главного экрана и слежением за буфером обмена."""
+    seen = set()
+    urls = []
+    for line in (raw or "").splitlines():
+        u = line.strip()
+        if u and u not in seen:
+            seen.add(u)
+            urls.append(u)
+    return urls
 
 
 def safe_str(value: Any) -> str:

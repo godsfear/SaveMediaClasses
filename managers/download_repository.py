@@ -53,7 +53,8 @@ CREATE TABLE IF NOT EXISTS downloads (
     params        TEXT NOT NULL DEFAULT '{}',
     thumbnail     BLOB,
     meta          TEXT,
-    content_hash  TEXT
+    content_hash  TEXT,
+    error_output  TEXT
 );
 """
 
@@ -67,6 +68,10 @@ ALTER TABLE downloads ADD COLUMN meta TEXT;
 
 _MIGRATE_CONTENT_HASH = """
 ALTER TABLE downloads ADD COLUMN content_hash TEXT;
+"""
+
+_MIGRATE_ERROR_OUTPUT = """
+ALTER TABLE downloads ADD COLUMN error_output TEXT;
 """
 
 _CREATE_INDEXES = [
@@ -83,7 +88,8 @@ VALUES (:task_id, :url, :source, 'running', :started_at, :params, :content_hash)
 
 _UPDATE_FINISHED = """
 UPDATE downloads
-SET status = :status, finished_at = :finished_at, error_message = :error_message
+SET status = :status, finished_at = :finished_at,
+    error_message = :error_message, error_output = :error_output
 WHERE task_id = :task_id;
 """
 
@@ -117,14 +123,16 @@ class DownloadRecord:
     __slots__ = (
         "task_id", "url", "source", "status",
         "started_at", "finished_at", "error_message",
-        "params", "thumbnail", "meta", "content_hash",
+        "params", "thumbnail", "meta", "content_hash", "error_output",
     )
 
     def __init__(self, params: str = "{}", thumbnail: Optional[bytes] = None,
-                 meta: Optional[str] = None, content_hash: Optional[str] = None, **kwargs):
+                 meta: Optional[str] = None, content_hash: Optional[str] = None,
+                 error_output: Optional[str] = None, **kwargs):
         for k, v in kwargs.items():
             if k in self.__slots__:
                 setattr(self, k, v)
+        self.error_output: str = error_output or ""
         try:
             self.params: Dict[str, Any] = json.loads(params) if isinstance(params, str) else params
         except (json.JSONDecodeError, TypeError):
@@ -158,7 +166,8 @@ class DownloadRepository:
             conn.execute("PRAGMA journal_mode=WAL")
             conn.execute(_CREATE_TABLE)
             # Миграции — ДО индексов: индекс по content_hash требует наличия колонки.
-            for migration in (_MIGRATE_THUMBNAIL, _MIGRATE_META, _MIGRATE_CONTENT_HASH):
+            for migration in (_MIGRATE_THUMBNAIL, _MIGRATE_META,
+                              _MIGRATE_CONTENT_HASH, _MIGRATE_ERROR_OUTPUT):
                 try:
                     conn.execute(migration)
                 except sqlite3.OperationalError as err:
@@ -231,7 +240,8 @@ class DownloadRepository:
 
     def _on_completed(self, e: DownloadCompletedEvent) -> None:
         self._finish(e.task_id, "completed" if e.success else "failed",
-                     None if e.success else e.message)
+                     None if e.success else e.message,
+                     None if e.success else (e.output_tail or None))
 
     def _on_cancelled(self, e: DownloadCancelledEvent) -> None:
         self._finish(e.task_id, "cancelled", None)
@@ -260,7 +270,8 @@ class DownloadRepository:
         except Exception:
             self._log.exception("Failed to set status %s for %s", status, task_id)
 
-    def _finish(self, task_id: str, status: str, error: Optional[str]) -> None:
+    def _finish(self, task_id: str, status: str, error: Optional[str],
+                error_output: Optional[str] = None) -> None:
         try:
             with self._connect() as conn:
                 conn.execute(_UPDATE_FINISHED, {
@@ -268,6 +279,7 @@ class DownloadRepository:
                     "status":        status,
                     "finished_at":   time.time(),
                     "error_message": error,
+                    "error_output":  error_output,
                 })
         except Exception:
             self._log.exception("Failed to update download record: %s", task_id)

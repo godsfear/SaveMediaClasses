@@ -4,7 +4,10 @@ import flet as ft
 
 from app_logging import get_logger
 from config import CHECK_INTERVAL_SECONDS, hex_to_flet
-from controllers import NavigationController, ThemeController, ToolsController, WindowController
+from controllers import (
+    ClipboardController, NavigationController, ThemeController,
+    ToolsController, WindowController,
+)
 from events import (
     ToolsCheckedEvent, ToolsRestoredEvent,
     SettingsChangedEvent, LanguageChangedEvent, ThemeChangedEvent,
@@ -79,7 +82,8 @@ class SaveMediaApp:
             screens=[main_screen, settings_screen, history_screen],
         )
 
-        tools_ctrl = ToolsController(svc, task_runner=page.run_task)
+        tools_ctrl     = ToolsController(svc, task_runner=page.run_task)
+        clipboard_ctrl = ClipboardController(page, svc)
 
         nav_ctrl = NavigationController(
             page, svc,
@@ -138,6 +142,10 @@ class SaveMediaApp:
 
         window_ctrl.reveal()
         page.update()
+
+        # Слежение за буфером: цикл живёт всегда, активен только при включённом
+        # тумблере (state.clipboard_watch); останавливается по AppClosingEvent.
+        page.run_task(clipboard_ctrl.run)
 
         await asyncio.sleep(0.1)
 
