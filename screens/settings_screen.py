@@ -12,10 +12,9 @@ from managers.tools_manager import (
 from managers.tool_registry import DEFAULT_TOOLS
 from managers.providers import Aria2cProvider
 from controllers.theme_target import ThemeTarget
-from controllers.tools_controller import ToolsController
 from screens.color_row import ColorRow
 from events import (
-    ToolsRestoredEvent,
+    ToolsRestoredEvent, ToolsActionRequestedEvent,
     ToolVersionLocalEvent, ToolVersionRemoteEvent,
     ToolButtonStateEvent,
     ToolProgressEvent, ToolProgressMessageEvent,
@@ -76,8 +75,10 @@ class SettingsScreen(ThemeTarget):
         self._bus         = svc.bus
         self._dm          = svc.dm
 
-        self._tools_ctrl: ToolsController | None = None
         self._s: Strings = Locale.load(self._state.language)
+        # Последнее ToolsRestoredEvent — повторно показывается при входе в
+        # настройки (reapply_restored вызывает навигация).
+        self._last_restored: ToolsRestoredEvent | None = None
 
         self._build_widgets()
         self._build_theme_section()
@@ -85,6 +86,7 @@ class SettingsScreen(ThemeTarget):
         self._build_layout()
 
         self._unsubs = [
+            self._bus.on(ToolsRestoredEvent,       self._on_tools_restored),
             self._bus.on(ToolVersionLocalEvent,    self._on_tool_local),
             self._bus.on(ToolVersionRemoteEvent,   self._on_tool_remote),
             self._bus.on(ToolButtonStateEvent,     self._on_btn_state),
@@ -93,10 +95,6 @@ class SettingsScreen(ThemeTarget):
             self._bus.on(ToolInstallStatusEvent,   self._on_install_status),
             self._bus.on(AppClosingEvent,          lambda e: self.dispose()),
         ]
-
-    def set_tools_controller(self, ctrl: ToolsController) -> None:
-        """Установить контроллер для делегирования кликов по кнопке."""
-        self._tools_ctrl = ctrl
 
     def dispose(self) -> None:
         """Отписаться от шины при уничтожении экрана."""
@@ -322,7 +320,8 @@ class SettingsScreen(ThemeTarget):
             divider = self.register_dividers(ft.Divider(height=1, color="#2a2a2a"))
             rows = []
             for k in field_keys:
-                cr = ColorRow(self, k, field_map[k])
+                cr = ColorRow(self, self._state, self._bus, self._safe_update,
+                              s, k, field_map[k])
                 self._color_rows.append(cr)
                 rows.append(cr.control)
             group_columns.append(ft.Column([group_label, divider, *rows], spacing=8))
@@ -571,7 +570,14 @@ class SettingsScreen(ThemeTarget):
 
     # ── Инструменты ───────────────────────────────────────────────────────────
 
-    def on_tools_restored(self, e: ToolsRestoredEvent) -> None:
+    def reapply_restored(self) -> None:
+        """Повторно показать восстановленное состояние версий (зовёт навигация
+        при входе в настройки — промежуточные события могли его перетереть)."""
+        if self._last_restored is not None:
+            self._on_tools_restored(self._last_restored)
+
+    def _on_tools_restored(self, e: ToolsRestoredEvent) -> None:
+        self._last_restored = e
         s = self._s
         t = self._state.theme
         for name, widget in self._tool_status.items():
@@ -690,11 +696,10 @@ class SettingsScreen(ThemeTarget):
     def _tool_widget(self, name: str) -> ft.Text | None:
         return self._tool_status.get(name)
 
-    # ── Обработчик кнопки — делегирует в контроллер ───────────────────────────
+    # ── Обработчик кнопки — публикует намерение (маршрутизирует ToolsController) ──
 
-    async def _handle_update_button_click(self, _) -> None:
-        if self._tools_ctrl is not None:
-            await self._tools_ctrl.handle_button_click()
+    def _handle_update_button_click(self, _) -> None:
+        self._bus.emit(ToolsActionRequestedEvent())
 
     # ── Лэйаут ────────────────────────────────────────────────────────────────
 

@@ -26,6 +26,7 @@ from i18n import Locale
 from managers.config_manager import ConfigManager
 from managers.download_manager import DownloadManager
 from managers.download_repository import DownloadRepository
+from managers.thumbnails import ThumbnailService
 from managers.tools_manager import ToolsManager
 from paths import AppPaths
 from state import AppState
@@ -42,6 +43,7 @@ class Services:
     config_mgr: ConfigManager
     tools:      ToolsManager
     dm:         DownloadManager
+    thumbs:     ThumbnailService
 
     # ── Персистентность ──────────────────────────────────────────────────────
     db: DownloadRepository
@@ -80,6 +82,7 @@ class Services:
             task_runner=task_runner,
             db=db,
         )
+        thumbs     = ThumbnailService(paths=paths, bus=bus, db=db, state=state)
 
         return Services(
             paths=paths,
@@ -88,6 +91,7 @@ class Services:
             config_mgr=config_mgr,
             tools=tools,
             dm=dm,
+            thumbs=thumbs,
             db=db,
             state=state,
         )

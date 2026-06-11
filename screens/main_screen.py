@@ -19,15 +19,19 @@ from events import (
     ToolsCheckedEvent,
     StatusMessageEvent,
     CookiesChangedEvent,
+    DownloadPathChangedEvent,
     SettingsChangedEvent,
     ResumeDownloadEvent,
+    ThumbnailReadyEvent,
     AppClosingEvent,
 )
 from i18n import Locale, Strings
 from managers.download_manager import DownloadManager, MAX_PARALLEL
 from managers.snapshot import DownloadSnapshot
 from services import Services
-from managers.providers import PROVIDERS, resolve_provider_for_url, torrent_name
+from managers.providers import (
+    PROVIDERS, DEFAULT_PROVIDER, resolve_provider_for_url, torrent_name,
+)
 from state import AppState
 
 # Варианты в дропдауне: "auto" (выбор по ссылке) + ключи единого реестра провайдеров.
@@ -177,6 +181,7 @@ class MainScreen(ThemeTarget):
         self._dm          = svc.dm
         self._bus         = svc.bus
         self._db          = svc.db
+        self._thumbs      = svc.thumbs
         self._log         = get_logger("app")
 
         self._cards: Dict[str, DownloadCard] = {}
@@ -199,7 +204,9 @@ class MainScreen(ThemeTarget):
             self._bus.on(DownloadCancelledEvent,      self._on_cancelled),
             self._bus.on(ToolsCheckedEvent,           self._on_tools_checked),
             self._bus.on(CookiesChangedEvent,         self._on_cookies_changed),
+            self._bus.on(DownloadPathChangedEvent,    self._on_path_changed),
             self._bus.on(ResumeDownloadEvent,         self._on_resume_download),
+            self._bus.on(ThumbnailReadyEvent,         self._on_thumbnail_ready),
             self._bus.on(AppClosingEvent,             lambda e: self.dispose()),
         ]
 
@@ -257,6 +264,31 @@ class MainScreen(ThemeTarget):
     def _on_cookies_changed(self, _e: CookiesChangedEvent) -> None:
         self.update_cookies_ui()
         self._safe_update()
+
+    def _on_path_changed(self, _e: DownloadPathChangedEvent) -> None:
+        self.update_folder_ui()
+        self._safe_update()
+
+    def _on_thumbnail_ready(self, e: ThumbnailReadyEvent) -> None:
+        card = self._cards.get(e.task_id)
+        if card:
+            card.set_thumbnail(e.data)
+            self._safe_update()
+
+    # ── Метка папки загрузки: состояние выводится из state ────────────────────
+
+    def update_folder_ui(self) -> None:
+        """Привести метку папки в соответствие со state.download_path.
+
+        Источник истины — state; виджет не трогает никто, кроме самого экрана.
+        Вызывается при инициализации, по DownloadPathChangedEvent и при смене языка."""
+        t = self._state.theme
+        if self._state.download_path:
+            self.folder_label.value = self._state.download_path
+            self.folder_label.color = hex_to_flet(t.status_ok_color)
+        else:
+            self.folder_label.value = self._s().folder_not_selected
+            self.folder_label.color = hex_to_flet(t.text_color)
 
     # ── Cookies-переключатель: состояние выводится из state ────────────────────
 
@@ -384,14 +416,11 @@ class MainScreen(ThemeTarget):
     # ── Синхронизация ─────────────────────────────────────────────────────────
 
     def sync_from_state(self) -> None:
-        s = self._state
-        p = s.ytdlp.parameters
+        p = self._state.ytdlp.parameters
         self.audio_only_switch.value      = p.audio_only.state
         self.cookies_enabled_switch.value = p.cookies.state
         self.downloader_dropdown.value    = self._selected_tool()
-        if s.download_path:
-            self.folder_label.value = s.download_path
-            self.folder_label.color = hex_to_flet(s.theme.status_ok_color)
+        self.update_folder_ui()
 
     def sync_to_state(self) -> None:
         p = self._state.ytdlp.parameters
@@ -444,10 +473,7 @@ class MainScreen(ThemeTarget):
         self.update_cookies_ui();                                self.cookies_enabled_switch.update()
         self._btn_text.value      = s.btn_download;    self._btn_text.update()
         self.download_btn.tooltip = s.btn_download_tooltip
-        if self.folder_label.value == self.folder_label.value:  # всегда обновляем если нет пути
-            if not self._state.download_path:
-                self.folder_label.value = s.folder_not_selected
-                self.folder_label.update()
+        self.update_folder_ui();                       self.folder_label.update()
 
     # ── Валидация URL ─────────────────────────────────────────────────────────
 
@@ -530,14 +556,14 @@ class MainScreen(ThemeTarget):
             return None
         pausable = PROVIDERS[tool].SUPPORTS_PAUSE
         self._add_card(task_id, title, pausable=pausable)
-        # У aria2c нет yt-dlp-метаданных — имя в историю как meta.title.
-        if tool != "yt-dlp" and self._db is not None:
+        # Провайдер без метаданных (aria2c) — имя в историю как meta.title.
+        if not self._thumbs.supports(tool) and self._db is not None:
             self._db.save_meta(task_id, {"title": title})
         self._update_download_btn()
         self._safe_update()
-        # Превью умеет получать только yt-dlp (по странице медиа).
-        if tool == "yt-dlp":
-            self._page.run_task(self._fetch_and_show_thumbnail, task_id, snapshot.url)
+        # Превью качает сервис; готовая картинка придёт ThumbnailReadyEvent.
+        if self._thumbs.supports(tool):
+            self._page.run_task(self._thumbs.fetch, task_id, snapshot.url)
         return task_id
 
     def _on_resume_download(self, e: ResumeDownloadEvent) -> None:
@@ -558,7 +584,7 @@ class MainScreen(ThemeTarget):
         # Старую incomplete-запись заменит новая (новый task_id) — не плодим дубли.
         if self._db is not None:
             self._db.delete(e.task_id)
-        tool = e.source if e.source in PROVIDERS else "yt-dlp"
+        tool = e.source if e.source in PROVIDERS else DEFAULT_PROVIDER
         self._launch(snapshot, tool, e.title or download_display_name(e.url))
 
     def _download_name(self, url: str) -> str:
@@ -621,31 +647,6 @@ class MainScreen(ThemeTarget):
             self.download_btn.tooltip  = s.btn_download_tooltip
 
     # ── Утилиты ───────────────────────────────────────────────────────────────
-
-    async def _fetch_and_show_thumbnail(self, task_id: str, url: str) -> None:
-        try:
-            from managers.providers import YtDlpProvider
-            provider = YtDlpProvider(self._paths)
-            exe = provider.resolve_exe()
-            if not exe:
-                return
-            proxy_url = self._state.proxy_address.strip() if self._state.proxy_enabled else None
-            to = self._state.timeouts
-            thumb_data, meta = await provider.fetch_thumbnail(
-                exe, url, proxy_url=proxy_url,
-                connect_timeout=to.thumbnail_connect, read_timeout=to.thumbnail_read)
-            if self._db is not None:
-                if thumb_data:
-                    self._db.save_thumbnail(task_id, thumb_data)
-                if meta:
-                    self._db.save_meta(task_id, meta)
-            if thumb_data:
-                card = self._cards.get(task_id)
-                if card:
-                    card.set_thumbnail(thumb_data)
-                    self._safe_update()
-        except Exception:
-            self._log.warning("Failed to fetch thumbnail for %s", url, exc_info=True)
 
     def _show_status(self, message: str, severity: str) -> None:
         self._bus.emit(StatusMessageEvent(message=message, severity=severity))

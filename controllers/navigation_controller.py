@@ -21,7 +21,9 @@ import flet as ft
 
 from app_logging import get_logger
 from config import hex_to_flet, severity_color
-from events import SettingsChangedEvent, StatusMessageEvent, ThemeChangedEvent
+from events import (
+    DownloadPathChangedEvent, SettingsChangedEvent, StatusMessageEvent, ThemeChangedEvent,
+)
 from i18n import Locale
 
 if TYPE_CHECKING:
@@ -53,8 +55,6 @@ class NavigationController:
         self._theme_ctrl      = theme_ctrl
         self._window_ctrl     = window_ctrl
         self._log             = get_logger("app")
-
-        self._pending_restored: list = []
 
         self._folder_picker = ft.FilePicker()
 
@@ -151,11 +151,6 @@ class NavigationController:
             self.proxy_btn.icon_color = self._appbar_fg()
             self.proxy_btn.tooltip    = s.proxy_off
 
-    def on_tools_restored_pending(self, e) -> None:
-        """Сохранить последнее ToolsRestoredEvent — показать при входе в настройки."""
-        self._pending_restored.clear()
-        self._pending_restored.append(e)
-
     def on_language_changed(self) -> None:
         """Перестроить все тексты тулбара и AppBar после смены языка."""
         s = Locale.load(self._svc.state.language)
@@ -220,8 +215,7 @@ class NavigationController:
         self._main.layout.visible     = False
         self._history.layout.visible  = False
         self._settings.layout.visible = True
-        if self._pending_restored:
-            self._settings.on_tools_restored(self._pending_restored[-1])
+        self._settings.reapply_restored()
         s = Locale.load(self._svc.state.language)
         self._page.appbar = self._make_appbar(s.appbar_settings, root=False)
         self._page.bottom_appbar.content = self.settings_status_container
@@ -336,9 +330,9 @@ class NavigationController:
             dialog_title=self._folder_picker_title
         )
         if path:
-            self._svc.state.download_path        = str(path)
-            self._main.folder_label.value        = str(path)
-            self._main.folder_label.color        = hex_to_flet(self._svc.state.theme.status_ok_color)
+            # Контроллер пишет только в state и шину; метку перевыводит сам
+            # MainScreen по DownloadPathChangedEvent.
+            self._svc.state.download_path = str(path)
             try:
                 os.makedirs(self._svc.state.download_path, exist_ok=True)
             except Exception:
@@ -346,6 +340,7 @@ class NavigationController:
                     "Failed to create selected download directory: %s",
                     self._svc.state.download_path,
                 )
+            self._svc.bus.emit(DownloadPathChangedEvent())
             self._svc.bus.emit(SettingsChangedEvent())
             self._svc.safe_update()
 

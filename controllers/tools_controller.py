@@ -18,11 +18,11 @@ ToolInstallStatusEvent и т.д.), на которые подписан UI. По
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import Any, Callable, Literal
 
 from config import VersionState
 from events import (
-    ToolsCheckedEvent,
+    ToolsCheckedEvent, ToolsActionRequestedEvent,
     ToolVersionLocalEvent, ToolVersionRemoteEvent,
     ToolButtonStateEvent,
     ToolProgressEvent, ToolProgressMessageEvent,
@@ -34,12 +34,20 @@ from services import Services
 
 class ToolsController:
 
-    def __init__(self, svc: Services) -> None:
-        self._tools = svc.tools
-        self._state = svc.state
-        self._bus   = svc.bus
-        self._specs = DEFAULT_TOOLS
+    def __init__(self, svc: Services, task_runner: Callable[..., Any]) -> None:
+        """task_runner — планировщик coroutine (в app.py: page.run_task);
+        нужен, чтобы запускать async-проверку из синхронного обработчика шины."""
+        self._tools       = svc.tools
+        self._state       = svc.state
+        self._bus         = svc.bus
+        self._task_runner = task_runner
+        self._specs       = DEFAULT_TOOLS
         self._btn_mode: Literal["check", "update"] = "check"
+
+        # Кнопка Check/Update в настройках публикует намерение — экран не
+        # держит ссылку на контроллер (раньше была сеттер-инъекция).
+        self._bus.on(ToolsActionRequestedEvent,
+                     lambda _e: self._task_runner(self.handle_button_click))
 
     @property
     def btn_mode(self) -> Literal["check", "update"]:
