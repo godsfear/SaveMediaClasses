@@ -229,6 +229,21 @@ class YtDlpProvider(_SubprocessProvider):
                     args.extend(shlex.split(raw))
                 except ValueError:
                     args.extend(raw.split())
+            # Пресет качества — ПОСЛЕ extra_args: последний -f переопределяет
+            # формат, остальные флаги extra_args продолжают действовать.
+            quality = safe_str(s.quality_args).strip()
+            if quality:
+                try:
+                    args.extend(shlex.split(quality))
+                except ValueError:
+                    args.extend(quality.split())
+            # Субтитры — только для видео (в аудиофайл их не вшить).
+            subs = safe_str(s.subtitles_args).strip()
+            if subs:
+                try:
+                    args.extend(shlex.split(subs))
+                except ValueError:
+                    args.extend(subs.split())
 
         is_pl  = "list=" in s.url.lower() or "playlist" in s.url.lower()
         t_name = s.clean_title_template if s.clean_titles else s.title_id_template

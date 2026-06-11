@@ -17,7 +17,13 @@ THUMBNAIL_SOCK_TIMEOUT = 10      # секунд — connect-таймаут httpx
 
 DEFAULT_DOWNLOAD_PATH = os.path.join(os.path.expanduser("~"), "Downloads")
 DEFAULT_PROXY_ADDRESS = "socks5://127.0.0.1:1080"
-DEFAULT_YT_DLP_ARGS   = "-f bestvideo+bestaudio/best --merge-output-format mp4"
+# Дополнительные аргументы yt-dlp. Формата (-f) здесь больше НЕТ — выбором
+# формата владеют пресеты качества (DEFAULT_QUALITY_PRESETS): при "best" yt-dlp
+# использует свой встроенный дефолт bestvideo*+bestaudio/best (тот же результат),
+# при явном пресете его -f добавляется после этих аргументов.
+DEFAULT_YT_DLP_ARGS   = "--merge-output-format mp4"
+# Старый дефолт (формат + контейнер) — для мягкой миграции сохранённых конфигов.
+_LEGACY_YT_DLP_ARGS   = "-f bestvideo+bestaudio/best --merge-output-format mp4"
 
 DEFAULT_YT_API_URL          = "https://api.github.com/repos/yt-dlp/yt-dlp/releases/latest"
 DEFAULT_YT_DOWNLOAD_URL     = (
@@ -297,6 +303,106 @@ class BinaryDef:
 
 # ── Параметры yt-dlp (переключатель UI + CLI-аргументы) ──────────────────────
 
+# Пресеты качества видео: ключ (пункт дропдауна) → CLI-аргументы yt-dlp.
+# У "best" аргументы пустые: формат задаёт extra_args (-f bestvideo+bestaudio/best).
+# У остальных свой -f добавляется ПОСЛЕ extra_args — последний -f выигрывает,
+# а прочие флаги extra_args (--merge-output-format и т.п.) сохраняются.
+DEFAULT_QUALITY_PRESETS: Dict[str, str] = {
+    "best":  "",
+    "2160p": "-f bestvideo[height<=2160]+bestaudio/best[height<=2160]",
+    "1440p": "-f bestvideo[height<=1440]+bestaudio/best[height<=1440]",
+    "1080p": "-f bestvideo[height<=1080]+bestaudio/best[height<=1080]",
+    "720p":  "-f bestvideo[height<=720]+bestaudio/best[height<=720]",
+    "480p":  "-f bestvideo[height<=480]+bestaudio/best[height<=480]",
+}
+
+
+@dataclass
+class ParamQuality:
+    """Качество видео: выбранный пресет + карта пресет → CLI-аргументы.
+
+    Карта редактируется в config.json (tools.yt-dlp.parameters.quality.presets):
+    можно поправить аргументы пресета или добавить свой — он появится в дропдауне.
+    Порядок пунктов = порядок ключей карты."""
+    value:   str = "best"
+    presets: Dict[str, str] = field(default_factory=lambda: dict(DEFAULT_QUALITY_PRESETS))
+
+    def selected_args(self) -> str:
+        """CLI-аргументы выбранного пресета ('' для best или неизвестного ключа)."""
+        return self.presets.get(self.value, "")
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {"value": self.value, "presets": dict(self.presets)}
+
+    @staticmethod
+    def from_dict(d: Dict[str, Any], def_: "ParamQuality | None" = None) -> "ParamQuality":
+        r = def_ or ParamQuality()
+        d = d if isinstance(d, dict) else {}
+        # Пресеты: дефолты + пользовательские правки/дополнения поверх.
+        presets = dict(r.presets)
+        raw = d.get("presets")
+        if isinstance(raw, dict):
+            for k, v in raw.items():
+                if isinstance(k, str) and isinstance(v, str):
+                    presets[k] = v
+        value = safe_str(d.get("value")) or r.value
+        if value not in presets:
+            value = "best" if "best" in presets else next(iter(presets), "best")
+        return ParamQuality(value=value, presets=presets)
+
+
+# Режимы субтитров: ключ → шаблон CLI-аргументов yt-dlp.
+# Плейсхолдер {lang} заменяется кодом языка: для пункта-языка (ru/en/...) — его
+# кодом, для "auto" — языком интерфейса. Ключ "lang" — общий шаблон для ЛЮБОГО
+# кода языка из локализации (отдельных записей на каждый язык не нужно).
+# yt-dlp сам пересекает запрошенные языки с доступными: отсутствующие
+# пропускаются без ошибки, загрузка не срывается.
+DEFAULT_SUBTITLE_PRESETS: Dict[str, str] = {
+    "off":  "",
+    "lang": "--embed-subs --sub-langs {lang}.*",
+    "auto": "--embed-subs --write-auto-subs --sub-langs {lang}.*",
+    "all":  "--embed-subs --sub-langs all",
+}
+
+
+@dataclass
+class ParamSubtitles:
+    """Субтитры: выбранный режим + карта режим → шаблон CLI-аргументов.
+
+    value: "off" | код языка локализации ("ru", "en", ...) | "auto" | "all".
+    Карта редактируется в config.json (tools.yt-dlp.parameters.subtitles.presets)."""
+    value:   str = "off"
+    presets: Dict[str, str] = field(default_factory=lambda: dict(DEFAULT_SUBTITLE_PRESETS))
+
+    def selected_args(self, ui_language: str = "en") -> str:
+        """CLI-аргументы выбранного режима ('' для off/неизвестного шаблона).
+
+        Код языка для {lang}: пункт-язык подставляет себя, остальные режимы —
+        язык интерфейса (актуально для "auto")."""
+        explicit = self.value in self.presets
+        template = self.presets[self.value] if explicit else self.presets.get("lang", "")
+        lang = (ui_language if explicit else self.value) or "en"
+        lang = lang.split("_")[0].split("-")[0]
+        return template.replace("{lang}", lang)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {"value": self.value, "presets": dict(self.presets)}
+
+    @staticmethod
+    def from_dict(d: Dict[str, Any], def_: "ParamSubtitles | None" = None) -> "ParamSubtitles":
+        r = def_ or ParamSubtitles()
+        d = d if isinstance(d, dict) else {}
+        presets = dict(r.presets)
+        raw = d.get("presets")
+        if isinstance(raw, dict):
+            for k, v in raw.items():
+                if isinstance(k, str) and isinstance(v, str):
+                    presets[k] = v
+        presets.setdefault("off", "")          # "выключено" должно существовать всегда
+        value = safe_str(d.get("value")) or r.value
+        return ParamSubtitles(value=value, presets=presets)
+
+
 @dataclass
 class ParamAudioOnly:
     state: bool = False
@@ -389,9 +495,13 @@ class ParamExtraArgs:
     @staticmethod
     def from_dict(d: Dict[str, Any], def_: "ParamExtraArgs | None" = None) -> "ParamExtraArgs":
         r = def_ or ParamExtraArgs()
-        return ParamExtraArgs(
-            value = (safe_str(d["value"]) if "value" in d else r.value),
-        )
+        value = safe_str(d["value"]) if "value" in d else r.value
+        # Мягкая миграция: нетронутый старый дефолт (с -f) → новый без формата.
+        # Пользовательские правки не трогаем — их -f продолжает работать
+        # (пресет качества "best" ничего не добавляет и не перебивает его).
+        if value.strip() == _LEGACY_YT_DLP_ARGS:
+            value = DEFAULT_YT_DLP_ARGS
+        return ParamExtraArgs(value=value)
 
 
 @dataclass
@@ -438,6 +548,8 @@ class ParamSaveToSource:
 class YtDlpParameters:
     """Параметры yt-dlp: каждый группирует состояние переключателя и CLI-аргументы."""
     audio_only:     ParamAudioOnly     = field(default_factory=ParamAudioOnly)
+    quality:        ParamQuality       = field(default_factory=ParamQuality)
+    subtitles:      ParamSubtitles     = field(default_factory=ParamSubtitles)
     cookies:        ParamCookies       = field(default_factory=ParamCookies)
     playlist:       ParamPlaylist      = field(default_factory=ParamPlaylist)
     embed_metadata: ParamEmbedMetadata = field(default_factory=ParamEmbedMetadata)
@@ -448,6 +560,8 @@ class YtDlpParameters:
     def to_dict(self) -> Dict[str, Any]:
         return {
             "audio_only":     self.audio_only.to_dict(),
+            "quality":        self.quality.to_dict(),
+            "subtitles":      self.subtitles.to_dict(),
             "cookies":        self.cookies.to_dict(),
             "playlist":       self.playlist.to_dict(),
             "embed_metadata": self.embed_metadata.to_dict(),
@@ -464,6 +578,8 @@ class YtDlpParameters:
             return cls.from_dict(raw if isinstance(raw, dict) else {}, sub_def)
         return YtDlpParameters(
             audio_only     = _s("audio_only",     ParamAudioOnly,     def_.audio_only),
+            quality        = _s("quality",        ParamQuality,       def_.quality),
+            subtitles      = _s("subtitles",      ParamSubtitles,     def_.subtitles),
             cookies        = _s("cookies",        ParamCookies,       def_.cookies),
             playlist       = _s("playlist",       ParamPlaylist,      def_.playlist),
             embed_metadata = _s("embed_metadata", ParamEmbedMetadata, def_.embed_metadata),

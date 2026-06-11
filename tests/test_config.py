@@ -4,6 +4,8 @@ import pytest
 
 from config import (
     ThemeConfig, NamedTheme, WindowConfig, TimeoutsConfig,
+    ParamQuality, ParamSubtitles, ParamExtraArgs, DEFAULT_QUALITY_PRESETS,
+    DEFAULT_YT_DLP_ARGS, _LEGACY_YT_DLP_ARGS,
     hex_to_flet, is_valid_hex, severity_color, SEVERITY_TOKENS,
     safe_str, safe_int, get_fallback_bool,
     download_display_name, magnet_btih,
@@ -88,6 +90,104 @@ def test_timeouts_rejects_nonpositive_except_card_fade():
 def test_timeouts_garbage_values():
     assert TimeoutsConfig.from_dict({"connect": "zz"}).connect == TimeoutsConfig().connect
     assert TimeoutsConfig.from_dict(None) == TimeoutsConfig()
+
+
+# ── ParamQuality ──────────────────────────────────────────────────────────────
+
+def test_quality_defaults():
+    q = ParamQuality()
+    assert q.value == "best"
+    assert q.selected_args() == ""                  # best: формат решает extra_args
+    assert "-f" in q.presets["1080p"]
+    assert list(q.presets) == list(DEFAULT_QUALITY_PRESETS)
+
+
+def test_quality_selected_args():
+    q = ParamQuality(value="720p")
+    assert "height<=720" in q.selected_args()
+    assert ParamQuality(value="nonexistent").selected_args() == ""
+
+
+def test_quality_from_dict_unknown_value_falls_back_to_best():
+    q = ParamQuality.from_dict({"value": "9000p"})
+    assert q.value == "best"
+
+
+def test_quality_from_dict_merges_user_presets():
+    q = ParamQuality.from_dict({
+        "value": "custom",
+        "presets": {"custom": "-f worst", "1080p": "-f my-override"},
+    })
+    assert q.value == "custom"                      # пользовательский пресет валиден
+    assert q.presets["custom"] == "-f worst"
+    assert q.presets["1080p"] == "-f my-override"   # правка дефолта
+    assert "720p" in q.presets                      # недостающие доехали из дефолтов
+
+
+def test_quality_roundtrip():
+    q = ParamQuality(value="480p")
+    assert ParamQuality.from_dict(q.to_dict()) == q
+
+
+# ── ParamSubtitles ────────────────────────────────────────────────────────────
+
+def test_subtitles_default_off():
+    p = ParamSubtitles()
+    assert p.value == "off"
+    assert p.selected_args("ru") == ""
+
+
+def test_subtitles_language_value_uses_lang_template():
+    p = ParamSubtitles(value="ru")
+    args = p.selected_args(ui_language="en")     # язык пункта важнее языка UI
+    assert "--embed-subs" in args
+    assert "--sub-langs ru.*" in args
+    assert "--write-auto-subs" not in args
+
+
+def test_subtitles_auto_uses_ui_language():
+    p = ParamSubtitles(value="auto")
+    args = p.selected_args(ui_language="ru")
+    assert "--write-auto-subs" in args
+    assert "ru.*" in args
+    # Региональный код сводится к базовому
+    assert "en.*" in ParamSubtitles(value="auto").selected_args("en_US")
+
+
+def test_subtitles_all():
+    assert "--sub-langs all" in ParamSubtitles(value="all").selected_args("ru")
+
+
+def test_subtitles_from_dict_keeps_off_preset():
+    """Даже если пользователь сломал карту, режим "off" обязан существовать."""
+    p = ParamSubtitles.from_dict({"value": "off", "presets": {"all": "-x"}})
+    assert p.selected_args("ru") == ""
+
+
+def test_subtitles_roundtrip():
+    p = ParamSubtitles(value="auto")
+    assert ParamSubtitles.from_dict(p.to_dict()) == p
+
+
+# ── ParamExtraArgs: формат ушёл в пресеты качества ────────────────────────────
+
+def test_extra_args_default_has_no_format():
+    tokens = DEFAULT_YT_DLP_ARGS.split()
+    assert "-f" not in tokens                       # формат задают пресеты качества
+    assert "--merge-output-format" in tokens
+
+
+def test_extra_args_legacy_default_migrates():
+    """Нетронутый старый дефолт (с -f bestvideo+bestaudio/best) → новый без формата."""
+    migrated = ParamExtraArgs.from_dict({"value": _LEGACY_YT_DLP_ARGS})
+    assert migrated.value == DEFAULT_YT_DLP_ARGS
+
+
+def test_extra_args_user_value_untouched():
+    custom = "-f bestaudio --limit-rate 1M"
+    assert ParamExtraArgs.from_dict({"value": custom}).value == custom
+    # Пустое значение пользователя — тоже его выбор, не подменяем дефолтом
+    assert ParamExtraArgs.from_dict({"value": ""}).value == ""
 
 
 # ── Утилиты ───────────────────────────────────────────────────────────────────

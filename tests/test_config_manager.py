@@ -41,6 +41,8 @@ def test_save_load_roundtrip(mgr):
                                                  latest="2025.06.01", status="outdated")
     state.timeouts.thumbnail_meta = 44.0
     state.ytdlp.parameters.audio_only.state = True
+    state.ytdlp.parameters.quality.value = "720p"
+    state.ytdlp.parameters.subtitles.value = "auto"
 
     mgr.save(state)
     restored = mgr.load()
@@ -54,6 +56,8 @@ def test_save_load_roundtrip(mgr):
     assert restored.tool_versions["yt-dlp"].status == "outdated"
     assert restored.timeouts.thumbnail_meta == 44.0
     assert restored.ytdlp.parameters.audio_only.state is True
+    assert restored.ytdlp.parameters.quality.value == "720p"
+    assert restored.ytdlp.parameters.subtitles.value == "auto"
 
 
 def test_corrupt_file_falls_back_to_defaults(mgr):
