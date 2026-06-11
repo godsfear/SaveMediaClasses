@@ -81,6 +81,7 @@ class Services:
             bus=bus,
             task_runner=task_runner,
             db=db,
+            max_parallel=lambda: state.max_parallel,
         )
         thumbs     = ThumbnailService(paths=paths, bus=bus, db=db, state=state)
 

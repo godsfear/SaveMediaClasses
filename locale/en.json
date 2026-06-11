@@ -48,6 +48,7 @@
     "btn_close": "Close",
     "proxy_label": "Proxy server address",
     "yt_args_label": "Additional yt-dlp arguments",
+    "max_parallel_label": "Parallel downloads",
     "switch_clean": "Clean filenames (without ID)",
     "switch_playlist": "Download full playlists",
     "switch_metadata": "Embed metadata & cover art",

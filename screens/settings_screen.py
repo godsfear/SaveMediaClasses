@@ -107,6 +107,7 @@ class SettingsScreen(ThemeTarget):
         s = self._state
         p = s.ytdlp.parameters
         self.proxy_input.value                 = s.proxy_address
+        self.max_parallel_dropdown.value       = str(s.max_parallel)
         self.yt_args_input.value               = p.extra_args.value
         self.clean_titles_switch.value         = p.clean_titles.state
         self.playlist_switch.value             = p.playlist.state
@@ -125,6 +126,9 @@ class SettingsScreen(ThemeTarget):
         s = self._state
         p = s.ytdlp.parameters
         s.proxy_address              = safe_str(self.proxy_input.value)
+        parallel = self.max_parallel_dropdown.value
+        if parallel and str(parallel).isdigit():
+            s.max_parallel = max(1, int(parallel))
         p.extra_args.value           = safe_str(self.yt_args_input.value)
         p.clean_titles.state         = bool(self.clean_titles_switch.value)
         p.playlist.state             = bool(self.playlist_switch.value)
@@ -166,6 +170,17 @@ class SettingsScreen(ThemeTarget):
         self.playlist_switch       = self.register_switches(ft.Switch(label=s.switch_playlist, active_color=ft.Colors.GREEN))
         self.embed_metadata_switch = self.register_switches(ft.Switch(label=s.switch_metadata, active_color=ft.Colors.GREEN))
         self.save_to_source_switch = self.register_switches(ft.Switch(label=s.switch_source,   active_color=ft.Colors.GREEN))
+
+        # Лимит одновременных загрузок: применяется на лету (менеджер читает
+        # state динамически, ожидающие задачи перепроверяют слоты по событию).
+        self.max_parallel_dropdown = self.register_accents(ft.Dropdown(
+            label=s.max_parallel_label,
+            border_radius=8, width=220,
+            focused_border_color=ft.Colors.BLUE,
+            options=self._max_parallel_options(),
+            value=str(self._state.max_parallel),
+            on_select=self._on_max_parallel_change,
+        ))
 
         self.cookies_browser_dropdown = self.register_accents(ft.Dropdown(
             label=s.cookies_label,
@@ -257,6 +272,16 @@ class SettingsScreen(ThemeTarget):
         self.header_appearance    = self.register_headers(ft.Text(s.section_appearance, size=14, weight=ft.FontWeight.BOLD,  color=ft.Colors.CYAN_400))
 
     # ── Куки UI ───────────────────────────────────────────────────────────────
+
+    def _max_parallel_options(self) -> list:
+        """1..10 + текущее значение из конфига (если задано больше вручную)."""
+        values = sorted({*range(1, 11), self._state.max_parallel})
+        return [ft.dropdown.Option(str(v)) for v in values]
+
+    def _on_max_parallel_change(self, _) -> None:
+        self.sync_to_state()
+        self._bus.emit(SettingsChangedEvent())
+        self._safe_update()
 
     def _on_browser_dropdown_change(self, _):
         self.sync_to_state()
@@ -506,6 +531,8 @@ class SettingsScreen(ThemeTarget):
         # Поля ввода
         self.proxy_input.label    = s.proxy_label;    self.proxy_input.update()
         self.yt_args_input.label  = s.yt_args_label;  self.yt_args_input.update()
+        self.max_parallel_dropdown.label = s.max_parallel_label
+        self.max_parallel_dropdown.update()
 
         # Переключатели
         self.clean_titles_switch.label   = s.switch_clean;    self.clean_titles_switch.update()
@@ -757,6 +784,7 @@ class SettingsScreen(ThemeTarget):
         self._card_downloaders = self.register_cards(ft.Container(
             content=ft.Column([
                 self.header_downloaders,
+                self.max_parallel_dropdown,
                 self.header_cookies,
                 self.cookies_browser_dropdown,
                 ytdlp_section,

@@ -78,6 +78,7 @@ class Strings:
     # Поля настроек
     proxy_label:        str = ""
     yt_args_label:      str = ""
+    max_parallel_label: str = ""
     switch_clean:       str = ""
     switch_playlist:    str = ""
     switch_metadata:    str = ""

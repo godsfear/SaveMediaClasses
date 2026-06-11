@@ -5,6 +5,8 @@ from typing import Any, Dict
 # ── Константы приложения ──────────────────────────────────────────────────────
 
 CHECK_INTERVAL_SECONDS = 6 * 3600
+DEFAULT_MAX_PARALLEL   = 5       # одновременных загрузок по умолчанию (settings.max_parallel)
+MAX_PARALLEL_CEILING   = 50      # верхняя граница клампа (защита от опечатки в config.json)
 CARD_LINGER_SECONDS    = 3       # сколько карточка висит после финала/паузы перед удалением
 SEED_LOG_INTERVAL_SECONDS = 600  # как часто логировать строку раздачи aria2 (SEED спамит ~1/с)
 

@@ -33,6 +33,7 @@ def test_save_load_roundtrip(mgr):
     state.download_path = "C:/custom"
     state.proxy_enabled = True
     state.download_tool = "aria2c"
+    state.max_parallel  = 8
     state.theme_mode = "light"
     state.theme_light.accent_color = "123456"
     state.saved_themes["mine"] = NamedTheme(mode="light",
@@ -50,6 +51,7 @@ def test_save_load_roundtrip(mgr):
     assert restored.download_path == "C:/custom"
     assert restored.proxy_enabled is True
     assert restored.download_tool == "aria2c"
+    assert restored.max_parallel == 8
     assert restored.theme_mode == "light"
     assert restored.theme_light.accent_color == "123456"
     assert restored.saved_themes["mine"].config.bg_color == "ABCDEF"
@@ -58,6 +60,15 @@ def test_save_load_roundtrip(mgr):
     assert restored.ytdlp.parameters.audio_only.state is True
     assert restored.ytdlp.parameters.quality.value == "720p"
     assert restored.ytdlp.parameters.subtitles.value == "auto"
+
+
+def test_max_parallel_clamped_on_load(mgr):
+    _write(mgr, {"settings": {"max_parallel": 9999}})
+    assert mgr.load().max_parallel == 50          # MAX_PARALLEL_CEILING
+    _write(mgr, {"settings": {"max_parallel": 0}})
+    assert mgr.load().max_parallel == 1
+    _write(mgr, {"settings": {"max_parallel": "junk"}})
+    assert mgr.load().max_parallel == 5           # дефолт
 
 
 def test_corrupt_file_falls_back_to_defaults(mgr):

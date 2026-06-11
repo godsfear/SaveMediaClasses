@@ -6,6 +6,7 @@ DownloadManager — владеет очередью загрузок.
 """
 
 import asyncio
+import contextlib
 import os
 import time
 import uuid
@@ -13,10 +14,11 @@ from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, Optional, TYPE_CHECKING
 
 from app_logging import get_logger
-from config import SEED_LOG_INTERVAL_SECONDS
+from config import SEED_LOG_INTERVAL_SECONDS, DEFAULT_MAX_PARALLEL, MAX_PARALLEL_CEILING
 from managers.snapshot import DownloadSnapshot
 from events import (
     EventBus,
+    SettingsChangedEvent,
     DownloadStartedEvent,
     DownloadProgressEvent,
     DownloadPostprocessingEvent,
@@ -29,8 +31,6 @@ from events import (
 
 if TYPE_CHECKING:
     from managers.providers import DownloadProvider
-
-MAX_PARALLEL = 5
 
 # (async_fn, *args) — в Flet: page.run_task
 TaskRunner = Callable[..., Any]
@@ -62,13 +62,17 @@ class DownloadManager:
                  log_path: str,
                  bus: EventBus,
                  task_runner: TaskRunner,
-                 db=None) -> None:
+                 db=None,
+                 max_parallel: Optional[Callable[[], int]] = None) -> None:
         """
         provider_factories — реестр {ключ: callable без аргументов → новый DownloadProvider}.
             Пример: {"yt-dlp": lambda: YtDlpProvider(paths), "aria2c": lambda: Aria2cProvider(paths)}
         default_provider — ключ провайдера по умолчанию (когда add() вызван без выбора).
         task_runner — планировщик async-задач (в app.py: page.run_task).
         db — DownloadRepository для сохранения thumbnail после загрузки (опционально).
+        max_parallel — поставщик текущего лимита одновременных загрузок
+            (в Services: lambda: state.max_parallel). Читается динамически:
+            смена настройки применяется без пересоздания менеджера.
         """
         self._provider_factories = provider_factories
         self._default_provider   = default_provider
@@ -77,7 +81,15 @@ class DownloadManager:
         self._db                 = db
         self._log                = get_logger("app")
 
-        self._semaphore = asyncio.Semaphore(MAX_PARALLEL)
+        # Слоты параллельности. Семафор не подходит: его ёмкость фиксируется
+        # при создании, а лимит меняется в настройках на лету. Вместо него —
+        # счётчик + Event: ожидающие перепроверяют условие при каждом сигнале.
+        self._max_parallel_fn = max_parallel or (lambda: DEFAULT_MAX_PARALLEL)
+        self._running   = 0                  # задач внутри _run (между acquire/release)
+        self._slot_free = asyncio.Event()
+        # Лимит могли увеличить — разбудить ожидающих перепроверить условие.
+        self._bus.on(SettingsChangedEvent, lambda _e: self._slot_free.set())
+
         self._active: Dict[str, DownloadTask] = {}
 
     def _make_provider(self, provider_key: Optional[str]) -> "DownloadProvider":
@@ -85,6 +97,37 @@ class DownloadManager:
         factory = self._provider_factories.get(provider_key or self._default_provider) \
             or self._provider_factories[self._default_provider]
         return factory()
+
+    # ── Слоты параллельности ──────────────────────────────────────────────────
+
+    @property
+    def max_parallel(self) -> int:
+        """Текущий лимит одновременных загрузок (кламп на случай мусора в конфиге)."""
+        try:
+            n = int(self._max_parallel_fn())
+        except (TypeError, ValueError):
+            n = DEFAULT_MAX_PARALLEL
+        return max(1, min(MAX_PARALLEL_CEILING, n))
+
+    async def _acquire_slot(self) -> None:
+        """Дождаться свободного слота. Лимит перечитывается на каждой проверке."""
+        while self._running >= self.max_parallel:
+            self._slot_free.clear()
+            await self._slot_free.wait()
+        self._running += 1
+
+    def _release_slot(self) -> None:
+        self._running -= 1
+        self._slot_free.set()
+
+    @contextlib.asynccontextmanager
+    async def _slot(self):
+        """Слот как контекст-менеджер (бывший asyncio.Semaphore в _run)."""
+        await self._acquire_slot()
+        try:
+            yield
+        finally:
+            self._release_slot()
 
     # ── Публичный API ─────────────────────────────────────────────────────────
 
@@ -95,7 +138,7 @@ class DownloadManager:
 
     @property
     def at_capacity(self) -> bool:
-        return self.active_count >= MAX_PARALLEL
+        return self.active_count >= self.max_parallel
 
     def is_active_url(self, url: str) -> bool:
         """Уже идёт загрузка с этим URL? Нельзя качать тот же URL дважды
@@ -182,7 +225,7 @@ class DownloadManager:
     # ── Внутренняя логика ─────────────────────────────────────────────────────
 
     async def _run(self, task: DownloadTask) -> None:
-        async with self._semaphore:
+        async with self._slot():
             if task.cancelled:
                 self._finish(task)
                 self._bus.emit(DownloadCancelledEvent(task_id=task.task_id))
