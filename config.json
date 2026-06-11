@@ -4,7 +4,7 @@
         "proxy_address": "socks5://127.0.0.1:9050",
         "proxy_enabled": false,
         "download_tool": "auto",
-        "last_check_time": 1781159597.5628006,
+        "last_check_time": 1781160079.5334895,
         "last_needs_update": false
     },
     "tools": {
@@ -124,8 +124,8 @@
     "window": {
         "width": 778,
         "height": 991,
-        "left": 3304,
-        "top": 310
+        "left": 3425,
+        "top": 272
     },
     "timeouts": {
         "connect": 5.0,

@@ -24,20 +24,14 @@ from events import (
     AppClosingEvent,
 )
 from i18n import Locale, Strings
-from managers.download_manager import DownloadManager, DownloadSnapshot, MAX_PARALLEL
+from managers.download_manager import DownloadManager, MAX_PARALLEL
+from managers.snapshot import DownloadSnapshot
 from services import Services
-from managers.providers import YtDlpProvider, Aria2cProvider, torrent_name
+from managers.providers import PROVIDERS, resolve_provider_for_url, torrent_name
 from state import AppState
 
-# Доступные загрузчики: ключ провайдера → класс (для is_valid_url и выпадающего списка).
-# Ключи совпадают с ключами реестра провайдеров в Services.create / DownloadManager.
-_PROVIDER_CLASSES = {
-    "yt-dlp": YtDlpProvider,
-    "aria2c": Aria2cProvider,
-}
-
-# Варианты в дропдауне: "auto" (выбор по ссылке) + конкретные провайдеры.
-_TOOL_OPTIONS = ("auto", *_PROVIDER_CLASSES)
+# Варианты в дропдауне: "auto" (выбор по ссылке) + ключи единого реестра провайдеров.
+_TOOL_OPTIONS = ("auto", *PROVIDERS)
 
 
 def _fmt_ts(ts) -> str:
@@ -413,12 +407,10 @@ class MainScreen(ThemeTarget):
         return tool if tool in _TOOL_OPTIONS else "auto"
 
     def _resolve_tool(self, url: str) -> str:
-        """Конкретный провайдер для ссылки. В "auto": файл/торрент → aria2c,
-        страница → yt-dlp; иначе — явно выбранный провайдер."""
+        """Конкретный провайдер для ссылки. В "auto" выбор делает реестр
+        (resolve_provider_for_url); иначе — явно выбранный провайдер."""
         sel = self._selected_tool()
-        if sel == "auto":
-            return "aria2c" if Aria2cProvider.claims_url(url) else "yt-dlp"
-        return sel
+        return resolve_provider_for_url(url) if sel == "auto" else sel
 
     def _on_downloader_change(self, _) -> None:
         self.sync_to_state()
@@ -464,7 +456,7 @@ class MainScreen(ThemeTarget):
         val = safe_str(self.url_input.value).strip()
         if not val:
             self.url_input.border_color = None
-        elif _PROVIDER_CLASSES[self._resolve_tool(val)].is_valid_url(val):
+        elif PROVIDERS[self._resolve_tool(val)].is_valid_url(val):
             self.url_input.border_color = hex_to_flet(t.status_ok_color)
         else:
             self.url_input.border_color = hex_to_flet(t.status_error_color)
@@ -480,7 +472,7 @@ class MainScreen(ThemeTarget):
             self._show_status(s.err_url_empty, "error")
             return
         tool = self._resolve_tool(url)   # в auto — выбор провайдера по ссылке
-        if not _PROVIDER_CLASSES[tool].is_valid_url(url):
+        if not PROVIDERS[tool].is_valid_url(url):
             self._show_status(s.err_url_invalid, "error")
             self.url_input.border_color = hex_to_flet(self._state.theme.status_error_color)
             self._safe_update()
@@ -536,7 +528,7 @@ class MainScreen(ThemeTarget):
         if task_id is None:
             self._show_status(s.status_ytdlp_missing, "warning")
             return None
-        pausable = getattr(_PROVIDER_CLASSES.get(tool), "SUPPORTS_PAUSE", False)
+        pausable = PROVIDERS[tool].SUPPORTS_PAUSE
         self._add_card(task_id, title, pausable=pausable)
         # У aria2c нет yt-dlp-метаданных — имя в историю как meta.title.
         if tool != "yt-dlp" and self._db is not None:
@@ -566,7 +558,7 @@ class MainScreen(ThemeTarget):
         # Старую incomplete-запись заменит новая (новый task_id) — не плодим дубли.
         if self._db is not None:
             self._db.delete(e.task_id)
-        tool = e.source if e.source in _PROVIDER_CLASSES else "yt-dlp"
+        tool = e.source if e.source in PROVIDERS else "yt-dlp"
         self._launch(snapshot, tool, e.title or download_display_name(e.url))
 
     def _download_name(self, url: str) -> str:
