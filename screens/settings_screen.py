@@ -11,7 +11,6 @@ from managers.tools_manager import (
     TOOL_VERSION_REMOTE_ERR, TOOL_VERSION_UNKNOWN, TOOL_VERSION_NEEDS_RUNTIME,
 )
 from managers.tool_registry import DEFAULT_TOOLS
-from managers.providers import Aria2cProvider
 from controllers.i18n_target import I18nTarget
 from controllers.theme_target import ThemeTarget
 from screens.color_row import ColorRow
@@ -60,7 +59,7 @@ class SettingsScreen(ThemeTarget, I18nTarget):
         self._safe_update = svc.safe_update
         self._state       = svc.state
         self._bus         = svc.bus
-        self._dm          = svc.dm
+        self._downloads   = svc.downloads
         self._db          = svc.db
 
         self._s: Strings = Locale.load(self._state.language)
@@ -371,9 +370,8 @@ class SettingsScreen(ThemeTarget, I18nTarget):
 
         def do_clean(_e) -> None:
             self._page.pop_dialog()
-            removed, freed = Aria2cProvider.clean_temp_dirs(
-                self._state.download_path, exclude=self._dm.active_temp_dirs(),
-                part_dirname=self._state.aria2c.parameters.part_dirname)
+            # Активные загрузки оркестратор исключает сам (через dm).
+            removed, freed = self._downloads.clean_temp()
             msg = (s.fmt("clean_temp_result", n=removed, size=_fmt_size(freed))
                    if removed else s.clean_temp_empty)
             self._page.show_dialog(ft.AlertDialog(

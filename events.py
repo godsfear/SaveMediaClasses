@@ -49,6 +49,17 @@ class DownloadCompletedEvent:
     file_path:    str = ""           # путь к скачанному файлу (только при success=True)
 
 @dataclass(frozen=True)
+class DownloadAcceptedEvent:
+    """Загрузка принята в работу (провайдер найден, задача поставлена в менеджер).
+    Источник — DownloadOrchestrator; MainScreen по нему рисует карточку.
+    Отличие от DownloadStartedEvent: тот несёт снимок для записи в БД и
+    эмитится менеджером уже внутри задачи, этот — факт принятия для UI."""
+    task_id:  str
+    title:    str
+    source:   str
+    pausable: bool = False
+
+@dataclass(frozen=True)
 class DownloadStartedEvent:
     """Эмитируется в момент старта загрузки — содержит полный снимок параметров.
     DownloadRepository использует его для записи в БД."""

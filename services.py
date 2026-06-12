@@ -25,6 +25,7 @@ from events import EventBus
 from i18n import Locale
 from managers.config_manager import ConfigManager
 from managers.download_manager import DownloadManager
+from managers.download_orchestrator import DownloadOrchestrator
 from managers.download_repository import DownloadRepository
 from managers.thumbnails import ThumbnailService
 from managers.tools_manager import ToolsManager
@@ -44,6 +45,9 @@ class Services:
     tools:      ToolsManager
     dm:         DownloadManager
     thumbs:     ThumbnailService
+    # Оркестратор загрузок: проверки перед запуском, постановка в dm,
+    # сопутствующие записи в БД/превью. Экраны зовут его, а не dm/db напрямую.
+    downloads:  DownloadOrchestrator
 
     # ── Персистентность ──────────────────────────────────────────────────────
     db: DownloadRepository
@@ -84,6 +88,8 @@ class Services:
             max_parallel=lambda: state.max_parallel,
         )
         thumbs     = ThumbnailService(paths=paths, bus=bus, db=db, state=state)
+        downloads  = DownloadOrchestrator(bus=bus, state=state, dm=dm, db=db,
+                                          thumbs=thumbs, task_runner=task_runner)
 
         return Services(
             paths=paths,
@@ -93,6 +99,7 @@ class Services:
             tools=tools,
             dm=dm,
             thumbs=thumbs,
+            downloads=downloads,
             db=db,
             state=state,
         )
