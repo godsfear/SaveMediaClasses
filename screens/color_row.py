@@ -2,13 +2,13 @@
 screens/color_row.py — одна строка редактора цвета темы.
 
 Инкапсулирует метку, hex-поле, превью и выпадающую палитру для ОДНОГО поля
-ThemeConfig. Держит явные ссылки на свои виджеты и собственные field_key/
-label_key, поэтому обновление из состояния (refresh) и перевод (relabel) НЕ
-требуют обхода дерева виджетов и обратного поиска ключа по тексту метки.
+ThemeConfig. Держит явные ссылки на свои виджеты и собственный field_key,
+поэтому обновление из состояния (refresh) не требует обхода дерева виджетов.
 
 Зависимости передаются явно (state/bus/safe_update/strings) — компонент не
 обращается к приватным полям экрана-владельца. target нужен только в момент
-создания: через него виджеты регистрируются в системе темы (ThemeTarget).
+создания: через него виджеты регистрируются в системе темы (ThemeTarget) и
+переводов (I18nTarget) — смену языка метка получает оттуда автоматически.
 """
 
 from __future__ import annotations
@@ -38,10 +38,10 @@ class ColorRow:
 
         current = getattr(state.theme, field_key, "FFFFFF")
 
-        self.label = target.register_muted_text(ft.Text(
+        self.label = target.register_i18n(target.register_muted_text(ft.Text(
             getattr(s, label_key, label_key),
             size=12, expand=True, color=ft.Colors.GREY_300,
-        ))
+        )), value=label_key)
         self._field = target.register_accents(ft.TextField(
             value=current.upper().lstrip("#"),
             width=100, border_radius=6, text_size=13,
@@ -114,8 +114,3 @@ class ColorRow:
         self._field.value        = val.upper().lstrip("#")
         self._field.border_color = None
         self._preview.bgcolor    = hex_to_flet(val)
-
-    def relabel(self, s) -> None:
-        """Обновить текст метки после смены языка."""
-        self.label.value = getattr(s, self.label_key, self.label_key)
-        self.label.update()

@@ -12,6 +12,7 @@ from managers.tools_manager import (
 )
 from managers.tool_registry import DEFAULT_TOOLS
 from managers.providers import Aria2cProvider
+from controllers.i18n_target import I18nTarget
 from controllers.theme_target import ThemeTarget
 from screens.color_row import ColorRow
 from events import (
@@ -51,7 +52,7 @@ def _fmt_size(num: int) -> str:
     return f"{int(num)} B"
 
 
-class SettingsScreen(ThemeTarget):
+class SettingsScreen(ThemeTarget, I18nTarget):
 
     def __init__(self, page: ft.Page, svc: Services) -> None:
         super().__init__()
@@ -162,14 +163,20 @@ class SettingsScreen(ThemeTarget):
             label=s.proxy_label, border_radius=8,
             focused_border_color=ft.Colors.BLUE,
         ))
+        self.register_i18n(self.proxy_input, label="proxy_label")
         self.yt_args_input = self.register_accents(ft.TextField(
             label=s.yt_args_label, border_radius=8,
             focused_border_color=ft.Colors.BLUE,
         ))
+        self.register_i18n(self.yt_args_input, label="yt_args_label")
         self.clean_titles_switch   = self.register_switches(ft.Switch(label=s.switch_clean,    active_color=ft.Colors.GREEN))
         self.playlist_switch       = self.register_switches(ft.Switch(label=s.switch_playlist, active_color=ft.Colors.GREEN))
         self.embed_metadata_switch = self.register_switches(ft.Switch(label=s.switch_metadata, active_color=ft.Colors.GREEN))
         self.save_to_source_switch = self.register_switches(ft.Switch(label=s.switch_source,   active_color=ft.Colors.GREEN))
+        self.register_i18n(self.clean_titles_switch,   label="switch_clean")
+        self.register_i18n(self.playlist_switch,       label="switch_playlist")
+        self.register_i18n(self.embed_metadata_switch, label="switch_metadata")
+        self.register_i18n(self.save_to_source_switch, label="switch_source")
 
         # Лимит одновременных загрузок: применяется на лету (менеджер читает
         # state динамически, ожидающие задачи перепроверяют слоты по событию).
@@ -181,6 +188,7 @@ class SettingsScreen(ThemeTarget):
             value=str(self._state.max_parallel),
             on_select=self._on_max_parallel_change,
         ))
+        self.register_i18n(self.max_parallel_dropdown, label="max_parallel_label")
 
         # Пункты — из единого реестра COOKIE_BROWSERS (он же у главного экрана).
         self.cookies_browser_dropdown = self.register_accents(ft.Dropdown(
@@ -193,11 +201,13 @@ class SettingsScreen(ThemeTarget):
             ],
             on_select=self._on_browser_dropdown_change,
         ))
+        self.register_i18n(self.cookies_browser_dropdown, label="cookies_label")
 
         # Уведомления о завершении (показываются при свёрнутом/неактивном окне).
         self.notify_switch = self.register_switches(ft.Switch(
             label=s.notify_label, active_color=ft.Colors.GREEN,
         ))
+        self.register_i18n(self.notify_switch, label="notify_label")
 
         # Срок хранения истории; чистка — при старте и при смене значения.
         self.history_keep_dropdown = self.register_accents(ft.Dropdown(
@@ -208,6 +218,7 @@ class SettingsScreen(ThemeTarget):
             value=str(self._state.history_keep_days),
             on_select=self._on_history_keep_change,
         ))
+        self.register_i18n(self.history_keep_dropdown, label="history_keep_label")
 
         self.language_dropdown = self.register_accents(ft.Dropdown(
             label=s.language_label,
@@ -221,6 +232,7 @@ class SettingsScreen(ThemeTarget):
             value=self._state.language,
             on_select=self._on_language_change,
         ))
+        self.register_i18n(self.language_dropdown, label="language_label")
 
         # Статусные строки инструментов строятся из реестра — добавление
         # нового инструмента автоматически добавляет его строку, без правок здесь.
@@ -259,11 +271,19 @@ class SettingsScreen(ThemeTarget):
         self.ffmpeg_download_input = self.register_accents(ft.TextField(label=s.url_ffmpeg_download, border_radius=8, focused_border_color=ft.Colors.BLUE))
         self.aria2_version_input   = self.register_accents(ft.TextField(label=s.url_aria2_version,   border_radius=8, focused_border_color=ft.Colors.BLUE))
         self.aria2_download_input  = self.register_accents(ft.TextField(label=s.url_aria2_download,  border_radius=8, focused_border_color=ft.Colors.BLUE))
+        self.register_i18n(self.yt_api_input,          label="url_yt_api")
+        self.register_i18n(self.yt_download_input,     label="url_yt_download")
+        self.register_i18n(self.ffmpeg_version_input,  label="url_ffmpeg_version")
+        self.register_i18n(self.ffmpeg_download_input, label="url_ffmpeg_download")
+        self.register_i18n(self.aria2_version_input,   label="url_aria2_version")
+        self.register_i18n(self.aria2_download_input,  label="url_aria2_download")
         # Ручная очистка временных .part-папок aria2c (см. _clean_temp).
         self.aria2_clean_btn = self.register_buttons(ft.Button(
             content=ft.Row([
                 self.register_button_texts(ft.Icon(ft.Icons.CLEANING_SERVICES_OUTLINED, size=18)),
-                self.register_button_texts(ft.Text(s.btn_clean_temp)),
+                self.register_i18n(
+                    self.register_button_texts(ft.Text(s.btn_clean_temp)),
+                    value="btn_clean_temp"),
             ], tight=True, spacing=8),
             style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=8)),
             on_click=self._clean_temp,
@@ -292,6 +312,19 @@ class SettingsScreen(ThemeTarget):
         self.header_theme         = self.register_headers(ft.Text(s.section_theme,       size=14, weight=ft.FontWeight.BOLD,  color=ft.Colors.CYAN_400))
         self.header_modes         = self.register_headers(ft.Text(s.section_modes,       size=14, weight=ft.FontWeight.BOLD,  color=ft.Colors.CYAN_400))
         self.header_appearance    = self.register_headers(ft.Text(s.section_appearance, size=14, weight=ft.FontWeight.BOLD,  color=ft.Colors.CYAN_400))
+        self.register_i18n(self.header_net,         value="section_network")
+        self.register_i18n(self.header_downloaders, value="section_downloaders")
+        self.register_i18n(self.header_cookies,     value="section_cookies")
+        self.register_i18n(self.header_ytdlp,       value="section_ytdlp")
+        self.register_i18n(self.header_ytdlp_urls,  value="section_ytdlp_urls")
+        self.register_i18n(self.header_aria2,       value="section_aria2")
+        self.register_i18n(self.header_aria2_urls,  value="section_aria2_urls")
+        self.register_i18n(self.header_deps,        value="section_deps")
+        self.register_i18n(self.header_deps_urls,   value="section_deps_urls")
+        self.register_i18n(self.header_history_set, value="section_history")
+        self.register_i18n(self.header_theme,       value="section_theme")
+        self.register_i18n(self.header_modes,       value="section_modes")
+        self.register_i18n(self.header_appearance,  value="section_appearance")
 
     # ── Куки UI ───────────────────────────────────────────────────────────────
 
@@ -366,18 +399,16 @@ class SettingsScreen(ThemeTarget):
         s = self._s
 
         # Каждая строка цвета — самостоятельный ColorRow с явными ссылками на свои
-        # виджеты. Храним плоский список строк и список (метка_группы, ключ) —
-        # refresh/relabel работают по ссылкам, без обхода дерева виджетов.
+        # виджеты. Храним плоский список строк — refresh работает по ссылкам,
+        # без обхода дерева; переводы (метки групп/строк) идут через register_i18n.
         field_map = dict(THEME_FIELDS)   # {field_key: label_key}
         self._color_rows: list[ColorRow] = []
-        self._group_labels: list[tuple[ft.Text, str]] = []
         group_columns = []
         for group_label_key, field_keys in THEME_GROUPS:
-            group_label = self.register_muted_text(ft.Text(
+            group_label = self.register_i18n(self.register_muted_text(ft.Text(
                 getattr(s, group_label_key, group_label_key),
                 size=12, color=ft.Colors.GREY_500, weight=ft.FontWeight.W_500,
-            ))
-            self._group_labels.append((group_label, group_label_key))
+            )), value=group_label_key)
             divider = self.register_dividers(ft.Divider(height=1, color="#2a2a2a"))
             rows = []
             for k in field_keys:
@@ -392,13 +423,15 @@ class SettingsScreen(ThemeTarget):
             content=ft.Column([
                 ft.Row([
                     self.header_theme,
-                    self.register_icon_buttons(ft.IconButton(
+                    self.register_i18n(self.register_icon_buttons(ft.IconButton(
                         icon=ft.Icons.RESTART_ALT_ROUNDED, icon_color=ft.Colors.GREY_400,
                         icon_size=18, tooltip=s.btn_reset_theme,
                         on_click=self._reset_theme,
-                    )),
+                    )), tooltip="btn_reset_theme"),
                 ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
-                self.register_muted_text(ft.Text(s.theme_hint, size=11, color=ft.Colors.GREY_500)),
+                self.register_i18n(self.register_muted_text(
+                    ft.Text(s.theme_hint, size=11, color=ft.Colors.GREY_500)),
+                    value="theme_hint"),
                 self.theme_fields_column,
             ], spacing=10, horizontal_alignment=ft.CrossAxisAlignment.STRETCH),
             bgcolor="#161616", border_radius=8, padding=15,
@@ -416,6 +449,7 @@ class SettingsScreen(ThemeTarget):
             label=s.theme_saved_label, border_radius=8, width=220,
             focused_border_color=ft.Colors.BLUE, options=[],
         ))
+        self.register_i18n(self.theme_set_dropdown, label="theme_saved_label")
         self._refresh_set_options()
 
         self._btn_set_apply = self.register_icon_buttons(ft.IconButton(
@@ -426,9 +460,13 @@ class SettingsScreen(ThemeTarget):
             icon=ft.Icons.DELETE_OUTLINE_ROUNDED, icon_size=20,
             tooltip=s.btn_theme_delete, on_click=self._delete_saved_theme,
         ))
+        self.register_i18n(self._btn_set_apply,  tooltip="btn_theme_apply")
+        self.register_i18n(self._btn_set_delete, tooltip="btn_theme_delete")
         self._btn_set_save = self.register_buttons(ft.Button(
             content=ft.Row([self.register_button_texts(ft.Icon(ft.Icons.SAVE_OUTLINED, size=18)),
-                            self.register_button_texts(ft.Text(s.btn_theme_save))], tight=True, spacing=8),
+                            self.register_i18n(
+                                self.register_button_texts(ft.Text(s.btn_theme_save)),
+                                value="btn_theme_save")], tight=True, spacing=8),
             on_click=self._open_save_dialog,
         ))
 
@@ -560,82 +598,23 @@ class SettingsScreen(ThemeTarget):
     # ── Смена языка — перезагрузка Strings и обновление всех текстов ──────────
 
     def rebuild_for_language(self) -> None:
-        """Загрузить новый locale-файл, обновить все текстовые метки и вызвать update() на каждом."""
+        """Перезагрузить Strings; статичные тексты — по регистрации
+        (apply_language), здесь только динамика. Отрисовку завершает общий
+        safe_update() оркестратора в app.py."""
         self._s = Locale.load(self._state.language)
         s = self._s
+        self.apply_language(s)
 
-        # Поля ввода
-        self.proxy_input.label    = s.proxy_label;    self.proxy_input.update()
-        self.yt_args_input.label  = s.yt_args_label;  self.yt_args_input.update()
-        self.max_parallel_dropdown.label = s.max_parallel_label
-        self.max_parallel_dropdown.update()
-        self.history_keep_dropdown.label   = s.history_keep_label
+        # Пункты дропдаунов: тексты зависят от значений/реестров.
         self.history_keep_dropdown.options = self._history_keep_options(s)
-        self.history_keep_dropdown.update()
-
-        # Переключатели
-        self.clean_titles_switch.label   = s.switch_clean;    self.clean_titles_switch.update()
-        self.playlist_switch.label       = s.switch_playlist; self.playlist_switch.update()
-        self.embed_metadata_switch.label = s.switch_metadata; self.embed_metadata_switch.update()
-        self.save_to_source_switch.label = s.switch_source;   self.save_to_source_switch.update()
-        self.notify_switch.label         = s.notify_label;    self.notify_switch.update()
-
-        # Куки (порядок пунктов = порядок реестра COOKIE_BROWSERS)
-        self.cookies_browser_dropdown.label = s.cookies_label
         for opt, (_code, label_key) in zip(self.cookies_browser_dropdown.options,
                                            COOKIE_BROWSERS):
             opt.text = getattr(s, label_key)
-        self.cookies_browser_dropdown.update()
 
-        # Язык
-        self.language_dropdown.label = s.language_label
-        self.language_dropdown.update()
-
-        # URL поля
-        self.yt_api_input.label          = s.url_yt_api;          self.yt_api_input.update()
-        self.yt_download_input.label     = s.url_yt_download;     self.yt_download_input.update()
-        self.ffmpeg_version_input.label  = s.url_ffmpeg_version;  self.ffmpeg_version_input.update()
-        self.ffmpeg_download_input.label = s.url_ffmpeg_download;  self.ffmpeg_download_input.update()
-        self.aria2_version_input.label   = s.url_aria2_version;   self.aria2_version_input.update()
-        self.aria2_download_input.label  = s.url_aria2_download;  self.aria2_download_input.update()
-        self.aria2_clean_btn.content.controls[1].value = s.btn_clean_temp
-        self.aria2_clean_btn.update()
-
-        # Заголовки секций
-        self.header_net.value           = s.section_network;     self.header_net.update()
-        self.header_downloaders.value   = s.section_downloaders; self.header_downloaders.update()
-        self.header_cookies.value       = s.section_cookies;     self.header_cookies.update()
-        self.header_ytdlp.value         = s.section_ytdlp;       self.header_ytdlp.update()
-        self.header_ytdlp_urls.value    = s.section_ytdlp_urls;  self.header_ytdlp_urls.update()
-        self.header_aria2.value         = s.section_aria2;       self.header_aria2.update()
-        self.header_aria2_urls.value    = s.section_aria2_urls;  self.header_aria2_urls.update()
-        self.header_deps.value          = s.section_deps;        self.header_deps.update()
-        self.header_deps_urls.value     = s.section_deps_urls;   self.header_deps_urls.update()
-        self.header_history_set.value   = s.section_history;     self.header_history_set.update()
-        self.header_theme.value         = s.section_theme;       self.header_theme.update()
-        self.header_modes.value         = s.section_modes;       self.header_modes.update()
-        self.header_appearance.value    = s.section_appearance;  self.header_appearance.update()
-
-        # Секция наборов тем
-        self._rebuild_mode_buttons();              self._mode_row.update()
-        self.theme_set_dropdown.label = s.theme_saved_label; self.theme_set_dropdown.update()
-        self._btn_set_apply.tooltip   = s.btn_theme_apply
-        self._btn_set_delete.tooltip  = s.btn_theme_delete
-        self._btn_set_save.content.controls[1].value = s.btn_theme_save
-        self._btn_set_save.update()
-
-        # Кнопка и статус
-        self.update_btn_text.value = s.btn_check;     self.update_btn_text.update()
-        # progress_text живёт в нижнем баре настроек и может быть не примонтирован —
-        # обновляем страницей, а не контролом.
-        self.progress_text.value   = s.status_waiting; self._safe_update()
-
-        # Группы цветов и сами строки — по сохранённым ссылкам, без обхода дерева.
-        for group_label, group_key in self._group_labels:
-            group_label.value = getattr(s, group_key, "")
-            group_label.update()
-        for row in self._color_rows:
-            row.relabel(s)
+        # Состояние-зависимые подписи.
+        self._rebuild_mode_buttons()
+        self.update_btn_text.value = s.btn_check
+        self.progress_text.value   = s.status_waiting
 
     # ── Инструменты ───────────────────────────────────────────────────────────
 

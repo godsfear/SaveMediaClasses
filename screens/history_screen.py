@@ -13,6 +13,7 @@ import flet as ft
 from config import (
     DOWNLOAD_STATUS_TOKENS, hex_to_flet, token_color, download_display_name,
 )
+from controllers.i18n_target import I18nTarget
 from controllers.theme_target import ThemeTarget
 from dataclasses import replace
 from ui_utils import fmt_ts, fmt_duration, open_path
@@ -56,7 +57,7 @@ def record_search_text(rec) -> str:
     return " ".join(p for p in parts if p).casefold()
 
 
-class HistoryScreen(ThemeTarget):
+class HistoryScreen(ThemeTarget, I18nTarget):
 
     def __init__(self, page: ft.Page, svc: Services) -> None:
         super().__init__()
@@ -97,10 +98,10 @@ class HistoryScreen(ThemeTarget):
 
     def _build_widgets(self) -> None:
         s = self._s()
-        self.header = self.register_headers(ft.Text(
+        self.header = self.register_i18n(self.register_headers(ft.Text(
             s.header_history, size=14,
             weight=ft.FontWeight.BOLD, color=ft.Colors.CYAN_400
-        ))
+        )), value="header_history")
         self._filter_row = ft.Row(spacing=6, wrap=True)
         self._search_input = self.register_accents(ft.TextField(
             hint_text=s.history_search_hint,
@@ -109,12 +110,13 @@ class HistoryScreen(ThemeTarget):
             content_padding=ft.Padding.symmetric(horizontal=10, vertical=8),
             on_change=lambda _: self.refresh(),
         ))
+        self.register_i18n(self._search_input, hint_text="history_search_hint")
         self._stats_text = self.register_muted_text(ft.Text("", size=12, color=ft.Colors.GREY_500))
         self._list       = ft.Column(spacing=6)
-        self._empty      = self.register_muted_text(ft.Text(
+        self._empty      = self.register_i18n(self.register_muted_text(ft.Text(
             s.history_empty, size=13, color=ft.Colors.GREY_600,
             text_align=ft.TextAlign.CENTER, visible=False
-        ))
+        )), value="history_empty")
         self._rebuild_filter_buttons()
 
     def _rebuild_filter_buttons(self) -> None:
@@ -157,12 +159,12 @@ class HistoryScreen(ThemeTarget):
             content=ft.Column([
                 ft.Row([
                     self.header,
-                    self.register_icon_buttons(ft.IconButton(
+                    self.register_i18n(self.register_icon_buttons(ft.IconButton(
                         icon=ft.Icons.REFRESH_ROUNDED,
                         icon_color=ft.Colors.GREY_500,
                         icon_size=18, tooltip=s.btn_refresh,
                         on_click=lambda _: self.refresh(),
-                    )),
+                    )), tooltip="btn_refresh"),
                 ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
                    vertical_alignment=ft.CrossAxisAlignment.CENTER),
                 self._filter_row,
@@ -210,13 +212,11 @@ class HistoryScreen(ThemeTarget):
         self._safe_update()
 
     def rebuild_for_language(self) -> None:
+        """Статичные тексты — по регистрации (apply_language); динамика —
+        фильтры и статистика. Отрисовку завершает safe_update() в app.py."""
         s = self._s()
-        self.header.value   = s.header_history;  self.header.update()
-        self._empty.value   = s.history_empty;   self._empty.update()
-        self._search_input.hint_text = s.history_search_hint
-        self._search_input.update()
+        self.apply_language(s)
         self._rebuild_filter_buttons()
-        self._filter_row.update()
         self._render_stats()
 
     # ── Фильтр ────────────────────────────────────────────────────────────────

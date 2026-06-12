@@ -21,6 +21,7 @@ import flet as ft
 
 from app_logging import get_logger
 from config import hex_to_flet, severity_color
+from controllers.i18n_target import I18nTarget
 from events import (
     DownloadPathChangedEvent, SettingsChangedEvent, StatusMessageEvent, ThemeChangedEvent,
 )
@@ -35,7 +36,7 @@ if TYPE_CHECKING:
     from services import Services
 
 
-class NavigationController:
+class NavigationController(I18nTarget):
 
     def __init__(
         self,
@@ -47,6 +48,7 @@ class NavigationController:
         theme_ctrl: "ThemeController",
         window_ctrl: "WindowController",
     ) -> None:
+        super().__init__()
         self._page            = page
         self._svc             = svc
         self._main            = main_screen
@@ -70,6 +72,14 @@ class NavigationController:
         self.clipboard_btn = ft.IconButton(icon=ft.Icons.CONTENT_PASTE_OFF_ROUNDED,   icon_color=fg, tooltip=s.clipboard_off)
         self.settings_btn = ft.IconButton(icon=ft.Icons.SETTINGS_ROUNDED,             icon_color=fg, tooltip=s.appbar_settings)
         self.exit_btn     = ft.IconButton(icon=ft.Icons.POWER_SETTINGS_NEW_ROUNDED,   icon_color=hex_to_flet(self._svc.state.theme.status_error_color), tooltip=s.btn_exit)
+
+        # Статичные tooltip — по регистрации; proxy/clipboard зависят от
+        # состояния и переводятся в update_proxy_ui/update_clipboard_ui.
+        self.register_i18n(self.theme_btn,    tooltip="theme_mode_tooltip")
+        self.register_i18n(self.history_btn,  tooltip="nav_history")
+        self.register_i18n(self.folder_btn,   tooltip="btn_folder")
+        self.register_i18n(self.settings_btn, tooltip="appbar_settings")
+        self.register_i18n(self.exit_btn,     tooltip="btn_exit")
 
         self._bind_toolbar()
 
@@ -181,13 +191,11 @@ class NavigationController:
         self._svc.safe_update()
 
     def on_language_changed(self) -> None:
-        """Перестроить все тексты тулбара и AppBar после смены языка."""
+        """Перестроить тексты тулбара и AppBar после смены языка: статичные
+        tooltip — по регистрации, состояние-зависимые — свои методы."""
         s = Locale.load(self._svc.state.language)
-        self._folder_picker_title  = s.folder_select_text
-        self.settings_btn.tooltip  = s.appbar_settings
-        self.history_btn.tooltip   = s.nav_history
-        self.folder_btn.tooltip    = s.btn_folder
-        self.exit_btn.tooltip      = s.btn_exit
+        self.apply_language(s)
+        self._folder_picker_title = s.folder_select_text
         self.update_proxy_ui()
         self.update_clipboard_ui()
         self._refresh_appbar_title(s)
