@@ -5,36 +5,32 @@ import flet as ft
 
 from app_logging import get_logger
 from config import (
-    safe_str, hex_to_flet, ThemeConfig, download_display_name, parse_url_lines,
-    COOKIE_BROWSERS,
+    safe_str, hex_to_flet, ThemeConfig, parse_url_lines, COOKIE_BROWSERS,
 )
 from ui_utils import fmt_ts, open_path
 from controllers.i18n_target import I18nTarget
 from controllers.theme_target import ThemeTarget
 from events import (
-    EventBus,
+    DownloadAcceptedEvent,
     DownloadProgressEvent,
     DownloadPostprocessingEvent,
     DownloadCompletedEvent,
     DownloadCancelledEvent,
+    DownloadPausedEvent,
+    DownloadResumedEvent,
     ToolsCheckedEvent,
     StatusMessageEvent,
     ClipboardUrlEvent,
     CookiesChangedEvent,
     DownloadPathChangedEvent,
     SettingsChangedEvent,
-    ResumeDownloadEvent,
     ThumbnailReadyEvent,
     AppClosingEvent,
 )
 from i18n import Locale, Strings
-from managers.download_manager import DownloadManager
-from managers.snapshot import DownloadSnapshot
+from managers.download_orchestrator import SubmitOutcome
 from services import Services
-from managers.providers import (
-    PROVIDERS, DEFAULT_PROVIDER, resolve_provider_for_url, torrent_name,
-)
-from state import AppState
+from managers.providers import PROVIDERS
 
 # Варианты в дропдауне: "auto" (выбор по ссылке) + ключи единого реестра провайдеров.
 _TOOL_OPTIONS = ("auto", *PROVIDERS)
@@ -175,12 +171,10 @@ class MainScreen(ThemeTarget, I18nTarget):
         self._state       = svc.state
         self._dm          = svc.dm
         self._bus         = svc.bus
-        self._db          = svc.db
-        self._thumbs      = svc.thumbs
+        self._downloads   = svc.downloads   # решения о запуске — у оркестратора
         self._log         = get_logger("app")
 
         self._cards: Dict[str, DownloadCard] = {}
-        self._paused: set = set()   # task_id поставленных на паузу карточек
 
         self._subscribe()
         self._build_widgets()
@@ -193,16 +187,20 @@ class MainScreen(ThemeTarget, I18nTarget):
 
     def _subscribe(self) -> None:
         self._unsubs = [
+            # Оркестратор принял задачу — рисуем карточку.
+            self._bus.on(DownloadAcceptedEvent,       self._on_accepted),
             self._bus.on(DownloadProgressEvent,       self._on_progress),
             self._bus.on(DownloadPostprocessingEvent, self._on_postprocessing),
             self._bus.on(DownloadCompletedEvent,      self._on_completed),
             self._bus.on(DownloadCancelledEvent,      self._on_cancelled),
+            # Пауза/возобновление (кнопка карточки или история) — вид карточки.
+            self._bus.on(DownloadPausedEvent,         self._on_paused),
+            self._bus.on(DownloadResumedEvent,        self._on_resumed),
             self._bus.on(ToolsCheckedEvent,           self._on_tools_checked),
             self._bus.on(CookiesChangedEvent,         self._on_cookies_changed),
             self._bus.on(DownloadPathChangedEvent,    self._on_path_changed),
             # Лимит параллельных мог измениться в настройках — переоценить кнопку.
             self._bus.on(SettingsChangedEvent,        lambda e: self._update_download_btn()),
-            self._bus.on(ResumeDownloadEvent,         self._on_resume_download),
             self._bus.on(ThumbnailReadyEvent,         self._on_thumbnail_ready),
             self._bus.on(ClipboardUrlEvent,           self._on_clipboard_urls),
             self._bus.on(AppClosingEvent,             lambda e: self.dispose()),
@@ -214,6 +212,26 @@ class MainScreen(ThemeTarget, I18nTarget):
             unsub()
 
     # ── Обработчики событий ───────────────────────────────────────────────────
+
+    def _on_accepted(self, e: DownloadAcceptedEvent) -> None:
+        """Оркестратор поставил задачу — показать карточку загрузки."""
+        self._add_card(e.task_id, e.title, pausable=e.pausable)
+        self._update_download_btn()
+        self._safe_update()
+
+    def _on_paused(self, e: DownloadPausedEvent) -> None:
+        card = self._cards.get(e.task_id)
+        if card:
+            card.set_paused(True)
+            # Через тот же интервал, что при завершении, карточка уезжает в историю.
+            self._page.run_task(self._close_paused_card_after_delay, e.task_id)
+            self._safe_update()
+
+    def _on_resumed(self, e: DownloadResumedEvent) -> None:
+        card = self._cards.get(e.task_id)
+        if card:
+            card.set_paused(False)
+            self._safe_update()
 
     def _on_progress(self, e: DownloadProgressEvent) -> None:
         card = self._cards.get(e.task_id)
@@ -503,12 +521,6 @@ class MainScreen(ThemeTarget, I18nTarget):
         tool = safe_str(self.downloader_dropdown.value) or self._state.download_tool
         return tool if tool in _TOOL_OPTIONS else "auto"
 
-    def _resolve_tool(self, url: str) -> str:
-        """Конкретный провайдер для ссылки. В "auto" выбор делает реестр
-        (resolve_provider_for_url); иначе — явно выбранный провайдер."""
-        sel = self._selected_tool()
-        return resolve_provider_for_url(url) if sel == "auto" else sel
-
     def _on_downloader_change(self, _) -> None:
         self.sync_to_state()
         self._on_url_change(None)          # перепроверить URL под новый загрузчик
@@ -585,10 +597,11 @@ class MainScreen(ThemeTarget, I18nTarget):
 
     def _on_url_change(self, _) -> None:
         t    = self._state.theme
+        sel  = self._selected_tool()
         urls = parse_url_lines(safe_str(self.url_input.value))
         if not urls:
             self.url_input.border_color = None
-        elif all(PROVIDERS[self._resolve_tool(u)].is_valid_url(u) for u in urls):
+        elif all(self._downloads.is_valid_url(u, sel) for u in urls):
             self.url_input.border_color = hex_to_flet(t.status_ok_color)
         else:
             self.url_input.border_color = hex_to_flet(t.status_error_color)
@@ -603,58 +616,39 @@ class MainScreen(ThemeTarget, I18nTarget):
         if not urls:
             self._show_status(s.err_url_empty, "error")
             return
+        self.sync_to_state()   # один коммит переключателей на запуск
         if len(urls) == 1:
-            self._submit_single(urls[0])
+            self._handle_outcome(self._downloads.submit(urls[0], self._selected_tool()),
+                                 urls[0])
         else:
             self._submit_batch(urls)
 
-    def _submit_single(self, url: str) -> None:
-        """Одна ссылка — прежний путь с диалогом подтверждения повтора."""
-        s    = self._s()
-        tool = self._resolve_tool(url)   # в auto — выбор провайдера по ссылке
-        if not PROVIDERS[tool].is_valid_url(url):
+    def _handle_outcome(self, outcome: SubmitOutcome, url: str) -> None:
+        """Перевести исход оркестратора в реакцию UI (статус-бар/диалог/поле)."""
+        s = self._s()
+        if outcome.status == "started":
+            self.url_input.value        = ""
+            self.url_input.border_color = None
+            self._safe_update()
+        elif outcome.status == "invalid":
             self._show_status(s.err_url_invalid, "error")
             self.url_input.border_color = hex_to_flet(self._state.theme.status_error_color)
             self._safe_update()
-            return
-        if self._dm.at_capacity:
+        elif outcome.status == "at_capacity":
             self._show_status(s.fmt("err_max_parallel", n=self._dm.max_parallel), "warning")
-            return
-        if self._dm.is_active_url(url):
+        elif outcome.status == "already_active":
             self._show_status(s.err_already_active, "warning")
-            return
-
-        # Предупреждение о повторе: эта ссылка уже была успешно загружена (любым
-        # инструментом — проверка по истории идёт по URL, без учёта source).
-        prev = self._db.find_completed(url) if self._db else None
-        if prev is not None:
-            self._confirm_redownload(url, tool, prev)
-            return
-
-        self._start_download(url, tool)
+        elif outcome.status == "duplicate":
+            # Эта ссылка уже была успешно загружена — спросить подтверждение.
+            self._confirm_redownload(url, outcome.prev)
+        elif outcome.status == "no_exe":
+            self._show_status(s.status_ytdlp_missing, "warning")
 
     def _submit_batch(self, urls: list) -> None:
-        """Пачка ссылок: запускаем валидные, невлезшие/невалидные остаются в поле.
-
-        Диалог «уже скачивалось» в пакете не показываем — N подтверждений подряд
-        хуже, чем повторная загрузка; статус-бар сообщает итог."""
+        """Пачка ссылок: запущенные строки убираются из поля, проблемные
+        (невалидные/не влезшие в лимит) остаются на виду; итог — в статус-баре."""
         s = self._s()
-        self.sync_to_state()             # один коммит переключателей на всю пачку
-        started, leftover = 0, []
-        for url in urls:
-            tool = self._resolve_tool(url)
-            if (self._dm.at_capacity
-                    or not PROVIDERS[tool].is_valid_url(url)
-                    or self._dm.is_active_url(url)):
-                leftover.append(url)
-                continue
-            snapshot = DownloadSnapshot.from_state(self._state, url)
-            if self._launch(snapshot, tool, self._download_name(url)) is None:
-                leftover.append(url)
-                continue
-            started += 1
-
-        # Запущенные строки убираем из поля, проблемные оставляем на виду.
+        started, leftover = self._downloads.submit_batch(urls, self._selected_tool())
         self.url_input.value = "\n".join(leftover)
         self._on_url_change(None)
         if started and not leftover:
@@ -683,13 +677,14 @@ class MainScreen(ThemeTarget, I18nTarget):
         self.url_input.value = "\n".join(dict.fromkeys(lines))
         self._on_url_change(None)
 
-    def _confirm_redownload(self, url: str, tool: str, prev) -> None:
+    def _confirm_redownload(self, url: str, prev) -> None:
         s    = self._s()
         when = fmt_ts(getattr(prev, "finished_at", None) or getattr(prev, "started_at", None))
 
         def proceed(_e) -> None:
             self._page.pop_dialog()
-            self._start_download(url, tool)
+            self._handle_outcome(
+                self._downloads.start_anyway(url, self._selected_tool()), url)
 
         self._page.show_dialog(ft.AlertDialog(
             modal=True,
@@ -701,63 +696,6 @@ class MainScreen(ThemeTarget, I18nTarget):
                 ft.TextButton(s.btn_download, on_click=proceed),
             ],
         ))
-
-    def _start_download(self, url: str, tool: str) -> None:
-        self.sync_to_state()
-        snapshot = DownloadSnapshot.from_state(self._state, url)
-        if self._launch(snapshot, tool, self._download_name(url)) is not None:
-            self.url_input.value        = ""
-            self.url_input.border_color = None
-            self._safe_update()
-
-    def _launch(self, snapshot, tool: str, title: str):
-        """Запустить загрузку по готовому снимку: задача в менеджер + карточка.
-        Общий путь для нового скачивания и для возобновления из истории."""
-        s = self._s()
-        task_id = self._dm.add(snapshot, provider_key=tool)
-        if task_id is None:
-            self._show_status(s.status_ytdlp_missing, "warning")
-            return None
-        pausable = PROVIDERS[tool].SUPPORTS_PAUSE
-        self._add_card(task_id, title, pausable=pausable)
-        # Провайдер без метаданных (aria2c) — имя в историю как meta.title.
-        if not self._thumbs.supports(tool) and self._db is not None:
-            self._db.save_meta(task_id, {"title": title})
-        self._update_download_btn()
-        self._safe_update()
-        # Превью качает сервис; готовая картинка придёт ThumbnailReadyEvent.
-        if self._thumbs.supports(tool):
-            self._page.run_task(self._thumbs.fetch, task_id, snapshot.url)
-        return task_id
-
-    def _on_resume_download(self, e: ResumeDownloadEvent) -> None:
-        """Возобновление/повтор из истории. Если задача ещё жива в этой сессии
-        НА ПАУЗЕ — просто снять с паузы; иначе (включая ещё видимую карточку
-        только что упавшей загрузки) реконструировать снимок и запустить заново
-        (докачка идёт через детерминированную .part)."""
-        if e.task_id in self._paused and e.task_id in self._cards:
-            self._paused.discard(e.task_id)
-            self._dm.resume(e.task_id)
-            self._cards[e.task_id].set_paused(False)
-            self._safe_update()
-            return
-        try:
-            snapshot = DownloadSnapshot.from_params(e.url, e.params or {})
-        except Exception:
-            self._log.warning("Failed to rebuild snapshot for resume: %s", e.url, exc_info=True)
-            snapshot = DownloadSnapshot.from_state(self._state, e.url)
-        # Старую incomplete-запись заменит новая (новый task_id) — не плодим дубли.
-        if self._db is not None:
-            self._db.delete(e.task_id)
-        tool = e.source if e.source in PROVIDERS else DEFAULT_PROVIDER
-        self._launch(snapshot, tool, e.title or download_display_name(e.url))
-
-    def _download_name(self, url: str) -> str:
-        """Имя для карточки/истории. Для .torrent — реальное имя из метаданных
-        торрента (info.name), не из имени файла; иначе — общий резолвер."""
-        if url.lower().endswith(".torrent"):
-            return torrent_name(url) or download_display_name(url)
-        return download_display_name(url)
 
     # ── Карточки ──────────────────────────────────────────────────────────────
 
@@ -772,31 +710,22 @@ class MainScreen(ThemeTarget, I18nTarget):
         self._cards_column.controls.append(card.container)
 
     def _toggle_pause(self, task_id: str) -> None:
-        card = self._cards.get(task_id)
-        if not card:
-            return
-        if task_id in self._paused:
-            self._paused.discard(task_id)
+        """Кнопка карточки: команда менеджеру; вид карточки обновят
+        DownloadPaused/ResumedEvent. Источник истины о паузе — dm."""
+        if self._dm.is_paused(task_id):
             self._dm.resume(task_id)
-            card.set_paused(False)
         else:
-            self._paused.add(task_id)
             self._dm.pause(task_id)
-            card.set_paused(True)
-            # Через тот же интервал, что при завершении, карточка уезжает в историю.
-            self._page.run_task(self._close_paused_card_after_delay, task_id)
-        self._safe_update()
 
     async def _close_paused_card_after_delay(self, task_id: str) -> None:
         await asyncio.sleep(self._state.timeouts.card_fade)
         # Возобновили за это время (в карточке или из истории)? — карточку оставляем.
-        if task_id in self._paused:
+        if self._dm.is_paused(task_id):
             self._dm.drop(task_id)        # убрать из активных — живёт в истории
             self._remove_card(task_id)
 
     def _remove_card(self, task_id: str) -> None:
         card = self._cards.pop(task_id, None)
-        self._paused.discard(task_id)
         if card and card.container in self._cards_column.controls:
             self._cards_column.controls.remove(card.container)
         self._update_download_btn()

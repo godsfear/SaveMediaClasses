@@ -220,6 +220,12 @@ class DownloadManager:
         task = self._active.get(task_id)
         return bool(task and task.provider.SUPPORTS_PAUSE)
 
+    def is_paused(self, task_id: str) -> bool:
+        """Задача жива в этой сессии и стоит на паузе (ждёт resume).
+        Единый источник истины о паузе — UI и оркестратор не ведут своих списков."""
+        task = self._active.get(task_id)
+        return bool(task and task.paused and not task.cancelled)
+
     def drop(self, task_id: str) -> None:
         """Выгрузить ПАУЗНУЮ задачу из активных — она «припаркована» в истории
         (статус incomplete) и будет возобновлена реконструкцией. Процесс уже убит,

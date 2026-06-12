@@ -117,8 +117,10 @@ class SaveMediaApp:
             svc.bus.emit(SettingsChangedEvent())
 
         # ToolsRestoredEvent обрабатывает сам SettingsScreen (подписан в конструкторе).
-        # Возобновление из истории: главный экран сам запустит загрузку (он
-        # подписан на ResumeDownloadEvent), а навигация переключит на него.
+        # Возобновление из истории: загрузку запустит DownloadOrchestrator
+        # (svc.downloads, подписан на ResumeDownloadEvent в Services.create),
+        # карточку нарисует MainScreen (по DownloadAcceptedEvent), а здесь —
+        # только переключение на главный экран.
         svc.bus.on(ResumeDownloadEvent, lambda e: nav_ctrl.show_main())
         svc.bus.on(SettingsChangedEvent, persist)
         svc.bus.on(LanguageChangedEvent, _on_language_changed)
