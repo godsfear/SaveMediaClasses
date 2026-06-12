@@ -628,7 +628,9 @@ class SettingsScreen(ThemeTarget):
 
         # Кнопка и статус
         self.update_btn_text.value = s.btn_check;     self.update_btn_text.update()
-        self.progress_text.value   = s.status_waiting; self.progress_text.update()
+        # progress_text живёт в нижнем баре настроек и может быть не примонтирован —
+        # обновляем страницей, а не контролом.
+        self.progress_text.value   = s.status_waiting; self._safe_update()
 
         # Группы цветов и сами строки — по сохранённым ссылкам, без обхода дерева.
         for group_label, group_key in self._group_labels:
@@ -740,7 +742,7 @@ class SettingsScreen(ThemeTarget):
             text = e.key
         self.progress_text.value = text
         self.progress_text.color = severity_color(self._state.theme, e.severity)
-        self.progress_text.update()
+        self._safe_update()
 
     def _on_install_status(self, e: ToolInstallStatusEvent) -> None:
         s = self._s
@@ -839,8 +841,6 @@ class SettingsScreen(ThemeTarget):
                 self.header_deps,
                 ft.Column(list(self._tool_status.values()), spacing=6),
                 ft.Row([self.update_btn], alignment=ft.MainAxisAlignment.END),
-                self.progress_bar,
-                self.progress_text,
                 ft.ExpansionTile(
                     title=self.header_deps_urls,
                     controls=[ft.Container(
