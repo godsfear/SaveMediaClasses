@@ -1,8 +1,4 @@
 import asyncio
-import datetime
-import os
-import subprocess
-import sys
 from typing import Dict
 
 import flet as ft
@@ -10,7 +6,9 @@ import flet as ft
 from app_logging import get_logger
 from config import (
     safe_str, hex_to_flet, ThemeConfig, download_display_name, parse_url_lines,
+    COOKIE_BROWSERS,
 )
+from ui_utils import fmt_ts, open_path
 from controllers.theme_target import ThemeTarget
 from events import (
     EventBus,
@@ -40,15 +38,8 @@ from state import AppState
 # Варианты в дропдауне: "auto" (выбор по ссылке) + ключи единого реестра провайдеров.
 _TOOL_OPTIONS = ("auto", *PROVIDERS)
 
-
-def _fmt_ts(ts) -> str:
-    """Unix-время → короткая дата для предупреждения о повторной загрузке."""
-    if not ts:
-        return "—"
-    try:
-        return datetime.datetime.fromtimestamp(ts).strftime("%d %b %Y  %H:%M")
-    except Exception:
-        return "—"
+# Ключ браузера → i18n-ключ имени (единый реестр в config.COOKIE_BROWSERS).
+_COOKIE_LABEL_KEYS = dict(COOKIE_BROWSERS)
 
 
 class DownloadCard:
@@ -309,17 +300,6 @@ class MainScreen(ThemeTarget):
 
     # ── Cookies-переключатель: состояние выводится из state ────────────────────
 
-    # Ключ браузера → i18n-ключ его отображаемого имени (тот же набор, что в
-    # выпадающем списке настроек). Экран сам резолвит имя, не обращаясь к Settings.
-    _COOKIE_LABEL_KEYS = {
-        "none":    "cookies_none",
-        "chrome":  "cookies_chrome",
-        "yandex":  "cookies_yandex",
-        "firefox": "cookies_firefox",
-        "edge":    "cookies_edge",
-        "opera":   "cookies_opera",
-    }
-
     def update_cookies_ui(self) -> None:
         """Привести переключатель cookies в соответствие с выбранным браузером.
 
@@ -332,7 +312,7 @@ class MainScreen(ThemeTarget):
             self.cookies_enabled_switch.disabled = True
             self.cookies_enabled_switch.label    = s.cookies_switch_off
         else:
-            name_key     = self._COOKIE_LABEL_KEYS.get(browser)
+            name_key     = _COOKIE_LABEL_KEYS.get(browser)
             browser_name = getattr(s, name_key, browser) if name_key else browser
             self.cookies_enabled_switch.disabled = False
             self.cookies_enabled_switch.label    = s.cookies_switch_on.format(browser=browser_name)
@@ -431,7 +411,7 @@ class MainScreen(ThemeTarget):
         self._log_btn = self.register_icon_buttons(ft.IconButton(
             icon=ft.Icons.RECEIPT_LONG_ROUNDED, icon_color=ft.Colors.GREY_500,
             icon_size=18, tooltip=s.btn_open_log,
-            on_click=lambda _: self._open_log(str(self._paths.log_file))
+            on_click=lambda _: open_path(str(self._paths.log_file))
         ))
 
     def _build_layout(self) -> None:
@@ -700,7 +680,7 @@ class MainScreen(ThemeTarget):
 
     def _confirm_redownload(self, url: str, tool: str, prev) -> None:
         s    = self._s()
-        when = _fmt_ts(getattr(prev, "finished_at", None) or getattr(prev, "started_at", None))
+        when = fmt_ts(getattr(prev, "finished_at", None) or getattr(prev, "started_at", None))
 
         def proceed(_e) -> None:
             self._page.pop_dialog()
@@ -830,15 +810,3 @@ class MainScreen(ThemeTarget):
 
     def _show_status(self, message: str, severity: str) -> None:
         self._bus.emit(StatusMessageEvent(message=message, severity=severity))
-
-    @staticmethod
-    def _open_log(path: str) -> None:
-        try:
-            if sys.platform == "win32":
-                os.startfile(path)
-            elif sys.platform == "darwin":
-                subprocess.Popen(["open", path])
-            else:
-                subprocess.Popen(["xdg-open", path])
-        except Exception:
-            get_logger("app").exception("Failed to open log file: %s", path)
