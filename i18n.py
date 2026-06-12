@@ -213,7 +213,7 @@ class Strings:
     btn_open_file:        str = ""
     status_tools_ok:      str = ""
     status_tools_update:  str = ""
-    status_ytdlp_missing: str = ""
+    status_tool_missing:  str = ""  # {tool}
     err_url_empty:        str = ""
     err_url_invalid:      str = ""
     err_max_parallel:     str = ""  # {n}

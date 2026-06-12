@@ -642,7 +642,8 @@ class MainScreen(ThemeTarget, I18nTarget):
             # Эта ссылка уже была успешно загружена — спросить подтверждение.
             self._confirm_redownload(url, outcome.prev)
         elif outcome.status == "no_exe":
-            self._show_status(s.status_ytdlp_missing, "warning")
+            self._show_status(
+                s.fmt("status_tool_missing", tool=outcome.tool or "yt-dlp"), "warning")
 
     def _submit_batch(self, urls: list) -> None:
         """Пачка ссылок: запущенные строки убираются из поля, проблемные

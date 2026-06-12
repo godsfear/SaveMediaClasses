@@ -70,7 +70,8 @@ class TimeoutsConfig:
     """Сетевые таймауты (секунды), персистятся в config.json — раньше были
     захардкожены в коде (tools_manager, providers)."""
     connect:           float = 5.0    # connect httpx при проверке версий инструментов
-    read:              float = 8.0    # read при проверке версий
+    read:              float = 8.0    # read при проверке версий (он же общий лимит запроса)
+    version_probe:     float = 5.0    # локальный вызов `<exe> --version`
     tool_download:     float = 30.0   # общий таймаут скачивания инструментов
     thumbnail_connect: float = THUMBNAIL_SOCK_TIMEOUT   # connect при загрузке превью
     thumbnail_read:    float = THUMBNAIL_TIMEOUT        # read при загрузке превью
@@ -81,6 +82,7 @@ class TimeoutsConfig:
         return {
             "connect":           self.connect,
             "read":              self.read,
+            "version_probe":     self.version_probe,
             "tool_download":     self.tool_download,
             "thumbnail_connect": self.thumbnail_connect,
             "thumbnail_read":    self.thumbnail_read,
@@ -101,6 +103,7 @@ class TimeoutsConfig:
         return TimeoutsConfig(
             connect           = _f("connect",           r.connect),
             read              = _f("read",              r.read),
+            version_probe     = _f("version_probe",     r.version_probe),
             tool_download     = _f("tool_download",     r.tool_download),
             thumbnail_connect = _f("thumbnail_connect", r.thumbnail_connect),
             thumbnail_read    = _f("thumbnail_read",    r.thumbnail_read),
