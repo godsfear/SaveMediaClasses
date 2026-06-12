@@ -41,6 +41,7 @@ class ThemeTarget:
     """
 
     def __init__(self) -> None:
+        super().__init__()   # кооперативный init — для связки с I18nTarget в экранах
         self._theme_headers:   list = []
         self._theme_switches:  list = []
         self._theme_accents:   list = []

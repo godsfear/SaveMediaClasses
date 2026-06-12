@@ -9,6 +9,7 @@ from config import (
     COOKIE_BROWSERS,
 )
 from ui_utils import fmt_ts, open_path
+from controllers.i18n_target import I18nTarget
 from controllers.theme_target import ThemeTarget
 from events import (
     EventBus,
@@ -164,7 +165,7 @@ class DownloadCard:
         )
 
 
-class MainScreen(ThemeTarget):
+class MainScreen(ThemeTarget, I18nTarget):
 
     def __init__(self, page: ft.Page, svc: Services) -> None:
         super().__init__()
@@ -338,6 +339,7 @@ class MainScreen(ThemeTarget):
                 self._on_url_change(None),
             ]
         ))
+        self.register_i18n(url_clear_btn, tooltip="btn_clear")
         # Поле принимает НЕСКОЛЬКО ссылок — по одной на строку (вставка пачки,
         # Shift+Enter — новая строка, Enter — запуск). Поле растёт до 4 строк.
         self.url_input = self.register_accents(ft.TextField(
@@ -350,6 +352,7 @@ class MainScreen(ThemeTarget):
             on_submit=self._on_download_click,
             suffix=url_clear_btn,
         ))
+        self.register_i18n(self.url_input, label="url_label", hint_text="url_hint")
         # Добавление локальных файлов-заданий (.torrent / .metalink) — замена
         # drag&drop: Flet не принимает OS-перетаскивание файлов на окно.
         self._file_picker = ft.FilePicker()
@@ -358,6 +361,7 @@ class MainScreen(ThemeTarget):
             icon_size=18, tooltip=s.btn_add_files,
             on_click=self._pick_task_files,
         ))
+        self.register_i18n(self.add_files_btn, tooltip="btn_add_files")
         # Выбор загрузчика для текущей ссылки: yt-dlp (медиа-сайты) или aria2c
         # (прямые файловые ссылки). Стоит справа от поля URL; выбор запоминается.
         self.downloader_dropdown = self.register_accents(ft.Dropdown(
@@ -368,6 +372,7 @@ class MainScreen(ThemeTarget):
             value=self._state.download_tool,
             on_select=self._on_downloader_change,
         ))
+        self.register_i18n(self.downloader_dropdown, label="downloader_label")
         # Пресет качества видео (yt-dlp). При «Только аудио» не участвует —
         # дропдаун блокируется обработчиком переключателя.
         self.quality_dropdown = self.register_accents(ft.Dropdown(
@@ -378,6 +383,7 @@ class MainScreen(ThemeTarget):
             value=self._state.ytdlp.parameters.quality.value,
             on_select=self._on_quality_change,
         ))
+        self.register_i18n(self.quality_dropdown, label="quality_label")
         # Субтитры (yt-dlp): без / язык из локализации / автоматические / все.
         # Список языков знать заранее не нужно — yt-dlp пересекает запрошенное
         # с доступным, отсутствующие пропускаются без ошибки.
@@ -389,14 +395,18 @@ class MainScreen(ThemeTarget):
             value=self._state.ytdlp.parameters.subtitles.value,
             on_select=self._on_subtitles_change,
         ))
+        self.register_i18n(self.subtitles_dropdown, label="subs_label")
         self.audio_only_switch      = self.register_switches(ft.Switch(
             label=s.switch_audio_only, active_color=ft.Colors.GREEN,
             on_change=self._on_audio_only_change,
         ))
+        self.register_i18n(self.audio_only_switch, label="switch_audio_only")
         self.cookies_enabled_switch = self.register_switches(ft.Switch(label=s.switch_cookies,    active_color=ft.Colors.GREEN, value=False))
 
         self._btn_icon = self.register_button_texts(ft.Icon(ft.Icons.DOWNLOAD_ROUNDED, color=ft.Colors.WHITE))
-        self._btn_text = self.register_button_texts(ft.Text(s.btn_download, color=ft.Colors.WHITE, weight=ft.FontWeight.BOLD))
+        self._btn_text = self.register_i18n(
+            self.register_button_texts(ft.Text(s.btn_download, color=ft.Colors.WHITE, weight=ft.FontWeight.BOLD)),
+            value="btn_download")
         self.download_btn = self.register_buttons(ft.Button(
             content=ft.Row([self._btn_icon, self._btn_text], tight=True, spacing=8),
             bgcolor=ft.Colors.GREEN, tooltip=s.btn_download_tooltip,
@@ -408,11 +418,15 @@ class MainScreen(ThemeTarget):
         self.header_folder = self.register_headers(ft.Text(s.header_folder,   size=14, weight=ft.FontWeight.BOLD, color=ft.Colors.CYAN_400))
         self.header_main   = self.register_headers(ft.Text(s.header_download, size=14, weight=ft.FontWeight.BOLD, color=ft.Colors.CYAN_400))
         self.header_queue  = self.register_headers(ft.Text(s.header_queue,    size=14, weight=ft.FontWeight.BOLD, color=ft.Colors.CYAN_400))
+        self.register_i18n(self.header_folder, value="header_folder")
+        self.register_i18n(self.header_main,   value="header_download")
+        self.register_i18n(self.header_queue,  value="header_queue")
         self._log_btn = self.register_icon_buttons(ft.IconButton(
             icon=ft.Icons.RECEIPT_LONG_ROUNDED, icon_color=ft.Colors.GREY_500,
             icon_size=18, tooltip=s.btn_open_log,
             on_click=lambda _: open_path(str(self._paths.log_file))
         ))
+        self.register_i18n(self._log_btn, tooltip="btn_open_log")
 
     def _build_layout(self) -> None:
         self.folder_card = self.register_cards(ft.Container(
@@ -556,25 +570,16 @@ class MainScreen(ThemeTarget):
     # ── Смена языка ───────────────────────────────────────────────────────────
 
     def rebuild_for_language(self) -> None:
+        """Статичные тексты — по регистрации (apply_language); здесь только
+        динамика: пункты дропдаунов и состояние-зависимые подписи.
+        Отрисовку завершает общий safe_update() оркестратора в app.py."""
         s = self._s()
-        self.header_folder.value  = s.header_folder;   self.header_folder.update()
-        self.header_main.value    = s.header_download; self.header_main.update()
-        self.header_queue.value   = s.header_queue;    self.header_queue.update()
-        self.url_input.label      = s.url_label;       self.url_input.update()
-        self.url_input.hint_text  = s.url_hint
-        self.add_files_btn.tooltip = s.btn_add_files;  self.add_files_btn.update()
-        self.downloader_dropdown.label = s.downloader_label; self.downloader_dropdown.update()
-        self.quality_dropdown.label    = s.quality_label
-        self.quality_dropdown.options  = self._quality_options(s)
-        self.quality_dropdown.update()
-        self.subtitles_dropdown.label   = s.subs_label
+        self.apply_language(s)
+        self.quality_dropdown.options   = self._quality_options(s)
         self.subtitles_dropdown.options = self._subs_options(s)
-        self.subtitles_dropdown.update()
-        self.audio_only_switch.label      = s.switch_audio_only; self.audio_only_switch.update()
-        self.update_cookies_ui();                                self.cookies_enabled_switch.update()
-        self._btn_text.value      = s.btn_download;    self._btn_text.update()
-        self.download_btn.tooltip = s.btn_download_tooltip
-        self.update_folder_ui();                       self.folder_label.update()
+        self.update_cookies_ui()      # подпись зависит от выбранного браузера
+        self._update_download_btn()   # tooltip зависит от занятости слотов
+        self.update_folder_ui()       # текст зависит от выбранности папки
 
     # ── Валидация URL ─────────────────────────────────────────────────────────
 
