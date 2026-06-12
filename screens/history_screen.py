@@ -5,18 +5,17 @@ Pull-модель: данные читаются из БД при открыти
 Фильтрация по статусу, статистика, теги из JSON-params.
 """
 
-import datetime
 import os
-import subprocess
-import sys
 from typing import Optional
 
 import flet as ft
 
-from app_logging import get_logger
-from config import hex_to_flet, download_display_name
+from config import (
+    DOWNLOAD_STATUS_TOKENS, hex_to_flet, token_color, download_display_name,
+)
 from controllers.theme_target import ThemeTarget
 from dataclasses import replace
+from ui_utils import fmt_ts, fmt_duration, open_path
 
 from events import (
     DownloadCompletedEvent, DownloadCancelledEvent,
@@ -27,14 +26,8 @@ from managers.snapshot import DownloadSnapshot
 from managers.download_repository import DownloadRecord, DownloadRepository
 from services import Services
 
-_STATUS_TOKEN = {
-    "completed":  "status_ok_color",
-    "failed":     "status_error_color",
-    "cancelled":  "status_warning_color",
-    "running":    "status_running_color",
-    "incomplete": "status_warning_color",
-    "seeding":    "status_running_color",
-}
+# Карта статус → токен темы живёт в config (DOWNLOAD_STATUS_TOKENS);
+# иконки — Flet-специфика, поэтому остаются здесь.
 _STATUS_ICON = {
     "completed":  ft.Icons.CHECK_CIRCLE_OUTLINE_ROUNDED,
     "failed":     ft.Icons.ERROR_OUTLINE_ROUNDED,
@@ -43,11 +36,6 @@ _STATUS_ICON = {
     "incomplete": ft.Icons.PAUSE_CIRCLE_OUTLINE_ROUNDED,
     "seeding":    ft.Icons.UPLOAD_ROUNDED,
 }
-
-
-def _status_color(status: str, t) -> str:
-    """Цвет статуса из активной темы (фолбэк — приглушённый текст)."""
-    return hex_to_flet(getattr(t, _STATUS_TOKEN.get(status, "text_muted_color")))
 
 
 # Сколько записей тянуть из БД, когда активен поиск (шире обычной страницы).
@@ -259,7 +247,7 @@ class HistoryScreen(ThemeTarget):
         muted_c     = hex_to_flet(t.text_muted_color)
         surface_c   = hex_to_flet(t.surface_color)
         border_c    = hex_to_flet(t.border_color)
-        color = _status_color(rec.status, t)
+        color = token_color(t, DOWNLOAD_STATUS_TOKENS, rec.status)
         icon  = _STATUS_ICON.get(rec.status,  ft.Icons.HELP_OUTLINE_ROUNDED)
 
         # Статус из локали
@@ -273,8 +261,8 @@ class HistoryScreen(ThemeTarget):
         }
         label = status_labels.get(rec.status, rec.status)
 
-        started  = _fmt_ts(rec.started_at)
-        duration = _fmt_duration(rec.started_at, rec.finished_at)
+        started  = fmt_ts(rec.started_at)
+        duration = fmt_duration(rec.started_at, rec.finished_at)
 
         # Метаданные из yt-dlp; для magnet имя берём из dn-параметра ссылки.
         meta = rec.meta or {}
@@ -329,14 +317,14 @@ class HistoryScreen(ThemeTarget):
             icon=ft.Icons.PLAY_CIRCLE_OUTLINE_ROUNDED,
             icon_color=hex_to_flet(t.status_ok_color), icon_size=16,
             tooltip=s.btn_open_file,
-            on_click=lambda _, f=file_path: _open_folder(f),
+            on_click=lambda _, f=file_path: open_path(f),
         ) if (rec.status == "completed" and file_path
               and os.path.exists(file_path)) else None
         btn_folder = ft.IconButton(
             icon=ft.Icons.FOLDER_OPEN_OUTLINED,
             icon_color=muted_c, icon_size=16,
             tooltip=s.btn_open_folder, disabled=not bool(folder),
-            on_click=lambda _, f=folder: _open_folder(f),
+            on_click=lambda _, f=folder: open_path(f),
         )
         btn_delete = ft.IconButton(
             icon=ft.Icons.DELETE_OUTLINE_ROUNDED,
@@ -521,39 +509,3 @@ class HistoryScreen(ThemeTarget):
         avg   = st.get("avg_duration_sec")
         avg_s = s.fmt("stats_avg", n=int(avg)) if avg else ""
         self._stats_text.value = s.fmt("stats_text", total=total, ok=ok, fail=fail, avg=avg_s)
-
-
-# ── Утилиты ───────────────────────────────────────────────────────────────────
-
-def _open_folder(path: str) -> None:
-    """Открыть путь системным способом: для папки — проводник, для файла —
-    ассоциированное приложение (плеер и т.п.)."""
-    try:
-        if sys.platform == "win32":
-            os.startfile(path)
-        elif sys.platform == "darwin":
-            subprocess.Popen(["open", path])
-        else:
-            subprocess.Popen(["xdg-open", path])
-    except Exception:
-        get_logger("app").exception("Failed to open download folder: %s", path)
-
-
-def _fmt_ts(ts: Optional[float]) -> str:
-    if not ts:
-        return "—"
-    try:
-        return datetime.datetime.fromtimestamp(ts).strftime("%d %b %Y  %H:%M")
-    except Exception:
-        return "—"
-
-
-def _fmt_duration(started: Optional[float], finished: Optional[float]) -> str:
-    if not started or not finished:
-        return ""
-    secs = int(finished - started)
-    if secs < 1:
-        return ""
-    if secs < 60:
-        return f"  •  {secs}с"
-    return f"  •  {secs // 60}м {secs % 60}с"

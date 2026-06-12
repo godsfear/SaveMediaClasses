@@ -2,7 +2,8 @@
 import flet as ft
 
 from config import (
-    THEME_FIELDS, THEME_GROUPS, SEVERITY_TOKENS, ThemeConfig, NamedTheme,
+    THEME_FIELDS, THEME_GROUPS, SEVERITY_TOKENS, TOOL_STATUS_TOKENS,
+    COOKIE_BROWSERS, ThemeConfig, NamedTheme,
     hex_to_flet, safe_str, severity_color,
 )
 from managers.tools_manager import (
@@ -48,16 +49,6 @@ def _fmt_size(num: int) -> str:
             return f"{int(size)} {unit}" if unit == "B" else f"{size:.1f} {unit}"
         size /= 1024
     return f"{int(num)} B"
-
-
-# Единая карта: статус проверки версии → токен темы (используется и при
-# проверке, и при восстановлении). Цвет вычисляется по активной палитре.
-_STATUS_TOKEN = {
-    "ok":       "status_ok_color",
-    "outdated": "status_warning_color",
-    "missing":  "status_error_color",
-    "error":    "status_warning_color",
-}
 
 
 class SettingsScreen(ThemeTarget):
@@ -191,17 +182,14 @@ class SettingsScreen(ThemeTarget):
             on_select=self._on_max_parallel_change,
         ))
 
+        # Пункты — из единого реестра COOKIE_BROWSERS (он же у главного экрана).
         self.cookies_browser_dropdown = self.register_accents(ft.Dropdown(
             label=s.cookies_label,
             border_radius=8,
             focused_border_color=ft.Colors.BLUE,
             options=[
-                ft.dropdown.Option("none",    s.cookies_none),
-                ft.dropdown.Option("chrome",  s.cookies_chrome),
-                ft.dropdown.Option("yandex",  s.cookies_yandex),
-                ft.dropdown.Option("firefox", s.cookies_firefox),
-                ft.dropdown.Option("edge",    s.cookies_edge),
-                ft.dropdown.Option("opera",   s.cookies_opera),
+                ft.dropdown.Option(code, getattr(s, label_key))
+                for code, label_key in COOKIE_BROWSERS
             ],
             on_select=self._on_browser_dropdown_change,
         ))
@@ -592,12 +580,11 @@ class SettingsScreen(ThemeTarget):
         self.save_to_source_switch.label = s.switch_source;   self.save_to_source_switch.update()
         self.notify_switch.label         = s.notify_label;    self.notify_switch.update()
 
-        # Куки
+        # Куки (порядок пунктов = порядок реестра COOKIE_BROWSERS)
         self.cookies_browser_dropdown.label = s.cookies_label
-        _cookie_attrs = ["cookies_none", "cookies_chrome", "cookies_yandex",
-                         "cookies_firefox", "cookies_edge", "cookies_opera"]
-        for opt, attr in zip(self.cookies_browser_dropdown.options, _cookie_attrs):
-            opt.text = getattr(s, attr)
+        for opt, (_code, label_key) in zip(self.cookies_browser_dropdown.options,
+                                           COOKIE_BROWSERS):
+            opt.text = getattr(s, label_key)
         self.cookies_browser_dropdown.update()
 
         # Язык
@@ -669,7 +656,7 @@ class SettingsScreen(ThemeTarget):
                                      name=name,
                                      loc=_resolve_version(info.current, s),
                                      rem=_resolve_version(info.latest, s))
-                self._color_tool(name, _STATUS_TOKEN.get(info.status, "text_muted_color"))
+                self._color_tool(name, TOOL_STATUS_TOKENS.get(info.status, "text_muted_color"))
             else:
                 widget.value = s.fmt("tool_dash", name=name)
                 self._color_tool(name, "text_muted_color")
@@ -706,7 +693,7 @@ class SettingsScreen(ThemeTarget):
         widget.value = s.fmt("tool_versions", name=e.tool_name,
                              loc=_resolve_version(e.local_version, s),
                              rem=_resolve_version(e.remote_version, s))
-        self._color_tool(e.tool_name, _STATUS_TOKEN.get(e.status, "text_muted_color"))
+        self._color_tool(e.tool_name, TOOL_STATUS_TOKENS.get(e.status, "text_muted_color"))
         widget.update()
 
     def _on_btn_state(self, e: ToolButtonStateEvent) -> None:

@@ -750,6 +750,18 @@ THEME_GROUPS = [
                                "status_warning_color", "status_running_color"]),
 ]
 
+# Браузеры для cookies (--cookies-from-browser): (ключ, i18n-ключ имени).
+# Единый реестр: дропдаун в настройках и переключатель главного экрана строятся
+# из него — добавление браузера не требует правок в экранах.
+COOKIE_BROWSERS = [
+    ("none",    "cookies_none"),
+    ("chrome",  "cookies_chrome"),
+    ("yandex",  "cookies_yandex"),
+    ("firefox", "cookies_firefox"),
+    ("edge",    "cookies_edge"),
+    ("opera",   "cookies_opera"),
+]
+
 PALETTE = [
     "F44336","E91E63","9C27B0","673AB7","3F51B5","2196F3",
     "03A9F4","00BCD4","009688","4CAF50","8BC34A","CDDC39",
@@ -764,9 +776,11 @@ PALETTE = [
 
 # ── Утилиты ───────────────────────────────────────────────────────────────────
 
-# Семантика статусных событий (severity) → токен ThemeConfig.
-# События шины несут только семантику ("ok"|"warning"|"error"|"info");
-# в конкретный цвет её переводит UI-слой по активной теме.
+# Карты «семантический ключ → токен ThemeConfig». События и записи БД несут
+# только семантику; в конкретный цвет её переводит UI-слой по активной теме
+# через token_color()/severity_color().
+
+# Severity статусных событий шины ("ok"|"warning"|"error"|"info").
 SEVERITY_TOKENS = {
     "ok":      "status_ok_color",
     "warning": "status_warning_color",
@@ -774,10 +788,34 @@ SEVERITY_TOKENS = {
     "info":    "text_secondary_color",
 }
 
+# Статусы загрузок (история/БД).
+DOWNLOAD_STATUS_TOKENS = {
+    "completed":  "status_ok_color",
+    "failed":     "status_error_color",
+    "cancelled":  "status_warning_color",
+    "running":    "status_running_color",
+    "incomplete": "status_warning_color",
+    "seeding":    "status_running_color",
+}
+
+# Статусы проверки версий инструментов (tool_specs.classify_version).
+TOOL_STATUS_TOKENS = {
+    "ok":       "status_ok_color",
+    "outdated": "status_warning_color",
+    "missing":  "status_error_color",
+    "error":    "status_warning_color",
+}
+
+
+def token_color(t: ThemeConfig, token_map: Dict[str, str], key: str,
+                fallback: str = "text_muted_color") -> str:
+    """Flet-цвет по карте «ключ → токен» из активной палитры."""
+    return hex_to_flet(getattr(t, token_map.get(key, fallback)))
+
 
 def severity_color(t: ThemeConfig, severity: str) -> str:
     """Flet-цвет для severity события из токенов активной темы."""
-    return hex_to_flet(getattr(t, SEVERITY_TOKENS.get(severity, "text_secondary_color")))
+    return token_color(t, SEVERITY_TOKENS, severity, "text_secondary_color")
 
 
 def hex_to_flet(hex_str: str) -> str:

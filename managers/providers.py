@@ -27,6 +27,25 @@ from config import safe_str, magnet_btih, THUMBNAIL_TIMEOUT, THUMBNAIL_SOCK_TIME
 from managers.snapshot import DownloadSnapshot
 
 
+def _split_args(raw: str) -> list[str]:
+    """CLI-строка из конфига → список аргументов. Кривые кавычки пользователя
+    не роняют запуск: фолбэк — наивный split по пробелам. '' → []."""
+    raw = safe_str(raw).strip()
+    if not raw:
+        return []
+    try:
+        return shlex.split(raw)
+    except ValueError:
+        return raw.split()
+
+
+def is_playlist_url(url: str) -> bool:
+    """Эвристика «ссылка на плейлист» — для шаблона пути загрузки и пометки
+    в метаданных (yt-dlp с --no-playlist сам этого не сообщает)."""
+    u = safe_str(url).lower()
+    return "list=" in u or "playlist" in u
+
+
 # ── Протокол ──────────────────────────────────────────────────────────────────
 
 @runtime_checkable
@@ -252,42 +271,20 @@ class YtDlpProvider(_SubprocessProvider):
 
         args.append(s.playlist_flag_on if s.playlist_enabled else s.playlist_flag_off)
 
-        if s.embed_metadata and s.metadata_flags:
-            try:
-                args.extend(shlex.split(s.metadata_flags))
-            except ValueError:
-                args.extend(s.metadata_flags.split())
+        if s.embed_metadata:
+            args.extend(_split_args(s.metadata_flags))
 
         if s.audio_only:
-            if s.audio_flags:
-                try:
-                    args.extend(shlex.split(s.audio_flags))
-                except ValueError:
-                    args.extend(s.audio_flags.split())
+            args.extend(_split_args(s.audio_flags))
         else:
-            raw = safe_str(s.yt_dlp_args).strip()
-            if raw:
-                try:
-                    args.extend(shlex.split(raw))
-                except ValueError:
-                    args.extend(raw.split())
+            args.extend(_split_args(s.yt_dlp_args))
             # Пресет качества — ПОСЛЕ extra_args: последний -f переопределяет
             # формат, остальные флаги extra_args продолжают действовать.
-            quality = safe_str(s.quality_args).strip()
-            if quality:
-                try:
-                    args.extend(shlex.split(quality))
-                except ValueError:
-                    args.extend(quality.split())
+            args.extend(_split_args(s.quality_args))
             # Субтитры — только для видео (в аудиофайл их не вшить).
-            subs = safe_str(s.subtitles_args).strip()
-            if subs:
-                try:
-                    args.extend(shlex.split(subs))
-                except ValueError:
-                    args.extend(subs.split())
+            args.extend(_split_args(s.subtitles_args))
 
-        is_pl  = "list=" in s.url.lower() or "playlist" in s.url.lower()
+        is_pl  = is_playlist_url(s.url)
         t_name = s.clean_title_template if s.clean_titles else s.title_id_template
         t_path = (
             os.path.join(s.playlist_dir_template, s.playlist_idx_prefix + t_name)
@@ -368,7 +365,7 @@ class YtDlpProvider(_SubprocessProvider):
                 thumb_url = data.get("thumbnail", "")
 
             # Добавляем признак плейлиста по URL — _type из --no-playlist не несёт этой инфы
-            if "list=" in url.lower() or "playlist" in url.lower():
+            if is_playlist_url(url):
                 data["_is_playlist"] = True
 
             if not thumb_url:
@@ -462,7 +459,7 @@ class Aria2cProvider(_SubprocessProvider):
         if s.seed:
             self._final_dir = ""
             self._part_dir  = ""
-            args = [exe, *shlex.split(safe_str(s.aria2_seed_args))]
+            args = [exe, *_split_args(s.aria2_seed_args)]
             if safe_str(s.download_path):
                 args.append(f"--dir={safe_str(s.download_path)}")
             if s.proxy_enabled and safe_str(s.proxy_address).strip():
@@ -473,7 +470,7 @@ class Aria2cProvider(_SubprocessProvider):
         # Фиксированные флаги aria2c берём из конфига (snapshot.aria2_args), а не
         # из кода. Их назначение важно для логики (summary-interval=0 — парсинг
         # прогресса, auto-save-interval=1 — pause/resume, continue/seed-time).
-        args = [exe, *shlex.split(safe_str(s.aria2_args))]
+        args = [exe, *_split_args(s.aria2_args)]
 
         # Качаем во временную подпапку <part_dirname>/<id>; финал — папка загрузки.
         # id = SHA-256(url)[:16] (64 бита): детерминирован, поэтому повторное

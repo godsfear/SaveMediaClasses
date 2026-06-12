@@ -8,7 +8,7 @@
         "clipboard_watch": false,
         "history_keep_days": 0,
         "notify_on_complete": true,
-        "last_check_time": 1781282438.28598,
+        "last_check_time": 1781283011.3130558,
         "last_needs_update": false
     },
     "tools": {
@@ -148,8 +148,8 @@
     "window": {
         "width": 778,
         "height": 1081,
-        "left": 3588,
-        "top": 245
+        "left": 3946,
+        "top": 201
     },
     "timeouts": {
         "connect": 5.0,
