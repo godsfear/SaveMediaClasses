@@ -77,6 +77,9 @@ class NavigationController:
         status_bar_text = ft.Text("", size=12,
                                   color=severity_color(svc.state.theme, "ok"))
         self._status_bar_text = status_bar_text
+        # severity последнего сообщения — чтобы при смене темы перекрасить
+        # текст из новой палитры, не теряя его семантику.
+        self._status_severity = "ok"
 
         self.main_status_container = ft.Container(
             content=status_bar_text, padding=ft.Padding(left=10, right=10)
@@ -93,6 +96,7 @@ class NavigationController:
         self._svc.bus.on(StatusMessageEvent, self._on_status_message)
 
     def _on_status_message(self, e: StatusMessageEvent) -> None:
+        self._status_severity       = e.severity
         self._status_bar_text.value = e.message
         self._status_bar_text.color = severity_color(self._svc.state.theme, e.severity)
         self._svc.safe_update()
@@ -124,6 +128,9 @@ class NavigationController:
             btn.icon_color = fg
         # Кнопка выхода — статусный цвет «ошибка» из активной палитры.
         self.exit_btn.icon_color = hex_to_flet(self._svc.state.theme.status_error_color)
+        # Статус-бар: последнее сообщение в цвет его severity из новой палитры.
+        self._status_bar_text.color = severity_color(
+            self._svc.state.theme, self._status_severity)
         self.update_proxy_ui()
         self.update_clipboard_ui()
         ab = self._page.appbar

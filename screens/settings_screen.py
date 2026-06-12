@@ -2,7 +2,7 @@
 import flet as ft
 
 from config import (
-    THEME_FIELDS, THEME_GROUPS, ThemeConfig, NamedTheme,
+    THEME_FIELDS, THEME_GROUPS, SEVERITY_TOKENS, ThemeConfig, NamedTheme,
     hex_to_flet, safe_str, severity_color,
 )
 from managers.tools_manager import (
@@ -58,11 +58,6 @@ _STATUS_TOKEN = {
     "missing":  "status_error_color",
     "error":    "status_warning_color",
 }
-
-
-def _status_color(status: str, t: ThemeConfig) -> str:
-    """Flet-цвет статуса инструмента из активной темы (фолбэк — приглушённый текст)."""
-    return hex_to_flet(getattr(t, _STATUS_TOKEN.get(status, "text_muted_color")))
 
 
 class SettingsScreen(ThemeTarget):
@@ -159,6 +154,13 @@ class SettingsScreen(ThemeTarget):
         super().apply_theme(t)
         # Подложка прогресс-бара (register_progress красит только .color).
         self.progress_bar.bgcolor = hex_to_flet(t.border_color)
+        # Кнопки «Тёмная/Светлая» строятся из цветов темы — перестроить.
+        self._rebuild_mode_buttons()
+        # Статусы инструментов и строка прогресса: перекрасить по их последним
+        # токенам/severity из новой палитры (семантика цвета сохраняется).
+        for name, token in self._tool_tokens.items():
+            self._color_tool(name, token)
+        self.progress_text.color = severity_color(t, self._progress_severity)
 
     # ── Виджеты ───────────────────────────────────────────────────────────────
 
@@ -242,11 +244,20 @@ class SettingsScreen(ThemeTarget):
                     color=hex_to_flet(self._state.theme.text_muted_color),
                     size=13, weight=ft.FontWeight.BOLD,
                 )
+        # Токен цвета каждой строки статуса (по последнему событию): apply_theme
+        # перекрашивает строки из новой палитры, не теряя их семантику.
+        self._tool_tokens: dict[str, str] = {
+            name: "text_muted_color" for name in self._tool_status
+        }
 
-        self.progress_text = self.register_progress(ft.Text(
+        # progress_text НЕ регистрируется в теме: его цвет несёт severity
+        # последнего сообщения, а не токен progress_color. Запоминаем severity
+        # и перекрашиваем в apply_theme.
+        self._progress_severity = "ok"
+        self.progress_text = ft.Text(
             s.status_waiting, size=12,
             color=severity_color(self._state.theme, "ok"),
-        ))
+        )
         self.progress_bar  = self.register_progress(ft.ProgressBar(
             value=0.0,
             color=hex_to_flet(self._state.theme.progress_color),
@@ -658,21 +669,22 @@ class SettingsScreen(ThemeTarget):
                                      name=name,
                                      loc=_resolve_version(info.current, s),
                                      rem=_resolve_version(info.latest, s))
-                widget.color = _status_color(info.status, t)
+                self._color_tool(name, _STATUS_TOKEN.get(info.status, "text_muted_color"))
             else:
                 widget.value = s.fmt("tool_dash", name=name)
-                widget.color = hex_to_flet(t.text_muted_color)
+                self._color_tool(name, "text_muted_color")
 
         if e.needs_update:
             self.update_btn_text.value = s.btn_update
             self.update_btn_icon.name  = ft.Icons.DOWNLOAD_ROUNDED
             self.progress_text.value   = s.fmt("status_has_updates", mins=e.mins_until_check)
-            self.progress_text.color   = severity_color(t, "warning")
+            self._progress_severity    = "warning"
         else:
             self.update_btn_text.value = s.btn_check
             self.update_btn_icon.name  = ft.Icons.REFRESH_ROUNDED
             self.progress_text.value   = s.fmt("status_all_ok", mins=e.mins_until_check)
-            self.progress_text.color   = severity_color(t, "ok")
+            self._progress_severity    = "ok"
+        self.progress_text.color = severity_color(t, self._progress_severity)
         self._safe_update()
 
     # ── Обработчики событий шины (инструменты) ───────────────────────────────
@@ -683,7 +695,7 @@ class SettingsScreen(ThemeTarget):
         if widget is None:
             return
         widget.value = s.fmt("tool_querying", name=e.tool_name, loc=_resolve_version(e.local_version, s))
-        widget.color = hex_to_flet(self._state.theme.text_muted_color)
+        self._color_tool(e.tool_name, "text_muted_color")
         widget.update()
 
     def _on_tool_remote(self, e: ToolVersionRemoteEvent) -> None:
@@ -694,7 +706,7 @@ class SettingsScreen(ThemeTarget):
         widget.value = s.fmt("tool_versions", name=e.tool_name,
                              loc=_resolve_version(e.local_version, s),
                              rem=_resolve_version(e.remote_version, s))
-        widget.color = _status_color(e.status, self._state.theme)
+        self._color_tool(e.tool_name, _STATUS_TOKEN.get(e.status, "text_muted_color"))
         widget.update()
 
     def _on_btn_state(self, e: ToolButtonStateEvent) -> None:
@@ -741,31 +753,39 @@ class SettingsScreen(ThemeTarget):
         else:
             text = e.key
         self.progress_text.value = text
+        self._progress_severity  = e.severity
         self.progress_text.color = severity_color(self._state.theme, e.severity)
         self._safe_update()
 
     def _on_install_status(self, e: ToolInstallStatusEvent) -> None:
         s = self._s
-        t = self._state.theme
         widget = self._tool_widget(e.tool_name)
         if widget is None:
             return
         if e.code == "downloading":
             widget.value = f"{e.tool_name}: {s.tool_update_downloading}"
-            widget.color = severity_color(t, "warning")
+            severity = "warning"
         elif e.code == "ok":
             widget.value = f"{e.tool_name}: {s.tool_update_ok}"
-            widget.color = severity_color(t, "ok")
+            severity = "ok"
         elif e.code == "manual":
             widget.value = f"{e.tool_name}: {s.fmt('tool_update_manual', hint=e.detail)}"
-            widget.color = severity_color(t, "warning")
+            severity = "warning"
         else:
             widget.value = f"{e.tool_name}: {s.fmt('tool_update_error', detail=e.detail)}"
-            widget.color = severity_color(t, "error")
+            severity = "error"
+        self._color_tool(e.tool_name, SEVERITY_TOKENS[severity])
         self._safe_update()
 
     def _tool_widget(self, name: str) -> ft.Text | None:
         return self._tool_status.get(name)
+
+    def _color_tool(self, name: str, token: str) -> None:
+        """Запомнить токен цвета строки инструмента и применить его из активной темы."""
+        self._tool_tokens[name] = token
+        widget = self._tool_status.get(name)
+        if widget is not None:
+            widget.color = hex_to_flet(getattr(self._state.theme, token))
 
     # ── Обработчик кнопки — публикует намерение (маршрутизирует ToolsController) ──
 

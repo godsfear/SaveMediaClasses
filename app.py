@@ -32,8 +32,8 @@ class SaveMediaApp:
         log = get_logger("app")
 
         # ── Тема страницы ─────────────────────────────────────────────────────
-        # theme_mode выставляется в theme_ctrl.apply() из state до reveal окна.
-        page.theme      = ft.Theme(color_scheme_seed=ft.Colors.BLUE)
+        # page.theme (seed от accent_color) и theme_mode выставляет
+        # theme_ctrl.apply() из state до reveal окна.
         page.title      = "SaveMedia"
         page.padding    = 15
         page.safe_area  = True

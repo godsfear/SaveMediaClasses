@@ -52,6 +52,9 @@ class ThemeController:
             ft.ThemeMode.LIGHT if self._svc.state.theme_mode == "light"
             else ft.ThemeMode.DARK
         )
+        # Seed Material-палитры Flet: от него зависят элементы вне токенов темы
+        # (меню дропдаунов, шевроны ExpansionTile, TextButton в диалогах).
+        self._page.theme = ft.Theme(color_scheme_seed=hex_to_flet(t.accent_color))
         self._page.bgcolor = hex_to_flet(t.bg_color)
         for screen in self._screens:
             screen.apply_theme(t)
