@@ -16,21 +16,13 @@ from config import (
     DEFAULT_DOWNLOAD_PATH, DEFAULT_PROXY_ADDRESS, DEFAULT_MAX_PARALLEL,
 )
 from i18n import Locale
-
-
-# Импорты реестра ленивые: он живёт в пакете managers, чей __init__ тянет
-# config_manager → state. Импорт на верхнем уровне state.py замкнул бы цикл;
-# на момент вызова (создание AppState / доступ к property) всё уже загружено.
-
-def _default_tools() -> Dict[str, ToolConfig]:
-    """Дефолтные конфиги всех инструментов (фабрика поля tools)."""
-    from managers.tool_registry import default_tools_config
-    return default_tools_config()
+# Импорт реестра прямой: managers/__init__ пуст (см. его docstring), поэтому
+# цепочка state → tool_registry → config ациклична и безопасна.
+from managers.tool_registry import DEFAULT_TOOLS, default_tools_config
 
 
 def _tool_default(name: str) -> ToolConfig:
     """Дефолтный конфиг конкретного инструмента из реестра — fallback для аксессоров."""
-    from managers.tool_registry import DEFAULT_TOOLS
     for tool in DEFAULT_TOOLS:
         if tool.name == name:
             return tool.default_config()
@@ -62,7 +54,7 @@ class AppState:
     last_needs_update: bool  = False
 
     # ── Инструменты: СТАТИЧЕСКИЙ конфиг (URL, имена, флаги) ───────────────────
-    tools: Dict[str, ToolConfig] = field(default_factory=_default_tools)
+    tools: Dict[str, ToolConfig] = field(default_factory=default_tools_config)
 
     # ── Инструменты: RUNTIME-состояние версий, ключ — имя бинарника ───────────
     # (yt-dlp, ffmpeg, ffplay, ffprobe). Отделено от конфига; заполняется
