@@ -42,10 +42,12 @@ if TYPE_CHECKING:
 class SubmitOutcome:
     """Исход постановки загрузки. status:
     "started" | "invalid" | "at_capacity" | "already_active" | "duplicate" | "no_exe".
-    prev — запись истории для "duplicate" (экран показывает диалог подтверждения)."""
+    prev — запись истории для "duplicate" (экран показывает диалог подтверждения);
+    tool — провайдер, которому ушла бы ссылка (для сообщения "no_exe")."""
     status:  str
     task_id: str | None = None
     prev:    Any = None
+    tool:    str = ""
 
 
 class DownloadOrchestrator:
@@ -130,8 +132,8 @@ class DownloadOrchestrator:
         snapshot = DownloadSnapshot.from_state(self._state, url)
         task_id = self.launch(snapshot, tool, self.download_name(url))
         if task_id is None:
-            return SubmitOutcome("no_exe")
-        return SubmitOutcome("started", task_id=task_id)
+            return SubmitOutcome("no_exe", tool=tool)
+        return SubmitOutcome("started", task_id=task_id, tool=tool)
 
     def launch(self, snapshot: DownloadSnapshot, tool: str, title: str) -> str | None:
         """Запустить загрузку по готовому снимку: задача в менеджер + событие для

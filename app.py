@@ -3,7 +3,7 @@ import time
 import flet as ft
 
 from app_logging import get_logger
-from config import CHECK_INTERVAL_SECONDS, hex_to_flet
+from config import CHECK_INTERVAL_SECONDS, PERSIST_DEBOUNCE_SECONDS, hex_to_flet
 from controllers import (
     ClipboardController, NavigationController, NotificationController,
     ThemeController, ToolsController, WindowController,
@@ -11,7 +11,7 @@ from controllers import (
 from events import (
     ToolsCheckedEvent, ToolsRestoredEvent,
     SettingsChangedEvent, LanguageChangedEvent, ThemeChangedEvent,
-    ResumeDownloadEvent,
+    ResumeDownloadEvent, AppClosingEvent,
 )
 from screens.history_screen import HistoryScreen
 from screens.main_screen import MainScreen
@@ -72,10 +72,35 @@ class SaveMediaApp:
         # в дропдауне, закрытие окна). Push (запись в state на каждый ввод)
         # означал бы сохранение на каждое нажатие клавиши без выгоды для
         # консистентности: между коммитами state читают только сами экраны.
-        def persist(_=None) -> None:
+        #
+        # Запись на диск ДЕБАУНСИТСЯ: правка hex-цвета шлёт SettingsChangedEvent
+        # на каждый символ — пишем после паузы тишины. Это безопасно: источники
+        # события сами коммитят своё состояние в state ДО эмита, откладывается
+        # только страховочный sync_to_state + сама запись файла. На закрытии
+        # приложения — немедленный flush (AppClosingEvent приходит до destroy).
+        def write_config() -> None:
             main_screen.sync_to_state()
             settings_screen.sync_to_state()
             svc.config_mgr.save(svc.state)
+
+        pending_save: dict = {"task": None}
+
+        async def _delayed_write() -> None:
+            await asyncio.sleep(PERSIST_DEBOUNCE_SECONDS)
+            write_config()
+
+        def _cancel_pending() -> None:
+            task = pending_save["task"]
+            if task is not None and not task.done():
+                task.cancel()
+
+        def persist(_=None) -> None:
+            _cancel_pending()
+            pending_save["task"] = page.run_task(_delayed_write)
+
+        def flush_config(_=None) -> None:
+            _cancel_pending()
+            write_config()
 
         # ── Контроллеры ───────────────────────────────────────────────────────
         window_ctrl = WindowController(page, svc)
@@ -123,6 +148,7 @@ class SaveMediaApp:
         # только переключение на главный экран.
         svc.bus.on(ResumeDownloadEvent, lambda e: nav_ctrl.show_main())
         svc.bus.on(SettingsChangedEvent, persist)
+        svc.bus.on(AppClosingEvent,      flush_config)
         svc.bus.on(LanguageChangedEvent, _on_language_changed)
         svc.bus.on(ThemeChangedEvent,    _on_theme_changed)
         svc.bus.on(ToolsCheckedEvent,    _on_tools_checked)

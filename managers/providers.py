@@ -450,7 +450,8 @@ class Aria2cProvider(_SubprocessProvider):
 
     def build_command(self, exe: str, snapshot: DownloadSnapshot) -> list[str]:
         s    = snapshot
-        self._is_magnet = safe_str(s.url).strip().lower().startswith("magnet:")
+        low  = safe_str(s.url).strip().lower()
+        self._is_magnet = low.startswith("magnet:")
         self._gids = []   # сброс на каждый запуск: важно для resume (иначе фаза
                           # метаданных magnet не подавится — _gids уже был ≥2)
 
@@ -471,6 +472,17 @@ class Aria2cProvider(_SubprocessProvider):
         # из кода. Их назначение важно для логики (summary-interval=0 — парсинг
         # прогресса, auto-save-interval=1 — pause/resume, continue/seed-time).
         args = [exe, *_split_args(s.aria2_args)]
+
+        # Контент с хешами кусков (торрент/metalink): сверить уже лежащие в
+        # .part файлы. Без этого брошенная загрузка без контрольного .aria2
+        # (приложение убили, .aria2 потерян) при повторном добавлении
+        # перезаписывалась бы с нуля (--allow-overwrite=true); с проверкой
+        # aria2 хеширует имеющееся и докачивает только недостающие куски.
+        # Для http/ftp без контрольных сумм флаг эффекта не имеет — добавляем
+        # структурно и только там, где он работает (как --dir/--all-proxy).
+        if (self._is_magnet or low.startswith("metalink:")
+                or low.endswith((".torrent", ".metalink"))):
+            args.append("--check-integrity=true")
 
         # Качаем во временную подпапку <part_dirname>/<id>; финал — папка загрузки.
         # id = SHA-256(url)[:16] (64 бита): детерминирован, поэтому повторное
@@ -659,9 +671,15 @@ def provider_factories(paths) -> dict[str, Callable[[], DownloadProvider]]:
 
 
 def resolve_provider_for_url(url: str) -> str:
-    """Auto-режим: ссылка на файл/торрент → aria2c, страница для извлечения → yt-dlp."""
-    return (Aria2cProvider.SOURCE_NAME if Aria2cProvider.claims_url(url)
-            else DEFAULT_PROVIDER)
+    """Auto-режим: ссылку забирает первый провайдер реестра, заявивший на неё
+    права (classmethod claims_url — например, файл/торрент → aria2c). Никто не
+    заявил → провайдер по умолчанию (yt-dlp, извлечение со страниц). Новый
+    провайдер участвует в auto-выборе, просто объявив claims_url."""
+    for key, cls in PROVIDERS.items():
+        claims = getattr(cls, "claims_url", None)
+        if claims is not None and claims(url):
+            return key
+    return DEFAULT_PROVIDER
 
 
 def extract_download_urls(text: str) -> list:

@@ -179,6 +179,20 @@ def test_aria2_build_command_uses_part_dir(paths):
     assert f"--dir={p.temp_dir()}" in cmd
 
 
+@pytest.mark.parametrize("url,expected", [
+    ("magnet:?xt=urn:btih:abc",      True),    # хеши кусков есть в метаданных
+    ("C:/dir/file.torrent",          True),
+    ("C:/dir/file.metalink",         True),
+    ("https://ex.com/f.zip",         False),   # у http контрольных сумм нет
+])
+def test_aria2_check_integrity_only_for_hashed_content(paths, url, expected):
+    """Брошенная торрент-загрузка без .aria2 сверяется по хешам, а не качается
+    заново; http-ссылкам флаг не добавляется (он там не имеет эффекта)."""
+    p = Aria2cProvider(paths)
+    cmd = p.build_command("aria2c.exe", snap(url, download_path="C:/dl"))
+    assert ("--check-integrity=true" in cmd) is expected
+
+
 def test_aria2_seed_mode_no_part_dir(paths):
     p = Aria2cProvider(paths)
     cmd = p.build_command("aria2c.exe",

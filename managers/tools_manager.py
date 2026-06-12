@@ -133,7 +133,8 @@ class ToolsManager:
             local: dict[str, str] = {}
             for spec in specs:
                 for b in spec.binaries(state):
-                    ver = await self._probe_local_version(spec, b)
+                    ver = await self._probe_local_version(
+                        spec, b, timeout=state.timeouts.version_probe)
                     local[b.name] = ver
                     on_local_version(b.name, ver)
 
@@ -157,7 +158,9 @@ class ToolsManager:
         finally:
             self._checking = False
 
-    async def _probe_local_version(self, spec: ToolSpec, binary: ToolBinary) -> str:
+    async def _probe_local_version(self, spec: ToolSpec, binary: ToolBinary,
+                                   timeout: float) -> str:
+        """timeout — лимит локального вызова `<exe> --version` (timeouts.version_probe)."""
         path = self._binary_path(binary)
         if not path:
             return TOOL_VERSION_MISSING
@@ -174,7 +177,7 @@ class ToolsManager:
                 stdin=subprocess.DEVNULL,
                 startupinfo=startup,
             )
-            out, _ = await asyncio.wait_for(proc.communicate(), timeout=5)
+            out, _ = await asyncio.wait_for(proc.communicate(), timeout=timeout)
             text = out.decode("utf-8", errors="replace").strip()
             return spec.parse_version(binary, text) or TOOL_VERSION_CALL_ERROR
         except Exception:
@@ -183,9 +186,12 @@ class ToolsManager:
 
     async def _fetch_remote(self, spec: ToolSpec, state: "AppState",
                             client: httpx.AsyncClient) -> str:
+        # Общий лимит запроса = timeouts.read (httpx-клиент стережёт фазы
+        # соединения/чтения, wait_for — весь вызов целиком).
         try:
             url = spec.version_url(state)
-            return await asyncio.wait_for(spec.fetch_remote_version(client, url), timeout=8.0)
+            return await asyncio.wait_for(
+                spec.fetch_remote_version(client, url), timeout=state.timeouts.read)
         except Exception:
             self._log.warning("Failed to get remote version for %s", spec.name, exc_info=True)
             return TOOL_VERSION_REMOTE_ERR
