@@ -65,17 +65,14 @@ class DownloadManager:
     def __init__(self,
                  provider_factories: Dict[str, Callable[[], "DownloadProvider"]],
                  default_provider: str,
-                 log_path: str,
                  bus: EventBus,
                  task_runner: TaskRunner,
-                 db=None,
                  max_parallel: Optional[Callable[[], int]] = None) -> None:
         """
         provider_factories — реестр {ключ: callable без аргументов → новый DownloadProvider}.
             Пример: {"yt-dlp": lambda: YtDlpProvider(paths), "aria2c": lambda: Aria2cProvider(paths)}
         default_provider — ключ провайдера по умолчанию (когда add() вызван без выбора).
         task_runner — планировщик async-задач (в app.py: page.run_task).
-        db — DownloadRepository для сохранения thumbnail после загрузки (опционально).
         max_parallel — поставщик текущего лимита одновременных загрузок
             (в Services: lambda: state.max_parallel). Читается динамически:
             смена настройки применяется без пересоздания менеджера.
@@ -84,7 +81,6 @@ class DownloadManager:
         self._default_provider   = default_provider
         self._task_runner        = task_runner
         self._bus                = bus
-        self._db                 = db
         self._log                = get_logger("app")
 
         # Слоты параллельности. Семафор не подходит: его ёмкость фиксируется
@@ -325,7 +321,7 @@ class DownloadManager:
                 return
 
             # Пауза: процесс убит, но задачу НЕ финализируем — она ждёт resume().
-            # Выход из `async with` освобождает слот семафора; partial цел в .part.
+            # Выход из `async with` освобождает слот параллельности; partial цел в .part.
             if task.paused:
                 return
 

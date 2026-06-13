@@ -1,4 +1,4 @@
-"""Тесты чистой логики config.py: миграции from_dict, утилиты, severity."""
+"""Тесты чистой логики пакета config: миграции from_dict, утилиты, severity."""
 
 import pytest
 

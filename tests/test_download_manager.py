@@ -13,7 +13,6 @@ def make_dm(limit_fn=None, bus=None):
     return DownloadManager(
         provider_factories={},
         default_provider="yt-dlp",
-        log_path="",
         bus=bus or EventBus(),
         task_runner=lambda *a: None,
         max_parallel=limit_fn,

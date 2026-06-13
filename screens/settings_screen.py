@@ -325,7 +325,7 @@ class SettingsScreen(ThemeTarget, I18nTarget):
         self.register_i18n(self.header_modes,       value="section_modes")
         self.register_i18n(self.header_appearance,  value="section_appearance")
 
-    # ── Куки UI ───────────────────────────────────────────────────────────────
+    # ── Обработчики настроек (история, лимит, браузер cookies, язык) ─────────
 
     def _history_keep_options(self, s: Strings) -> list:
         """«Всегда» + стандартные сроки + текущее значение (если задано вручную)."""

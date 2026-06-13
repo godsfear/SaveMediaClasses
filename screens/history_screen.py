@@ -473,9 +473,10 @@ class HistoryScreen(ThemeTarget, I18nTarget):
 
     def _resume(self, rec: DownloadRecord) -> None:
         """Возобновить незавершённую (или повторить неудачную/отменённую)
-        загрузку: событие подхватит главный экран (запустит/докачает с теми же
-        параметрами), навигация переключит на него. Старая запись будет заменена
-        новой; partial у aria2c докачивается — .part/<id> детерминирована по URL."""
+        загрузку: событие подхватит DownloadOrchestrator (запустит/докачает с
+        теми же параметрами), карточку нарисует главный экран, навигация
+        переключит на него. Старая запись будет заменена новой; partial у
+        aria2c докачивается — .part/<id> детерминирована по URL."""
         title = (rec.meta or {}).get("title") or download_display_name(rec.url)
         self._bus.emit(ResumeDownloadEvent(
             task_id=rec.task_id, url=rec.url, source=rec.source,
