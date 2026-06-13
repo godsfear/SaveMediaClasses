@@ -5,7 +5,8 @@ Services создаётся один раз в app.py и передаётся в
 Добавление новой зависимости: поле в Services — подписи экранов не меняются.
 
 Что входит:
-  Инфраструктура  — bus, config_mgr, tools, dm
+  Инфраструктура  — bus, config_mgr, tools, dm, thumbs, downloads (оркестратор)
+  Персистентность — db (история загрузок)
   Состояние       — state (изменяемый dataclass, это нормально)
   Окружение       — paths (единый источник путей), safe_update
 
@@ -81,10 +82,8 @@ class Services:
         dm         = DownloadManager(
             provider_factories=provider_factories(paths),
             default_provider=DEFAULT_PROVIDER,
-            log_path=paths.log_file,
             bus=bus,
             task_runner=task_runner,
-            db=db,
             max_parallel=lambda: state.max_parallel,
         )
         thumbs     = ThumbnailService(paths=paths, bus=bus, db=db, state=state)

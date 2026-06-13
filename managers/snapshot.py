@@ -2,8 +2,8 @@
 managers/snapshot.py — неизменяемый снимок параметров загрузки.
 
 Выделен в отдельный модуль, чтобы его могли типизированно импортировать все
-слои (events, providers, download_manager, экраны) без циклических зависимостей:
-модуль зависит только от stdlib (AppState — лишь под TYPE_CHECKING).
+слои (events, providers, download_manager, оркестратор, экраны) без циклических
+зависимостей: модуль зависит только от stdlib (AppState — лишь под TYPE_CHECKING).
 """
 
 from __future__ import annotations
@@ -57,9 +57,10 @@ class DownloadSnapshot:
         """Собрать неизменяемый снимок из текущего AppState.
 
         Знание внутренних имён флагов/шаблонов yt-dlp-параметров локализовано
-        здесь, а не в UI-экране: экрану достаточно вызвать from_state(state, url).
-        Доступ к параметрам — через типизированный аксессор state.ytdlp,
-        поэтому строковых имён инструментов тут тоже нет.
+        здесь, а не у вызывающего (DownloadOrchestrator): ему достаточно
+        вызвать from_state(state, url). Доступ к параметрам — через
+        типизированный аксессор state.ytdlp, поэтому строковых имён
+        инструментов тут тоже нет.
         """
         p = state.ytdlp.parameters
         a = state.aria2c.parameters

@@ -57,6 +57,9 @@ DEFAULT_ARIA2_DOWNLOAD_URL  = "https://api.github.com/repos/aria2/aria2/releases
 # приложения): --summary-interval=0 (парсинг прогресса по \r-строке без спама),
 # --auto-save-interval=1 (контрольный .aria2 актуален для pause/resume),
 # --continue=true (докачка), --seed-time=0 (не сидировать торрент после докачки).
+# Для торрент/metalink-ссылок Aria2cProvider.build_command дополнительно
+# добавляет --check-integrity=true (структурно, в коде): докачка брошенной
+# загрузки без контрольного .aria2 идёт по хешам кусков, а не с нуля.
 DEFAULT_ARIA2_ARGS          = ("--summary-interval=0 --console-log-level=warn "
                                "--continue=true --auto-file-renaming=false "
                                "--allow-overwrite=true --auto-save-interval=1 --seed-time=0")

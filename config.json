@@ -8,7 +8,7 @@
         "clipboard_watch": false,
         "history_keep_days": 0,
         "notify_on_complete": true,
-        "last_check_time": 1781299611.0178828,
+        "last_check_time": 1781376984.6132646,
         "last_needs_update": false
     },
     "tools": {
@@ -120,9 +120,9 @@
     },
     "tool_versions": {
         "yt-dlp": {
-            "current": "2026.06.09",
+            "current": "\u0000CALL",
             "latest": "2026.06.09",
-            "status": "ok"
+            "status": "error"
         },
         "ffmpeg": {
             "current": "8.1.1",
@@ -148,8 +148,8 @@
     "window": {
         "width": 778,
         "height": 1081,
-        "left": 3750,
-        "top": 170
+        "left": 3847,
+        "top": 301
     },
     "timeouts": {
         "connect": 5.0,
@@ -232,5 +232,5 @@
             }
         }
     },
-    "language": "en"
+    "language": "ru"
 }

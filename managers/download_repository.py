@@ -8,6 +8,7 @@ DownloadRepository — SQLite-слой истории загрузок.
     url           TEXT              — исходная ссылка
     source        TEXT              — провайдер ("yt-dlp", "aria2c", ...)
     status        TEXT              — "running"|"completed"|"failed"|"cancelled"
+                                      |"incomplete" (пауза) |"seeding" (раздача)
     started_at    REAL              — Unix timestamp начала
     finished_at   REAL              — Unix timestamp завершения (NULL пока идёт)
     error_message TEXT              — текст ошибки (NULL если успех)

@@ -1,4 +1,8 @@
-from .main_screen import MainScreen
-from .settings_screen import SettingsScreen
+"""
+screens — экраны приложения (главный, настройки, история).
 
-__all__ = ["MainScreen", "SettingsScreen"]
+__init__ намеренно пуст: импортируйте модули по полному пути
+(from screens.main_screen import MainScreen) — так делают app.py и контроллеры.
+Прежние реэкспорты здесь устаревали (HistoryScreen в них так и не попал) и
+никем не использовались.
+"""
