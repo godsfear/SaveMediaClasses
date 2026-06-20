@@ -70,7 +70,8 @@ class WindowController:
             page.window.min_width     = 500
             page.window.min_height    = 550
             page.window.prevent_close = True
-            page.window.visible       = False
+            # Окно НЕ прячем: в flet build (нативный flutter) повторный показ
+            # из main() не закрепляется и окно остаётся скрытым. Показываем сразу.
 
     def reveal(self) -> None:
         """Показать окно после page.add() — вызывать после финальной инициализации."""

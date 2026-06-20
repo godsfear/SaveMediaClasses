@@ -47,9 +47,27 @@ class AppPaths:
         if getattr(sys, "frozen", False):
             base = Path(sys.executable).resolve().parent
         else:
-            base = Path(__file__).resolve().parent
+            base = cls._flet_build_dir() or Path(__file__).resolve().parent
         data = base if cls._dir_writable(base) else cls.user_data_dir()
         return cls(app_dir=base, data_dir=data)
+
+    @staticmethod
+    def _flet_build_dir() -> "Path | None":
+        """Папка с .exe в сборке `flet build`.
+
+        serious_python распаковывает КОД приложения в %APPDATA%\\...\\flet\\app
+        и запускает оттуда, поэтому __file__ указывает не на папку с exe. Но
+        рантайм (папка с exe) лежит на sys.path как <exe_dir>\\site-packages и т.п.,
+        и в ней есть flutter_windows.dll — по нему её и находим, чтобы config.json
+        и locale читались рядом с exe (а не из папки распаковки)."""
+        for entry in sys.path:
+            try:
+                parent = Path(entry).parent
+            except Exception:
+                continue
+            if (parent / "flutter_windows.dll").exists():
+                return parent
+        return None
 
     # ── Пользовательский data-dir (фолбэк, когда app_dir только на чтение) ─────
 
@@ -110,16 +128,31 @@ class AppPaths:
 
     @property
     def assets_dir(self) -> Path:
-        return self.app_dir
+        """Единый источник правды: папка ассетов приложения.
+
+        - flet build: FLET_ASSETS_DIR (бандл-ассеты рантайма).
+        - pack (PyInstaller onefile): <_MEIPASS>/assets.
+        - dev / pack-onedir: <app_dir>/assets.
+        """
+        env = os.environ.get("FLET_ASSETS_DIR")
+        if env:
+            return Path(env)
+        meipass = getattr(sys, "_MEIPASS", None)
+        if meipass and (Path(meipass) / "assets").exists():
+            return Path(meipass) / "assets"
+        return self.app_dir / "assets"
 
     @property
-    def app_icon(self) -> Path:
-        return self.app_dir / "SaveMedia.png"
+    def icon(self) -> Path:
+        """PNG-логотип/картинка приложения (тулбар, About, тело тоста).
+        Единый источник — ассеты."""
+        return self.assets_dir / "icon.png"
 
     @property
-    def app_icon_ico(self) -> Path:
-        """Windows-иконка (.ico) — для реестра уведомлений (IconUri)."""
-        return self.app_dir / "SaveMedia.ico"
+    def icon_ico(self) -> Path:
+        """ICO для shell/реестра уведомлений (крупный PNG Windows игнорирует).
+        Тот же единый источник — ассеты."""
+        return self.assets_dir / "icon.ico"
 
     @property
     def pyproject(self) -> Path:
