@@ -1,6 +1,7 @@
 /.venv/
 /venv/
 /tools/
+/graphify-out/
 
 __pycache__/
 *.py[cod]
