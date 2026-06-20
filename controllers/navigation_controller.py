@@ -60,6 +60,11 @@ class NavigationController(I18nTarget):
         self._window_ctrl     = window_ctrl
         self._log             = get_logger("app")
 
+        # Логотип тулбара/About: в flet build ft.Image по абсолютному пути с диска
+        # не отображается (flet отдаёт картинки только из assets/URL/base64).
+        # Встраиваем PNG как data-URI в src — работает и в pack, и в build.
+        self._icon_src = self._load_icon_src()
+
         self._folder_picker = ft.FilePicker()
 
         s = Locale.load(svc.state.language)
@@ -275,14 +280,24 @@ class NavigationController(I18nTarget):
 
     # ── Приватное ─────────────────────────────────────────────────────────────
 
+    def _load_icon_src(self) -> "str | None":
+        """Логотип как data-URI для ft.Image(src=...). Единый источник — paths.icon."""
+        try:
+            import base64
+            b64 = base64.b64encode(self._svc.paths.icon.read_bytes()).decode("ascii")
+            return "data:image/png;base64," + b64
+        except Exception:
+            self._log.debug("logo icon not found: %s", self._svc.paths.icon)
+            return None
+
     def _logo(self) -> ft.Container:
+        img = (
+            ft.Image(src=self._icon_src, width=28, height=28, fit="contain")
+            if self._icon_src else
+            ft.Icon(ft.Icons.DOWNLOAD_ROUNDED, size=28, color=self._appbar_fg())
+        )
         return ft.Container(
-            content=ft.Image(
-                src=str(self._svc.paths.app_icon),
-                width=28,
-                height=28,
-                fit="contain",
-            ),
+            content=img,
             padding=ft.Padding(left=8, top=0, right=0, bottom=0),
             on_click=self._show_about,
             tooltip="About",
@@ -318,10 +333,8 @@ class NavigationController(I18nTarget):
             bgcolor=hex_to_flet(t.card_color),
             title=ft.Row(
                 [
-                    ft.Image(
-                        src=str(self._svc.paths.app_icon),
-                        width=32, height=32, fit="contain",
-                    ),
+                    ft.Image(src=self._icon_src, width=32, height=32, fit="contain")
+                    if self._icon_src else ft.Container(width=0),
                     ft.Text("SaveMedia", size=20, weight=ft.FontWeight.BOLD),
                     ft.Text(
                         f"v{ver}" if (ver := self._app_version()) else "",

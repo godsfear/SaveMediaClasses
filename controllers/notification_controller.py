@@ -118,10 +118,11 @@ class NotificationController:
         self._in_view: bool | None = None
         # Windows 11 не показывает тосты от незарегистрированного AppID —
         # регистрируем свой в HKCU один раз при старте (идемпотентно).
-        # В реестр — .ico (большой PNG для атрибуции Windows игнорирует).
-        ico = svc.paths.app_icon_ico
+        # В реестр — .ico из ассетов (крупный PNG Windows для атрибуции игнорирует),
+        # фолбэк на .png. Источник тот же — assets.
+        ico = svc.paths.icon_ico
         register_win_app_id(
-            icon_path=str(ico if os.path.exists(ico) else svc.paths.app_icon))
+            icon_path=str(ico if os.path.exists(ico) else svc.paths.icon))
         # Логотип для тела тоста: тосты не принимают пути с не-ASCII символами
         # (проект может лежать в «Мой диск» и т.п.) — копируем png в служебную
         # папку приложения (%APPDATA%-база, ASCII) один раз.
@@ -135,7 +136,7 @@ class NotificationController:
         try:
             import shutil
             import tempfile
-            src = str(self._svc.paths.app_icon)
+            src = str(self._svc.paths.icon)
             if not os.path.exists(src):
                 return ""
             # Папка приложения может лежать в кириллическом пути («Мой диск») —

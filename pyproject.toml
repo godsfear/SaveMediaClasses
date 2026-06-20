@@ -1,7 +1,7 @@
 [project]
 name = "SaveMedia"
 version = "1.0.0"
-requires-python = ">=3.13"
+requires-python = ">=3.12"
 dependencies = [
     "flet>=0.85.1",
     "httpx>=0.28.1",
@@ -12,4 +12,30 @@ dev = [
     "pillow>=12.2.0",
     "pyinstaller>=6.20.0",
     "pytest>=8.0",
+]
+
+[tool.flet]
+company = "godsfear"
+copyright = "Copyright (c) 2026 godsfear"
+
+[tool.flet.app]
+# Не код / рантайм-мусор — не пакуем в сборку.
+# ВНИМАНИЕ: locale/ и config/ НЕ исключать — это нужные данные/код приложения.
+# tools/ — бинарники (ffmpeg/yt-dlp), приложение качает их при первом запуске.
+exclude = [
+    ".claude",
+    ".git",
+    ".gitignore",
+    ".idea",
+    "venv",
+    "graphify-out",
+    "Releases",
+    "tests",
+    "images",
+    "tools",
+    "config.json",
+    "uv.lock",
+    "readme.md",
+    "__pycache__",
+    "**/__pycache__",
 ]
