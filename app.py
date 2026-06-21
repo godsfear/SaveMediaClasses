@@ -171,8 +171,6 @@ class SaveMediaApp:
         nav_ctrl.apply_appbar_theme()
         theme_ctrl.apply()
         page.add(main_screen.layout, settings_screen.layout, history_screen.layout)
-
-        window_ctrl.reveal()
         page.update()
 
         # Слежение за буфером: цикл живёт всегда, активен только при включённом
@@ -197,3 +195,10 @@ class SaveMediaApp:
             ))
             svc.bus.emit(ToolsCheckedEvent(needs_update=svc.state.last_needs_update))
             safe_update()
+
+        # Окно стартует скрытым (hide_window_on_start в pyproject) — показываем его
+        # ОДИН раз в самом конце main(), когда UI готов. reveal() из середины main()
+        # в flet build (нативный flutter) не закрепляется, поэтому только здесь.
+        await asyncio.sleep(0.3)
+        window_ctrl.reveal()
+        page.update()
