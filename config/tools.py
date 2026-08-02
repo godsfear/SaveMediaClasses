@@ -3,7 +3,7 @@ config/tools.py — статическая конфигурация инстру
 
 Разделение ответственности:
   • ToolConfig / YtDlpConfig / BinaryDef — СТАТИЧЕСКАЯ конфигурация: URL,
-    имена файлов, флаги. Редактируется пользователем, персистится в "tools".
+    имена файлов, команды. Редактируется пользователем, персистится в "tools".
   • VersionState — RUNTIME-состояние версий (current/latest/status), которое
     контроллер обновляет при проверке. Персистится отдельно, в секции
     "tool_versions", ключ — имя бинарника. Конфиг им не «загрязняется».
@@ -21,6 +21,7 @@ from config.constants import (
     DEFAULT_ARIA2_ARGS, DEFAULT_ARIA2_PART_DIRNAME, DEFAULT_ARIA2_SEED_ARGS,
     DEFAULT_YT_DLP_ARGS, _LEGACY_YT_DLP_ARGS,
 )
+from config.tooling import CommandSpec
 from config.utils import get_fallback_bool, safe_int, safe_str
 
 
@@ -45,30 +46,37 @@ class VersionState:
 
 @dataclass
 class BinaryDef:
-    """Статическое описание одного бинарника инструмента: имя файла + флаг версии.
+    """Статическое описание бинарника: имя файла + команда проверки версии.
 
     is_primary помечает бинарник, версия которого представляет инструмент целиком
     (его имя совпадает с именем инструмента). У каждого инструмента ровно один primary.
     """
-    filename:     str  = ""
-    version_flag: str  = "--version"
-    is_primary:   bool = False
+    filename:      str         = ""
+    version_probe: CommandSpec = field(
+        default_factory=lambda: CommandSpec(args=("--version",))
+    )
+    is_primary:    bool        = False
 
     def to_dict(self) -> Dict[str, Any]:
         return {
-            "filename":     self.filename,
-            "version_flag": self.version_flag,
-            "is_primary":   self.is_primary,
+            "filename":      self.filename,
+            "version_probe": self.version_probe.to_dict(),
+            "is_primary":    self.is_primary,
         }
 
     @staticmethod
     def from_dict(d: Dict[str, Any], defaults: "BinaryDef | None" = None) -> "BinaryDef":
         def_ = defaults or BinaryDef()
         raw_primary = d.get("is_primary")
+        raw_probe = d.get("version_probe", {})
         return BinaryDef(
-            filename     = safe_str(d.get("filename"))     or def_.filename,
-            version_flag = safe_str(d.get("version_flag")) or def_.version_flag,
-            is_primary   = def_.is_primary if raw_primary is None else bool(raw_primary),
+            filename      = safe_str(d.get("filename")) or def_.filename,
+            version_probe = CommandSpec.from_dict(
+                raw_probe if isinstance(raw_probe, dict) else {},
+                def_.version_probe,
+                allow_empty=False,
+            ),
+            is_primary    = def_.is_primary if raw_primary is None else bool(raw_primary),
         )
 
 
@@ -377,6 +385,7 @@ class ToolConfig:
     download_url: str = ""
     chunk_size:   int = 8_192
     binaries:     Dict[str, BinaryDef] = field(default_factory=dict)
+    self_update:  CommandSpec = field(default_factory=CommandSpec)
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -384,6 +393,7 @@ class ToolConfig:
             "download_url": self.download_url,
             "chunk_size":   self.chunk_size,
             "binaries":     {k: v.to_dict() for k, v in self.binaries.items()},
+            "self_update":  self.self_update.to_dict(),
         }
 
     @staticmethod
@@ -409,6 +419,11 @@ class ToolConfig:
             download_url = safe_str(d.get("download_url")) or def_.download_url,
             chunk_size   = safe_int(d.get("chunk_size"), def_.chunk_size),
             binaries     = ToolConfig._merge_binaries(d, def_),
+            self_update  = CommandSpec.from_dict(
+                d.get("self_update", {})
+                if isinstance(d.get("self_update"), dict) else {},
+                def_.self_update,
+            ),
         )
 
     @classmethod

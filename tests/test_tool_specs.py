@@ -42,3 +42,12 @@ def test_remote_is_known():
 ])
 def test_status_needs_update(status, remote, expected):
     assert status_needs_update(status, remote) is expected
+
+
+def test_non_runnable_binary_is_reinstalled_but_missing_runtime_is_not():
+    assert status_needs_update(
+        STATUS_ERROR, "1.0", TOOL_VERSION_CALL_ERROR,
+    ) is True
+    assert status_needs_update(
+        STATUS_ERROR, "1.0", TOOL_VERSION_NEEDS_RUNTIME,
+    ) is False

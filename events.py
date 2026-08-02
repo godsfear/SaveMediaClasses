@@ -116,7 +116,7 @@ class ClipboardUrlEvent:
     urls: tuple
 
 
-# ── Инструменты (yt-dlp / ffmpeg) ─────────────────────────────────────────────
+# ── Внешние инструменты ──────────────────────────────────────────────────────
 
 @dataclass(frozen=True)
 class ToolsCheckedEvent:
@@ -178,7 +178,7 @@ class ToolProgressMessageEvent:
 @dataclass(frozen=True)
 class ToolInstallStatusEvent:
     """Статус загрузки/установки конкретного инструмента."""
-    tool_name: str    # "yt-dlp" | "ffmpeg"
+    tool_name: str    # имя логического инструмента из реестра
     code:      str    # "downloading" | "ok" | "error" | "manual"
     detail:    str = ""
 

@@ -71,7 +71,7 @@ class TimeoutsConfig:
     захардкожены в коде (tools_manager, providers)."""
     connect:           float = 5.0    # connect httpx при проверке версий инструментов
     read:              float = 8.0    # read при проверке версий (он же общий лимит запроса)
-    version_probe:     float = 5.0    # локальный вызов `<exe> --version`
+    version_probe:     float = 5.0    # локальный вызов настроенной version_probe
     tool_download:     float = 30.0   # общий таймаут скачивания инструментов
     thumbnail_connect: float = THUMBNAIL_SOCK_TIMEOUT   # connect при загрузке превью
     thumbnail_read:    float = THUMBNAIL_TIMEOUT        # read при загрузке превью

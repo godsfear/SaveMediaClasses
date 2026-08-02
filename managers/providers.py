@@ -25,6 +25,7 @@ from typing import Callable, ClassVar, Protocol, runtime_checkable
 from app_logging import get_logger
 from config import safe_str, magnet_btih, THUMBNAIL_TIMEOUT, THUMBNAIL_SOCK_TIMEOUT
 from managers.snapshot import DownloadSnapshot
+from managers.tool_resolver import ToolResolver
 
 
 def _split_args(raw: str) -> list[str]:
@@ -127,10 +128,11 @@ class _SubprocessProvider:
 
     SUPPORTS_PAUSE = False   # умеет ли провайдер pause/resume (kill + докачка)
 
-    def __init__(self, paths) -> None:
+    def __init__(self, paths, resolver: ToolResolver | None = None) -> None:
         self._paths = paths   # AppPaths — единый источник путей
         self._ext   = ".exe" if os.name == "nt" else ""
         self._proc  = None
+        self._resolver = resolver or ToolResolver(paths)
 
     def temp_dir(self) -> str:
         """По умолчанию провайдер качает сразу в папку назначения — temp-папки нет."""
@@ -175,9 +177,7 @@ class _SubprocessProvider:
             startup = subprocess.STARTUPINFO()
             startup.dwFlags |= subprocess.STARTF_USESHOWWINDOW
 
-        env = os.environ.copy()
-        sep = ";" if os.name == "nt" else ":"
-        env["PATH"] = f"{self._paths.tools_dir}{sep}{self._paths.app_dir}{sep}{env.get('PATH', '')}"
+        env = self._resolver.process_env()
 
         self._proc = await asyncio.create_subprocess_exec(
             *cmd_args,
@@ -236,8 +236,8 @@ class YtDlpProvider(_SubprocessProvider):
         re.compile(r'^\[MoveFiles] Moving file "(?:.+)" to "(.+)"$'),
     )
 
-    def __init__(self, paths) -> None:
-        super().__init__(paths)
+    def __init__(self, paths, resolver: ToolResolver | None = None) -> None:
+        super().__init__(paths, resolver)
         self._final_path = ""
 
     # ── DownloadProvider protocol ─────────────────────────────────────────────
@@ -253,11 +253,7 @@ class YtDlpProvider(_SubprocessProvider):
         return self._final_path
 
     def resolve_exe(self) -> str:
-        # Приоритет — наша tools_dir; фолбэк — yt-dlp, установленный в системе (PATH).
-        path = os.path.join(self._paths.tools_dir, f"yt-dlp{self._ext}")
-        if os.path.exists(path) and os.path.getsize(path) > 0:
-            return path
-        return shutil.which("yt-dlp") or ""
+        return self._resolver.resolve("yt-dlp").path
 
     def build_command(self, exe: str, snapshot: DownloadSnapshot) -> list[str]:
         s    = snapshot
@@ -345,6 +341,7 @@ class YtDlpProvider(_SubprocessProvider):
                 exe, "--dump-single-json", "--no-playlist", url,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.DEVNULL,
+                env=self._resolver.process_env(),
                 startupinfo=startup,
             )
             try:
@@ -418,8 +415,8 @@ class Aria2cProvider(_SubprocessProvider):
     _ETA_RE      = re.compile(r"ETA:([^\s\]]+)")
     _GID_RE      = re.compile(r"\[#(\w+)")
 
-    def __init__(self, paths) -> None:
-        super().__init__(paths)
+    def __init__(self, paths, resolver: ToolResolver | None = None) -> None:
+        super().__init__(paths, resolver)
         # У magnet первая под-загрузка — это метаданные (.torrent): свой GID,
         # доходит до 100% на ~десятках КиБ. Реальный контент идёт под СЛЕДУЮЩИМ
         # GID. Чтобы бар не прыгал 100%→0%, прогресс метаданных подавляем.
@@ -442,11 +439,7 @@ class Aria2cProvider(_SubprocessProvider):
         return self._final_path
 
     def resolve_exe(self) -> str:
-        # Приоритет — наша tools_dir; фолбэк — aria2c, установленный в системе (PATH).
-        path = os.path.join(self._paths.tools_dir, f"aria2c{self._ext}")
-        if os.path.exists(path) and os.path.getsize(path) > 0:
-            return path
-        return shutil.which("aria2c") or ""
+        return self._resolver.resolve("aria2c").path
 
     def build_command(self, exe: str, snapshot: DownloadSnapshot) -> list[str]:
         s    = snapshot
@@ -665,9 +658,11 @@ PROVIDERS: dict[str, type] = {
 DEFAULT_PROVIDER = YtDlpProvider.SOURCE_NAME
 
 
-def provider_factories(paths) -> dict[str, Callable[[], DownloadProvider]]:
+def provider_factories(
+    paths, resolver: ToolResolver | None = None,
+) -> dict[str, Callable[[], DownloadProvider]]:
     """Фабрики провайдеров для DownloadManager (один экземпляр = одна загрузка)."""
-    return {key: (lambda cls=cls: cls(paths)) for key, cls in PROVIDERS.items()}
+    return {key: (lambda cls=cls: cls(paths, resolver)) for key, cls in PROVIDERS.items()}
 
 
 def resolve_provider_for_url(url: str) -> str:

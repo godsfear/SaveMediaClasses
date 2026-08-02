@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from config import NamedTheme, ThemeConfig, VersionState, WindowConfig
+from config import CommandSpec, NamedTheme, ThemeConfig, VersionState, WindowConfig
 from managers.config_manager import ConfigManager
 from state import AppState
 
@@ -25,7 +25,7 @@ def test_load_missing_file_returns_defaults(mgr):
     state = mgr.load()
     assert state.download_tool == "auto"
     assert state.theme_mode == "dark"
-    assert "yt-dlp" in state.tools and "aria2c" in state.tools
+    assert {"yt-dlp", "deno", "ffmpeg", "aria2c"} <= set(state.tools)
 
 
 def test_save_load_roundtrip(mgr):
@@ -124,7 +124,78 @@ def test_legacy_tool_versions_migrated_from_tools_section(mgr):
 
 def test_user_tool_overrides_survive_defaults_merge(mgr):
     """Пользовательский URL сохраняется, отсутствующие бинарники доезжают из дефолтов."""
-    _write(mgr, {"tools": {"ffmpeg": {"version_url": "https://my.mirror/ver"}}})
+    _write(mgr, {"tools": {
+        "ffmpeg": {"version_url": "https://my.mirror/ver"},
+        "deno": {"download_url": "https://my.mirror/deno-release"},
+    }})
     state = mgr.load()
     assert state.ffmpeg.version_url == "https://my.mirror/ver"
     assert set(state.ffmpeg.binaries) == {"ffmpeg", "ffplay", "ffprobe"}
+    assert state.deno.download_url == "https://my.mirror/deno-release"
+
+
+def test_version_probe_argv_roundtrip(mgr):
+    state = AppState()
+    state.deno.binaries["deno"].version_probe = CommandSpec(
+        args=("--version", "--quiet"),
+    )
+
+    mgr.save(state)
+    restored = mgr.load()
+
+    assert restored.deno.binaries["deno"].version_probe.args == (
+        "--version", "--quiet",
+    )
+
+
+def test_invalid_version_probe_falls_back_to_tool_default(mgr):
+    _write(mgr, {"tools": {"ffmpeg": {"binaries": {
+        "ffmpeg": {"version_probe": {"args": "-version"}},
+    }}}})
+
+    state = mgr.load()
+
+    assert state.ffmpeg.binaries["ffmpeg"].version_probe.args == ("-version",)
+
+
+def test_tooling_command_and_detector_overrides_roundtrip(mgr):
+    _write(mgr, {"tooling": {
+        "package_managers": {
+            "uv": {
+                "executable": "C:/portable/uv.exe",
+                "upgrade": {"args": ["tool", "upgrade", "--force", "{package_id}"]},
+            },
+        },
+        "detectors": {
+            "uv": {
+                "kind": "bin_directory",
+                "bin_env_var": "MY_UV_BIN",
+                "default_bin_dir": "C:/portable/bin",
+            },
+        },
+    }})
+
+    state = mgr.load()
+    mgr.save(state)
+    state = mgr.load()
+    uv = state.tooling.package_managers["uv"]
+
+    assert uv.executable == "C:/portable/uv.exe"
+    assert uv.upgrade.render(uv.executable, {"package_id": "yt-dlp"}) == [
+        "C:/portable/uv.exe", "tool", "upgrade", "--force", "yt-dlp",
+    ]
+    assert state.tooling.detectors["uv"].bin_env_var == "MY_UV_BIN"
+
+
+def test_unknown_command_placeholder_falls_back_to_default(mgr):
+    _write(mgr, {"tooling": {"package_managers": {"winget": {
+        "upgrade": {"args": ["upgrade", "{arbitrary_shell_value}"]},
+    }}}})
+
+    state = mgr.load()
+
+    assert state.tooling.package_managers["winget"].upgrade.args == (
+        "upgrade", "--id", "{package_id}", "--exact", "--silent",
+        "--accept-package-agreements", "--accept-source-agreements",
+        "--disable-interactivity",
+    )

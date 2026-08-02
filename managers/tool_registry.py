@@ -1,7 +1,7 @@
 """
 managers/tool_registry.py — конкретные инструменты и реестр по умолчанию.
 
-Здесь — вся специфика yt-dlp и ffmpeg. Движок (ToolsManager) её не знает.
+Здесь — вся специфика внешних инструментов. Движок (ToolsManager) её не знает.
 
 Чтобы добавить инструмент:
   1. Реализовать подкласс BaseTool в этом файле (parse_version /
@@ -17,18 +17,22 @@ from __future__ import annotations
 
 import asyncio
 import os
+import platform
 import re
 import shutil
+import sys
 from typing import TYPE_CHECKING, Dict
 
 from app_logging import get_logger
 from config import (
     safe_str,
-    YT_DLP_CHUNK_SIZE, FFMPEG_CHUNK_SIZE, ARIA2_CHUNK_SIZE,
+    YT_DLP_CHUNK_SIZE, FFMPEG_CHUNK_SIZE, ARIA2_CHUNK_SIZE, DENO_CHUNK_SIZE,
     DEFAULT_YT_API_URL, DEFAULT_YT_DOWNLOAD_URL,
     DEFAULT_FFMPEG_VERSION_URL, DEFAULT_FFMPEG_DOWNLOAD_URL,
     DEFAULT_ARIA2_VERSION_URL, DEFAULT_ARIA2_DOWNLOAD_URL,
-    ToolConfig, YtDlpConfig, Aria2cConfig, BinaryDef, YtDlpParameters,
+    DEFAULT_DENO_VERSION_URL, DEFAULT_DENO_DOWNLOAD_URL,
+    ToolConfig, YtDlpConfig, Aria2cConfig, BinaryDef, CommandSpec,
+    YtDlpParameters,
 )
 from managers.tool_specs import (
     BaseTool, InstallContext, ManualInstallRequired, ToolBinary,
@@ -57,9 +61,11 @@ class YtDlpTool(BaseTool):
             download_url = DEFAULT_YT_DOWNLOAD_URL,
             chunk_size   = YT_DLP_CHUNK_SIZE,
             binaries     = {
-                self.name: BinaryDef(filename="yt-dlp", version_flag="--version",
+                self.name: BinaryDef(filename="yt-dlp",
+                                     version_probe=CommandSpec(("--version",)),
                                      is_primary=True),
             },
+            self_update  = CommandSpec(args=("-U",)),
             parameters   = YtDlpParameters(),
         )
 
@@ -97,6 +103,92 @@ class YtDlpTool(BaseTool):
         if os.name != "nt":
             os.chmod(dest, 0o755)
 
+# ── Deno (JS runtime для полноценной поддержки YouTube в yt-dlp) ────────────
+
+class DenoTool(BaseTool):
+    """Один self-contained бинарник из официальных GitHub Releases."""
+
+    name = "deno"
+    _VERSION_RE = re.compile(r"^deno\s+([0-9]+(?:\.[0-9]+){1,2})", re.IGNORECASE)
+
+    def default_config(self) -> ToolConfig:
+        return ToolConfig(
+            version_url=DEFAULT_DENO_VERSION_URL,
+            download_url=DEFAULT_DENO_DOWNLOAD_URL,
+            chunk_size=DENO_CHUNK_SIZE,
+            binaries={
+                self.name: BinaryDef(filename="deno",
+                                     version_probe=CommandSpec(("--version",)),
+                                     is_primary=True),
+            },
+            self_update=CommandSpec(args=("upgrade",)),
+        )
+
+    def parse_version(self, binary: ToolBinary, output: str) -> str:
+        first = safe_str(output.splitlines()[0]) if output.splitlines() else ""
+        match = self._VERSION_RE.search(first)
+        return safe_str(match.group(1)) if match else ""
+
+    async def fetch_remote_version(self, client: "httpx.AsyncClient", url: str) -> str:
+        res = await client.get(url, headers=_UA)
+        res.raise_for_status()
+        tag = safe_str(res.json().get("tag_name")).lstrip("v")
+        return tag or TOOL_VERSION_UNKNOWN
+
+    async def install(self, ctx: InstallContext) -> None:
+        res = await ctx.client.get(ctx.download_url, headers=_UA)
+        res.raise_for_status()
+        asset_name = self._asset_name()
+        asset = next(
+            (a for a in res.json().get("assets", [])
+             if safe_str(a.get("name")) == asset_name),
+            None,
+        )
+        if not asset or not asset.get("browser_download_url"):
+            raise RuntimeError(f"Deno release asset not found: {asset_name}")
+
+        zip_path = os.path.join(ctx.tools_dir, "deno_temp.zip")
+        member = f"deno{ctx.ext}".lower()
+        try:
+            await stream_to_file(ctx.client, asset["browser_download_url"],
+                                 zip_path, ctx.on_progress, ctx.chunk_size)
+            ctx.on_progress(None)
+            found = await asyncio.to_thread(
+                extract_zip_members, zip_path, ctx.tools_dir, {member}
+            )
+            if found == 0:
+                raise RuntimeError(f"{member} not found in Deno archive")
+            dest = os.path.join(ctx.tools_dir, member)
+            if os.name != "nt":
+                os.chmod(dest, 0o755)
+        finally:
+            try:
+                if os.path.exists(zip_path):
+                    os.remove(zip_path)
+            except Exception:
+                _log.exception("Failed to remove temporary Deno archive")
+
+    @staticmethod
+    def _asset_name() -> str:
+        machine = platform.machine().lower()
+        if machine in ("arm64", "aarch64"):
+            arch = "aarch64"
+        elif machine in ("amd64", "x86_64"):
+            arch = "x86_64"
+        else:
+            raise ManualInstallRequired(
+                "https://docs.deno.com/runtime/getting_started/installation/"
+            )
+        if os.name == "nt":
+            target = "pc-windows-msvc"
+        elif sys.platform == "darwin":
+            target = "apple-darwin"
+        elif sys.platform.startswith("linux"):
+            target = "unknown-linux-gnu"
+        else:
+            raise ManualInstallRequired("https://docs.deno.com/runtime/getting_started/installation/")
+        return f"deno-{arch}-{target}.zip"
+
 
 # ── ffmpeg-комплект (ffmpeg + ffplay + ffprobe) ──────────────────────────────
 
@@ -116,10 +208,13 @@ class FfmpegTool(BaseTool):
             download_url = DEFAULT_FFMPEG_DOWNLOAD_URL,
             chunk_size   = FFMPEG_CHUNK_SIZE,
             binaries     = {
-                self.name: BinaryDef(filename="ffmpeg",  version_flag="-version",
+                self.name: BinaryDef(filename="ffmpeg",
+                                     version_probe=CommandSpec(("-version",)),
                                      is_primary=True),
-                "ffplay":  BinaryDef(filename="ffplay",  version_flag="-version"),
-                "ffprobe": BinaryDef(filename="ffprobe", version_flag="-version"),
+                "ffplay":  BinaryDef(filename="ffplay",
+                                      version_probe=CommandSpec(("-version",))),
+                "ffprobe": BinaryDef(filename="ffprobe",
+                                      version_probe=CommandSpec(("-version",))),
             },
         )
 
@@ -194,7 +289,8 @@ class Aria2cTool(BaseTool):
             download_url = DEFAULT_ARIA2_DOWNLOAD_URL,
             chunk_size   = ARIA2_CHUNK_SIZE,
             binaries     = {
-                self.name: BinaryDef(filename="aria2c", version_flag="--version",
+                self.name: BinaryDef(filename="aria2c",
+                                     version_probe=CommandSpec(("--version",)),
                                      is_primary=True),
             },
         )
@@ -266,7 +362,7 @@ class Aria2cTool(BaseTool):
 
 def build_default_tools() -> list[BaseTool]:
     """Список инструментов приложения. Порядок = порядок отображения в настройках."""
-    return [YtDlpTool(), FfmpegTool(), Aria2cTool()]
+    return [YtDlpTool(), DenoTool(), FfmpegTool(), Aria2cTool()]
 
 
 DEFAULT_TOOLS: list[BaseTool] = build_default_tools()

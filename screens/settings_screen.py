@@ -105,6 +105,8 @@ class SettingsScreen(ThemeTarget, I18nTarget):
         self.cookies_browser_dropdown.value    = p.cookies.browser
         self.yt_api_input.value          = s.ytdlp.version_url
         self.yt_download_input.value     = s.ytdlp.download_url
+        self.deno_version_input.value    = s.deno.version_url
+        self.deno_download_input.value   = s.deno.download_url
         self.ffmpeg_version_input.value  = s.ffmpeg.version_url
         self.ffmpeg_download_input.value = s.ffmpeg.download_url
         self.aria2_version_input.value   = s.aria2c.version_url
@@ -130,6 +132,8 @@ class SettingsScreen(ThemeTarget, I18nTarget):
         p.cookies.browser            = safe_str(self.cookies_browser_dropdown.value)
         s.ytdlp.version_url   = safe_str(self.yt_api_input.value)
         s.ytdlp.download_url  = safe_str(self.yt_download_input.value)
+        s.deno.version_url    = safe_str(self.deno_version_input.value)
+        s.deno.download_url   = safe_str(self.deno_download_input.value)
         s.ffmpeg.version_url  = safe_str(self.ffmpeg_version_input.value)
         s.ffmpeg.download_url = safe_str(self.ffmpeg_download_input.value)
         s.aria2c.version_url  = safe_str(self.aria2_version_input.value)
@@ -266,12 +270,16 @@ class SettingsScreen(ThemeTarget, I18nTarget):
 
         self.yt_api_input          = self.register_accents(ft.TextField(label=s.url_yt_api,          border_radius=8, focused_border_color=ft.Colors.BLUE))
         self.yt_download_input     = self.register_accents(ft.TextField(label=s.url_yt_download,     border_radius=8, focused_border_color=ft.Colors.BLUE))
+        self.deno_version_input    = self.register_accents(ft.TextField(label=s.url_deno_version,    border_radius=8, focused_border_color=ft.Colors.BLUE))
+        self.deno_download_input   = self.register_accents(ft.TextField(label=s.url_deno_download,   border_radius=8, focused_border_color=ft.Colors.BLUE))
         self.ffmpeg_version_input  = self.register_accents(ft.TextField(label=s.url_ffmpeg_version,  border_radius=8, focused_border_color=ft.Colors.BLUE))
         self.ffmpeg_download_input = self.register_accents(ft.TextField(label=s.url_ffmpeg_download, border_radius=8, focused_border_color=ft.Colors.BLUE))
         self.aria2_version_input   = self.register_accents(ft.TextField(label=s.url_aria2_version,   border_radius=8, focused_border_color=ft.Colors.BLUE))
         self.aria2_download_input  = self.register_accents(ft.TextField(label=s.url_aria2_download,  border_radius=8, focused_border_color=ft.Colors.BLUE))
         self.register_i18n(self.yt_api_input,          label="url_yt_api")
         self.register_i18n(self.yt_download_input,     label="url_yt_download")
+        self.register_i18n(self.deno_version_input,    label="url_deno_version")
+        self.register_i18n(self.deno_download_input,   label="url_deno_download")
         self.register_i18n(self.ffmpeg_version_input,  label="url_ffmpeg_version")
         self.register_i18n(self.ffmpeg_download_input, label="url_ffmpeg_download")
         self.register_i18n(self.aria2_version_input,   label="url_aria2_version")
@@ -829,6 +837,7 @@ class SettingsScreen(ThemeTarget, I18nTarget):
                     title=self.header_deps_urls,
                     controls=[ft.Container(
                         content=ft.Column([
+                            self.deno_version_input, self.deno_download_input,
                             self.ffmpeg_version_input, self.ffmpeg_download_input,
                         ], spacing=10, horizontal_alignment=ft.CrossAxisAlignment.STRETCH),
                         padding=ft.Padding.only(left=8, right=8, bottom=8),

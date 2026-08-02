@@ -12,7 +12,7 @@ from typing import Dict
 
 from config import (
     ThemeConfig, NamedTheme, WindowConfig, TimeoutsConfig,
-    ToolConfig, YtDlpConfig, Aria2cConfig, VersionState,
+    ToolConfig, YtDlpConfig, Aria2cConfig, VersionState, ToolingConfig,
     DEFAULT_DOWNLOAD_PATH, DEFAULT_PROXY_ADDRESS, DEFAULT_MAX_PARALLEL,
 )
 from i18n import Locale
@@ -53,11 +53,14 @@ class AppState:
     last_check_time:   float = 0.0
     last_needs_update: bool  = False
 
-    # ── Инструменты: СТАТИЧЕСКИЙ конфиг (URL, имена, флаги) ───────────────────
+    # ── Инструменты: СТАТИЧЕСКИЙ конфиг (URL, имена, команды) ─────────────────
     tools: Dict[str, ToolConfig] = field(default_factory=default_tools_config)
 
+    # ── Способы системной установки: команды package manager + detectors ─────
+    tooling: ToolingConfig = field(default_factory=ToolingConfig)
+
     # ── Инструменты: RUNTIME-состояние версий, ключ — имя бинарника ───────────
-    # (yt-dlp, ffmpeg, ffplay, ffprobe). Отделено от конфига; заполняется
+    # (yt-dlp, deno, ffmpeg, ffplay, ffprobe, aria2c). Отделено от конфига; заполняется
     # проверкой версий, персистится в секции "tool_versions" config.json.
     tool_versions: Dict[str, VersionState] = field(default_factory=dict)
 
@@ -97,6 +100,11 @@ class AppState:
     def ffmpeg(self) -> ToolConfig:
         cfg = self.tools.get("ffmpeg")
         return cfg if isinstance(cfg, ToolConfig) else _tool_default("ffmpeg")
+
+    @property
+    def deno(self) -> ToolConfig:
+        cfg = self.tools.get("deno")
+        return cfg if isinstance(cfg, ToolConfig) else _tool_default("deno")
 
     @property
     def aria2c(self) -> Aria2cConfig:

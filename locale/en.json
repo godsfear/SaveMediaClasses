@@ -84,6 +84,8 @@
     "tool_querying": "{name}: Local: {loc} | Remote: querying...",
     "url_yt_api": "yt-dlp API endpoint",
     "url_yt_download": "yt-dlp download URL",
+    "url_deno_version": "Deno version API endpoint",
+    "url_deno_download": "Deno archive API for OS and architecture",
     "url_ffmpeg_version": "FFmpeg version file",
     "url_ffmpeg_download": "FFmpeg zip archive URL",
     "url_aria2_version": "aria2 releases API endpoint",

@@ -143,6 +143,8 @@ class Strings:
     # URL поля
     url_yt_api:          str = ""
     url_yt_download:     str = ""
+    url_deno_version:    str = ""
+    url_deno_download:   str = ""
     url_ffmpeg_version:  str = ""
     url_ffmpeg_download: str = ""
     url_aria2_version:   str = ""

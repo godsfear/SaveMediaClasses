@@ -3,12 +3,17 @@ name = "SaveMedia"
 version = "1.0.0"
 requires-python = ">=3.12"
 dependencies = [
-    "flet>=0.85.1",
+    # CLI, Flutter shell и Python runtime обязаны быть одной версии: flet build
+    # разрешает runtime-зависимости отдельно и при диапазоне может упаковать
+    # более новый, протокольно несовместимый Python-пакет.
+    "flet==0.86.5",
     "httpx>=0.28.1",
 ]
 
 [project.optional-dependencies]
 dev = [
+    "flet-cli==0.86.5",
+    "flet-desktop==0.86.5",
     "pillow>=12.2.0",
     "pyinstaller>=6.20.0",
     "pytest>=8.0",
@@ -31,6 +36,8 @@ exclude = [
     ".git",
     ".gitignore",
     ".idea",
+    ".pytest_cache",
+    ".venv",
     "venv",
     "graphify-out",
     "Releases",
@@ -38,6 +45,8 @@ exclude = [
     "images",
     "tools",
     "config.json",
+    "savemedia.db",
+    "savemedia.log",
     "uv.lock",
     "readme.md",
     "__pycache__",

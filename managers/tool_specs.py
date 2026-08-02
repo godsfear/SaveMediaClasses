@@ -26,7 +26,7 @@ import zipfile
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Callable, Optional, Protocol, runtime_checkable
 
-from config import safe_int, ToolConfig
+from config import CommandSpec, safe_int, ToolConfig
 
 if TYPE_CHECKING:
     import httpx
@@ -71,9 +71,16 @@ def remote_is_known(remote: str) -> bool:
     return remote not in _REMOTE_BAD
 
 
-def status_needs_update(status: str, remote: str) -> bool:
-    """Подлежит ли бинарник обновлению. Обновляем только если есть валидная удалённая версия."""
-    return remote_is_known(remote) and status in _INSTALLABLE_STATUSES
+def status_needs_update(status: str, remote: str, local: str = "") -> bool:
+    """Подлежит ли бинарник обновлению/переустановке.
+
+    Найденный, но не запускающийся executable эквивалентен нерабочему — при
+    известной удалённой версии его нужно заменить managed-копией. Отсутствующий
+    runtime остаётся диагностической ошибкой: повторная загрузка бинарника его
+    не исправит.
+    """
+    installable = status in _INSTALLABLE_STATUSES or local == TOOL_VERSION_CALL_ERROR
+    return remote_is_known(remote) and installable
 
 
 # ── Описание бинарника ────────────────────────────────────────────────────────
@@ -87,10 +94,12 @@ class ToolBinary:
     предоставляет ffmpeg + ffplay + ffprobe. Расширение (.exe) добавляет
     движок по платформе — здесь хранится базовое имя.
     """
-    name:         str                 # отображаемое имя (ключ виджета): "yt-dlp", "ffmpeg"
-    filename:     str                 # базовое имя файла без расширения
-    version_flag: str  = "--version"  # флаг для вывода версии
-    is_primary:   bool = False        # бинарник, чья версия представляет весь инструмент
+    name:          str                         # отображаемое имя (ключ виджета): "yt-dlp", "ffmpeg"
+    filename:      str                         # базовое имя файла без расширения
+    version_probe: CommandSpec = field(
+        default_factory=lambda: CommandSpec(args=("--version",))
+    )
+    is_primary:    bool = False                # версия представляет весь инструмент
 
 
 # ── Контекст установки ────────────────────────────────────────────────────────
@@ -138,7 +147,7 @@ class ToolSpec(Protocol):
         ...
 
     def parse_version(self, binary: ToolBinary, output: str) -> str:
-        """Распарсить вывод `<exe> <version_flag>` в строку версии. '' если не удалось."""
+        """Распарсить вывод декларативной version_probe в версию. '' если не удалось."""
         ...
 
     def version_url(self, state: "AppState") -> str:
@@ -166,6 +175,10 @@ class ToolSpec(Protocol):
         Скачать и установить инструмент. При невозможности авто-установки —
         поднять ManualInstallRequired(hint).
         """
+        ...
+
+    def self_update_command(self, state: "AppState", executable: str) -> list[str]:
+        """Команда self-update из конфигурации или пустой список."""
         ...
 
 
@@ -217,7 +230,7 @@ class BaseTool(abc.ABC):
         return [
             ToolBinary(name=name,
                        filename=bd.filename or name,
-                       version_flag=bd.version_flag or "--version",
+                       version_probe=bd.version_probe,
                        is_primary=bd.is_primary)
             for name, bd in self.cfg(state).binaries.items()
         ]
@@ -232,6 +245,10 @@ class BaseTool(abc.ABC):
     def missing_runtime(self) -> bool:
         """Переопределяется инструментом, которому нужен внешний рантайм (см. ToolSpec)."""
         return False
+
+    def self_update_command(self, state: "AppState", executable: str) -> list[str]:
+        command = self.cfg(state).self_update
+        return command.render(executable) if command.args else []
 
     # ── Инструмент-специфика — реализуют подклассы ─────────────────────────────
 

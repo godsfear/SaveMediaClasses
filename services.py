@@ -5,7 +5,7 @@ Services создаётся один раз в app.py и передаётся в
 Добавление новой зависимости: поле в Services — подписи экранов не меняются.
 
 Что входит:
-  Инфраструктура  — bus, config_mgr, tools, dm, thumbs, downloads (оркестратор)
+  Инфраструктура  — bus, config_mgr, tools, tool_resolver, dm, thumbs, downloads
   Персистентность — db (история загрузок)
   Состояние       — state (изменяемый dataclass, это нормально)
   Окружение       — paths (единый источник путей), safe_update
@@ -30,6 +30,7 @@ from managers.download_orchestrator import DownloadOrchestrator
 from managers.download_repository import DownloadRepository
 from managers.thumbnails import ThumbnailService
 from managers.tools_manager import ToolsManager
+from managers.tool_resolver import ToolResolver
 from paths import AppPaths
 from state import AppState
 
@@ -44,6 +45,7 @@ class Services:
     bus:        EventBus
     config_mgr: ConfigManager
     tools:      ToolsManager
+    tool_resolver: ToolResolver
     dm:         DownloadManager
     thumbs:     ThumbnailService
     # Оркестратор загрузок: проверки перед запуском, постановка в dm,
@@ -76,11 +78,12 @@ class Services:
 
         bus        = EventBus()
         config_mgr = ConfigManager(paths.config_file)
-        tools      = ToolsManager(paths)
         state      = config_mgr.load()
+        tool_resolver = ToolResolver(paths, state.tooling.detectors)
+        tools      = ToolsManager(paths, tool_resolver)
         db         = DownloadRepository(db_path=paths.db_file, bus=bus)
         dm         = DownloadManager(
-            provider_factories=provider_factories(paths),
+            provider_factories=provider_factories(paths, tool_resolver),
             default_provider=DEFAULT_PROVIDER,
             bus=bus,
             task_runner=task_runner,
@@ -96,6 +99,7 @@ class Services:
             bus=bus,
             config_mgr=config_mgr,
             tools=tools,
+            tool_resolver=tool_resolver,
             dm=dm,
             thumbs=thumbs,
             downloads=downloads,

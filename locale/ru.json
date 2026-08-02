@@ -84,6 +84,8 @@
     "tool_querying": "{name}: Локально: {loc} | Сеть: опрос...",
     "url_yt_api": "API утилиты yt-dlp",
     "url_yt_download": "Ссылка на скачивание yt-dlp",
+    "url_deno_version": "API версии Deno",
+    "url_deno_download": "API архива Deno для ОС и архитектуры",
     "url_ffmpeg_version": "Файл версии пакета FFmpeg",
     "url_ffmpeg_download": "Ссылка на zip-архив FFmpeg",
     "url_aria2_version": "API релизов aria2",

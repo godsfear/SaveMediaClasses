@@ -24,6 +24,7 @@ PERSIST_DEBOUNCE_SECONDS  = 1.0  # пауза тишины перед запис
 YT_DLP_CHUNK_SIZE      = 8_192   # байт/итерацию при скачивании yt-dlp
 FFMPEG_CHUNK_SIZE      = 16_384  # байт/итерацию при скачивании ffmpeg zip
 ARIA2_CHUNK_SIZE       = 16_384  # байт/итерацию при скачивании aria2 zip
+DENO_CHUNK_SIZE        = 16_384  # байт/итерацию при скачивании Deno zip
 THUMBNAIL_TIMEOUT      = 15.0    # секунд — общий async-таймаут скачивания thumbnail
 THUMBNAIL_SOCK_TIMEOUT = 10      # секунд — connect-таймаут httpx для thumbnail
 
@@ -44,7 +45,7 @@ DEFAULT_YT_DOWNLOAD_URL     = (
     "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp"
 )
 DEFAULT_FFMPEG_VERSION_URL  = "https://www.gyan.dev/ffmpeg/builds/release-version"
-DEFAULT_FFMPEG_DOWNLOAD_URL = "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-full.zip"
+DEFAULT_FFMPEG_DOWNLOAD_URL = "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip"
 
 # aria2 публикует релизы на GitHub. Имя ассета содержит версию
 # (aria2-X.Y.Z-win-64bit-buildN.zip), поэтому стабильного "latest"-URL на сам
@@ -52,6 +53,11 @@ DEFAULT_FFMPEG_DOWNLOAD_URL = "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release
 # Aria2cTool.install() сам находит нужный ассет в ответе. Отсюда оба URL равны.
 DEFAULT_ARIA2_VERSION_URL   = "https://api.github.com/repos/aria2/aria2/releases/latest"
 DEFAULT_ARIA2_DOWNLOAD_URL  = "https://api.github.com/repos/aria2/aria2/releases/latest"
+
+# Deno нужен yt-dlp для решения JavaScript-проверок YouTube. И проверка, и
+# установка используют releases/latest API: имя архива зависит от ОС/архитектуры.
+DEFAULT_DENO_VERSION_URL    = "https://api.github.com/repos/denoland/deno/releases/latest"
+DEFAULT_DENO_DOWNLOAD_URL   = "https://api.github.com/repos/denoland/deno/releases/latest"
 
 # Фиксированные CLI-флаги aria2c для скачивания. ВАЖНО (от них зависит логика
 # приложения): --summary-interval=0 (парсинг прогресса по \r-строке без спама),

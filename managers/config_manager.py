@@ -5,6 +5,7 @@ from typing import Any, Dict
 from app_logging import get_logger
 from config import (
     ThemeConfig, NamedTheme, WindowConfig, TimeoutsConfig, ToolConfig, VersionState,
+    ToolingConfig,
     MAX_PARALLEL_CEILING,
     safe_str, safe_int, get_fallback_bool,
 )
@@ -69,6 +70,10 @@ class ConfigManager:
             last_check_time   = float(cfg.get("last_check_time",  defaults.last_check_time)),
             last_needs_update = bool(cfg.get("last_needs_update",  defaults.last_needs_update)),
             tools         = tools,
+            tooling       = ToolingConfig.from_dict(
+                raw.get("tooling", {}) if isinstance(raw.get("tooling"), dict) else {},
+                defaults.tooling,
+            ),
             tool_versions = tool_versions,
             theme_mode   = theme_mode,
             theme_dark   = theme_dark,
@@ -172,6 +177,7 @@ class ConfigManager:
                 "last_needs_update": state.last_needs_update,
             },
             "tools":         {k: v.to_dict() for k, v in state.tools.items()},
+            "tooling":       state.tooling.to_dict(),
             "tool_versions": {k: v.to_dict() for k, v in state.tool_versions.items()},
             "window":   state.window.to_dict(),
             "timeouts": state.timeouts.to_dict(),

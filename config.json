@@ -1,0 +1,333 @@
+{
+    "settings": {
+        "download_path": "C:\\Users\\DRDmitriy\\Downloads",
+        "proxy_address": "socks5://127.0.0.1:1080",
+        "proxy_enabled": false,
+        "download_tool": "auto",
+        "max_parallel": 5,
+        "clipboard_watch": false,
+        "history_keep_days": 0,
+        "notify_on_complete": true,
+        "last_check_time": 1785703038.1284068,
+        "last_needs_update": false
+    },
+    "tools": {
+        "yt-dlp": {
+            "version_url": "https://api.github.com/repos/yt-dlp/yt-dlp/releases/latest",
+            "download_url": "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe",
+            "chunk_size": 8192,
+            "binaries": {
+                "yt-dlp": {
+                    "filename": "yt-dlp",
+                    "version_probe": {
+                        "args": [
+                            "--version"
+                        ]
+                    },
+                    "is_primary": true
+                }
+            },
+            "self_update": {
+                "args": [
+                    "-U"
+                ]
+            },
+            "parameters": {
+                "audio_only": {
+                    "state": false,
+                    "args": "-x --audio-format mp3 --audio-quality 0"
+                },
+                "quality": {
+                    "value": "best",
+                    "presets": {
+                        "best": "",
+                        "2160p": "-f bestvideo[height<=2160]+bestaudio/best[height<=2160]",
+                        "1440p": "-f bestvideo[height<=1440]+bestaudio/best[height<=1440]",
+                        "1080p": "-f bestvideo[height<=1080]+bestaudio/best[height<=1080]",
+                        "720p": "-f bestvideo[height<=720]+bestaudio/best[height<=720]",
+                        "480p": "-f bestvideo[height<=480]+bestaudio/best[height<=480]"
+                    }
+                },
+                "subtitles": {
+                    "value": "off",
+                    "presets": {
+                        "off": "",
+                        "lang": "--embed-subs --sub-langs {lang}.*",
+                        "auto": "--embed-subs --write-auto-subs --sub-langs {lang}.*",
+                        "all": "--embed-subs --sub-langs all"
+                    }
+                },
+                "cookies": {
+                    "state": false,
+                    "browser": "none",
+                    "flag": "--cookies-from-browser"
+                },
+                "playlist": {
+                    "state": true,
+                    "flag_on": "--yes-playlist",
+                    "flag_off": "--no-playlist",
+                    "dir_template": "%(playlist_title)s",
+                    "idx_prefix": "%(playlist_index)s - "
+                },
+                "embed_metadata": {
+                    "state": true,
+                    "args": "--embed-metadata --embed-thumbnail"
+                },
+                "extra_args": {
+                    "value": "--merge-output-format mp4"
+                },
+                "clean_titles": {
+                    "state": true,
+                    "template_on": "%(title)s.%(ext)s",
+                    "template_off": "%(title)s [%(id)s].%(ext)s"
+                },
+                "save_to_source": {
+                    "state": true,
+                    "dir_template": "%(extractor_key)s"
+                }
+            }
+        },
+        "deno": {
+            "version_url": "https://api.github.com/repos/denoland/deno/releases/latest",
+            "download_url": "https://api.github.com/repos/denoland/deno/releases/latest",
+            "chunk_size": 16384,
+            "binaries": {
+                "deno": {
+                    "filename": "deno",
+                    "version_probe": {
+                        "args": [
+                            "--version"
+                        ]
+                    },
+                    "is_primary": true
+                }
+            },
+            "self_update": {
+                "args": [
+                    "upgrade"
+                ]
+            }
+        },
+        "ffmpeg": {
+            "version_url": "https://www.gyan.dev/ffmpeg/builds/release-version",
+            "download_url": "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip",
+            "chunk_size": 16384,
+            "binaries": {
+                "ffmpeg": {
+                    "filename": "ffmpeg",
+                    "version_probe": {
+                        "args": [
+                            "-version"
+                        ]
+                    },
+                    "is_primary": true
+                },
+                "ffplay": {
+                    "filename": "ffplay",
+                    "version_probe": {
+                        "args": [
+                            "-version"
+                        ]
+                    },
+                    "is_primary": false
+                },
+                "ffprobe": {
+                    "filename": "ffprobe",
+                    "version_probe": {
+                        "args": [
+                            "-version"
+                        ]
+                    },
+                    "is_primary": false
+                }
+            },
+            "self_update": {
+                "args": []
+            }
+        },
+        "aria2c": {
+            "version_url": "https://api.github.com/repos/aria2/aria2/releases/latest",
+            "download_url": "https://api.github.com/repos/aria2/aria2/releases/latest",
+            "chunk_size": 16384,
+            "binaries": {
+                "aria2c": {
+                    "filename": "aria2c",
+                    "version_probe": {
+                        "args": [
+                            "--version"
+                        ]
+                    },
+                    "is_primary": true
+                }
+            },
+            "self_update": {
+                "args": []
+            },
+            "parameters": {
+                "download": "--summary-interval=0 --console-log-level=warn --continue=true --auto-file-renaming=false --allow-overwrite=true --auto-save-interval=1 --seed-time=0",
+                "seed": "--summary-interval=0 --console-log-level=warn --check-integrity=true --seed-ratio=0.0 --bt-detach-seed-only=false",
+                "part_dirname": ".part"
+            }
+        }
+    },
+    "tooling": {
+        "package_managers": {
+            "winget": {
+                "executable": "winget",
+                "check": {
+                    "args": [
+                        "list",
+                        "--upgrade-available",
+                        "--include-unknown",
+                        "--accept-source-agreements",
+                        "--disable-interactivity"
+                    ],
+                    "optional_args": {
+                        "proxy_url": [
+                            "--proxy",
+                            "{proxy_url}"
+                        ]
+                    }
+                },
+                "upgrade": {
+                    "args": [
+                        "upgrade",
+                        "--id",
+                        "{package_id}",
+                        "--exact",
+                        "--silent",
+                        "--accept-package-agreements",
+                        "--accept-source-agreements",
+                        "--disable-interactivity"
+                    ]
+                },
+                "version_parser": "winget_table"
+            },
+            "uv": {
+                "executable": "uv",
+                "check": {
+                    "args": []
+                },
+                "upgrade": {
+                    "args": [
+                        "tool",
+                        "upgrade",
+                        "{package_id}"
+                    ]
+                },
+                "version_parser": "none"
+            }
+        },
+        "detectors": {
+            "winget": {
+                "kind": "resolved_link_parent",
+                "path_fragment": "/microsoft/winget/links/",
+                "target_marker": "_Microsoft.Winget.Source_",
+                "bin_env_var": "",
+                "default_bin_dir": ""
+            },
+            "uv": {
+                "kind": "bin_directory",
+                "path_fragment": "",
+                "target_marker": "",
+                "bin_env_var": "UV_TOOL_BIN_DIR",
+                "default_bin_dir": "~/.local/bin"
+            }
+        }
+    },
+    "tool_versions": {
+        "yt-dlp": {
+            "current": "2026.07.04",
+            "latest": "2026.07.04",
+            "status": "ok"
+        },
+        "deno": {
+            "current": "2.9.4",
+            "latest": "2.9.4",
+            "status": "ok"
+        },
+        "ffmpeg": {
+            "current": "8.1.2",
+            "latest": "8.1.2",
+            "status": "ok"
+        },
+        "ffplay": {
+            "current": "8.1.2",
+            "latest": "8.1.2",
+            "status": "ok"
+        },
+        "ffprobe": {
+            "current": "8.1.2",
+            "latest": "8.1.2",
+            "status": "ok"
+        },
+        "aria2c": {
+            "current": "1.37.0",
+            "latest": "1.37.0",
+            "status": "ok"
+        }
+    },
+    "window": {
+        "width": 600,
+        "height": 776,
+        "left": 3343,
+        "top": 219
+    },
+    "timeouts": {
+        "connect": 5.0,
+        "read": 8.0,
+        "version_probe": 5.0,
+        "tool_download": 30.0,
+        "thumbnail_connect": 10.0,
+        "thumbnail_read": 15.0,
+        "thumbnail_meta": 20.0,
+        "card_fade": 3.0
+    },
+    "theme": {
+        "mode": "dark",
+        "dark": {
+            "accent_color": "00B4D8",
+            "switch_color": "4CAF50",
+            "header_color": "00B4D8",
+            "progress_color": "4CAF50",
+            "button_color": "4CAF50",
+            "button_text_color": "FFFFFF",
+            "text_color": "E0E0E0",
+            "text_secondary_color": "BDBDBD",
+            "text_muted_color": "9E9E9E",
+            "bg_color": "121212",
+            "appbar_color": "1c1c1c",
+            "bottom_bar_color": "141414",
+            "card_color": "161616",
+            "surface_color": "1A1A1A",
+            "border_color": "2A2A2A",
+            "status_ok_color": "66BB6A",
+            "status_error_color": "EF5350",
+            "status_warning_color": "FFA726",
+            "status_running_color": "42A5F5"
+        },
+        "light": {
+            "accent_color": "0288D1",
+            "switch_color": "43A047",
+            "header_color": "0277BD",
+            "progress_color": "43A047",
+            "button_color": "43A047",
+            "button_text_color": "FFFFFF",
+            "text_color": "212121",
+            "text_secondary_color": "616161",
+            "text_muted_color": "9E9E9E",
+            "bg_color": "FAFAFA",
+            "appbar_color": "ECEFF1",
+            "bottom_bar_color": "ECEFF1",
+            "card_color": "FFFFFF",
+            "surface_color": "F5F5F5",
+            "border_color": "E0E0E0",
+            "status_ok_color": "2E7D32",
+            "status_error_color": "C62828",
+            "status_warning_color": "EF6C00",
+            "status_running_color": "1565C0"
+        },
+        "saved": {}
+    },
+    "language": "ru"
+}
