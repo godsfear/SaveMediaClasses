@@ -304,11 +304,8 @@ class NavigationController(I18nTarget):
         )
 
     def _app_version(self) -> str:
-        try:
-            from importlib.metadata import version
-            return version("savemediaclasses")
-        except Exception:
-            pass
+        """Версия из pyproject.toml — единый источник: из него же flet build берёт
+        версию exe, а CI подставляет туда номер из тега релиза."""
         try:
             import tomllib
             with open(self._svc.paths.pyproject, "rb") as f:

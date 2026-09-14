@@ -1,0 +1,57 @@
+# Сборка Windows: тесты → flet build → zip.
+#   push в master / pull request — zip в артефактах запуска (Actions → запуск → Artifacts);
+#   push тега vX.Y.Z             — ещё и GitHub Release с SaveMedia_win64.zip.
+# Номер версии берётся из тега и записывается в pyproject.toml: оттуда его читают
+# и flet build (свойства exe), и окно About.
+name: Build Windows
+
+on:
+  push:
+    branches: [master]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+env:
+  PYTHONUTF8: 1               # кириллица в выводе flet/pytest на консоли раннера
+  FLET_CLI_NO_RICH_OUTPUT: 1
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    permissions:
+      contents: write         # gh release create
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v6
+
+      - name: Version from tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        run: uv version --no-sync "${GITHUB_REF_NAME#v}"
+
+      - name: Tests
+        run: uv run --extra dev pytest -q
+
+      - name: Build
+        run: uv run --extra dev flet build windows --yes
+
+      - name: Pack
+        shell: pwsh
+        run: |
+          Rename-Item build/windows SaveMedia
+          Compress-Archive -Path build/SaveMedia -DestinationPath SaveMedia_win64.zip
+
+      - uses: actions/upload-artifact@v5
+        with:
+          name: SaveMedia_win64
+          path: SaveMedia_win64.zip
+          if-no-files-found: error
+
+      - name: Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" SaveMedia_win64.zip --title "SaveMedia $GITHUB_REF_NAME" --generate-notes

@@ -156,4 +156,6 @@ class AppPaths:
 
     @property
     def pyproject(self) -> Path:
-        return self.app_dir / "pyproject.toml"
+        """pyproject.toml лежит рядом с КОДОМ, а не с exe: flet build кладёт его
+        в app/ вместе с модулями (app_dir там — папка exe, файла в ней нет)."""
+        return Path(__file__).resolve().parent / "pyproject.toml"
