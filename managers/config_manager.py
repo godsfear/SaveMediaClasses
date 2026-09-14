@@ -7,7 +7,7 @@ from config import (
     ThemeConfig, NamedTheme, WindowConfig, TimeoutsConfig, ToolConfig, VersionState,
     ToolingConfig,
     MAX_PARALLEL_CEILING,
-    safe_str, safe_int, get_fallback_bool,
+    safe_str, safe_int, safe_float, get_fallback_bool,
 )
 from i18n import Locale
 from state import AppState
@@ -42,6 +42,9 @@ class ConfigManager:
         if not dp:
             dp = defaults.download_path
 
+        overrides = cfg.get("managed_overrides")
+        overrides = overrides if isinstance(overrides, list) else []
+
         tools_raw = raw.get("tools", {})
         tools = {}
         for tool_name, tool_default in defaults.tools.items():
@@ -67,8 +70,9 @@ class ConfigManager:
                                                 defaults.history_keep_days)),
             notify_on_complete = fb_bool(cfg, "notify_on_complete",
                                          defaults.notify_on_complete),
-            last_check_time   = float(cfg.get("last_check_time",  defaults.last_check_time)),
+            last_check_time   = safe_float(cfg.get("last_check_time"), defaults.last_check_time),
             last_needs_update = bool(cfg.get("last_needs_update",  defaults.last_needs_update)),
+            managed_overrides = [name for name in overrides if isinstance(name, str)],
             tools         = tools,
             tooling       = ToolingConfig.from_dict(
                 raw.get("tooling", {}) if isinstance(raw.get("tooling"), dict) else {},
@@ -175,6 +179,7 @@ class ConfigManager:
                 "notify_on_complete": state.notify_on_complete,
                 "last_check_time":   state.last_check_time,
                 "last_needs_update": state.last_needs_update,
+                "managed_overrides": state.managed_overrides,
             },
             "tools":         {k: v.to_dict() for k, v in state.tools.items()},
             "tooling":       state.tooling.to_dict(),
@@ -189,9 +194,13 @@ class ConfigManager:
             },
             "language": state.language,
         }
+        # Через временный файл + os.replace: оборванная запись (сбой диска, убитый
+        # процесс) не должна оставить пользователя без настроек.
+        tmp_path = self.config_file + ".tmp"
         try:
-            with open(self.config_file, "w", encoding="utf-8") as f:
+            with open(tmp_path, "w", encoding="utf-8") as f:
                 json.dump(data, f, ensure_ascii=False, indent=4)
+            os.replace(tmp_path, self.config_file)
         except OSError:
             self._log.exception("Failed to save config: %s", self.config_file)
 

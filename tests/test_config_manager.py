@@ -44,6 +44,7 @@ def test_save_load_roundtrip(mgr):
     state.ytdlp.parameters.audio_only.state = True
     state.ytdlp.parameters.quality.value = "720p"
     state.ytdlp.parameters.subtitles.value = "auto"
+    state.managed_overrides = ["ffmpeg", "ffprobe"]
 
     mgr.save(state)
     restored = mgr.load()
@@ -60,6 +61,7 @@ def test_save_load_roundtrip(mgr):
     assert restored.ytdlp.parameters.audio_only.state is True
     assert restored.ytdlp.parameters.quality.value == "720p"
     assert restored.ytdlp.parameters.subtitles.value == "auto"
+    assert restored.managed_overrides == ["ffmpeg", "ffprobe"]
 
 
 def test_max_parallel_clamped_on_load(mgr):
@@ -81,6 +83,38 @@ def test_corrupt_file_falls_back_to_defaults(mgr):
 def _write(mgr, data: dict) -> None:
     with open(mgr.config_file, "w", encoding="utf-8") as f:
         json.dump(data, f)
+
+
+@pytest.mark.parametrize("broken", [
+    {"settings": {"download_tool": "aria2c", "last_check_time": "oops"}},
+    {"settings": {"download_tool": "aria2c", "last_check_time": float("nan")}},
+    {"settings": {"download_tool": "aria2c"}, "window": None},
+    {"settings": {"download_tool": "aria2c"}, "window": []},
+])
+def test_wrong_field_type_falls_back_only_for_that_field(mgr, broken):
+    """Корректный JSON с неверным типом не роняет старт и не сбрасывает остальное."""
+    _write(mgr, broken)
+    state = mgr.load()
+    assert state.download_tool == "aria2c"
+    assert state.last_check_time == 0.0
+    assert state.window == WindowConfig()
+
+
+def test_interrupted_save_keeps_previous_config(mgr, monkeypatch):
+    import managers.config_manager as config_manager_module
+    state = AppState()
+    state.download_tool = "aria2c"
+    mgr.save(state)
+
+    def torn_dump(data, f, **kwargs):
+        f.write('{"settings": {')           # запись оборвалась на середине
+        raise OSError("disk full")
+
+    monkeypatch.setattr(config_manager_module.json, "dump", torn_dump)
+    state.download_tool = "yt-dlp"
+    mgr.save(state)
+
+    assert mgr.load().download_tool == "aria2c"
 
 
 def test_legacy_single_theme_becomes_dark(mgr):

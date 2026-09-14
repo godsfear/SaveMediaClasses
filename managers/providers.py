@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import locale
 import os
 import re
 import shlex
@@ -23,9 +24,12 @@ import subprocess
 from typing import Callable, ClassVar, Protocol, runtime_checkable
 
 from app_logging import get_logger
-from config import safe_str, magnet_btih, THUMBNAIL_TIMEOUT, THUMBNAIL_SOCK_TIMEOUT
+from config import (
+    safe_str, magnet_btih, THUMBNAIL_TIMEOUT, THUMBNAIL_SOCK_TIMEOUT,
+    DEFAULT_ARIA2_PART_DIRNAME,
+)
 from managers.snapshot import DownloadSnapshot
-from managers.tool_resolver import ToolResolver
+from managers.tool_resolver import ToolOrigin, ToolResolver
 
 
 def _split_args(raw: str) -> list[str]:
@@ -38,6 +42,22 @@ def _split_args(raw: str) -> list[str]:
         return shlex.split(raw)
     except ValueError:
         return raw.split()
+
+
+def _decode_cli_output(raw: bytes) -> str:
+    """Декодировать UTF-8 или вывод Windows ANSI без символов замены."""
+    encodings = ("utf-8", locale.getpreferredencoding(False), "cp1252")
+    tried: set[str] = set()
+    for encoding in encodings:
+        key = encoding.casefold()
+        if key in tried:
+            continue
+        tried.add(key)
+        try:
+            return raw.decode(encoding)
+        except (LookupError, UnicodeDecodeError):
+            continue
+    return raw.decode("utf-8", errors="replace")
 
 
 def is_playlist_url(url: str) -> bool:
@@ -100,6 +120,10 @@ class DownloadProvider(Protocol):
         """Превратить сырую строку прогресса в человекочитаемый статус для UI."""
         ...
 
+    def failure_reason(self, output: str) -> str:
+        """Семантическая причина сбоя или пустая строка для общего случая."""
+        ...
+
     @classmethod
     def is_valid_url(cls, url: str) -> bool:
         """Проверить что URL подходит для этого провайдера."""
@@ -133,6 +157,8 @@ class _SubprocessProvider:
         self._ext   = ".exe" if os.name == "nt" else ""
         self._proc  = None
         self._resolver = resolver or ToolResolver(paths)
+        # Отмена, пришедшая пока процесс ещё создаётся (_proc пуст), — см. run().
+        self._cancel_requested = False
 
     def temp_dir(self) -> str:
         """По умолчанию провайдер качает сразу в папку назначения — temp-папки нет."""
@@ -150,7 +176,11 @@ class _SubprocessProvider:
         """По умолчанию — строка как есть. Подклассы переопределяют под свой формат."""
         return line.strip()
 
+    def failure_reason(self, output: str) -> str:
+        return ""
+
     def cancel(self) -> None:
+        self._cancel_requested = True
         if not self._proc or self._proc.returncode is not None:
             return
         try:
@@ -179,6 +209,7 @@ class _SubprocessProvider:
 
         env = self._resolver.process_env()
 
+        self._cancel_requested = False
         self._proc = await asyncio.create_subprocess_exec(
             *cmd_args,
             stdout=asyncio.subprocess.PIPE,
@@ -188,6 +219,9 @@ class _SubprocessProvider:
             # новая сессия = отдельная группа процессов; killpg убьёт процесс + детей разом
             **({} if os.name == "nt" else {"start_new_session": True}),
         )
+        if self._cancel_requested:
+            # pause/cancel пришли во время создания процесса, когда _proc был пуст.
+            self.cancel()
 
         # Делим поток и по \n, и по \r: aria2c обновляет строку прогресса возвратом
         # каретки (\r), не переводом строки, поэтому readline() склеивал бы апдейты
@@ -202,10 +236,10 @@ class _SubprocessProvider:
             segments = re.split(rb"[\r\n]", buf)
             buf = segments.pop()        # последний сегмент может быть неполным
             for seg in segments:
-                text = seg.decode("utf-8", errors="replace").strip()
+                text = _decode_cli_output(seg).strip()
                 if text:
                     on_line(text)
-        tail = buf.decode("utf-8", errors="replace").strip()
+        tail = _decode_cli_output(buf).strip()
         if tail:
             on_line(tail)
 
@@ -224,6 +258,10 @@ class YtDlpProvider(_SubprocessProvider):
 
     SOURCE_NAME = "yt-dlp"
     _POST_TAGS = ["[Merger]", "[Metadata]", "[Thumbnails]", "[ExtractAudio]", "[Modify]"]
+    _AUTH_ERROR_MARKERS = (
+        "sign in to confirm you",
+        "use --cookies-from-browser or --cookies for the authentication",
+    )
 
     # Строки вывода, из которых извлекается путь итогового файла. Порядок фаз
     # yt-dlp: download → merge → extract/convert → move; последнее совпадение
@@ -255,15 +293,33 @@ class YtDlpProvider(_SubprocessProvider):
     def resolve_exe(self) -> str:
         return self._resolver.resolve("yt-dlp").path
 
-    def build_command(self, exe: str, snapshot: DownloadSnapshot) -> list[str]:
-        s    = snapshot
-        args = [exe]
-
+    @staticmethod
+    def _network_args(s: DownloadSnapshot) -> list[str]:
+        """Прокси и cookies — общие для загрузки и запроса метаданных."""
+        args: list[str] = []
         if s.proxy_enabled and safe_str(s.proxy_address).strip():
             args.extend(["--proxy", safe_str(s.proxy_address).strip()])
-
         if s.cookies_enabled and s.cookies_browser != "none":
             args.extend([s.cookies_flag, safe_str(s.cookies_browser)])
+        return args
+
+    def _tool_args(self) -> list[str]:
+        """Явные пути ffmpeg/deno, когда resolver выбрал managed-копию при живой
+        системной: yt-dlp ищет их по PATH, где системные папки идут раньше tools,
+        и взял бы не ту версию, что проверена и показана в настройках."""
+        args: list[str] = []
+        for name, flag, value in (("ffmpeg", "--ffmpeg-location", "{}"),
+                                  ("deno", "--js-runtimes", "deno:{}")):
+            location = self._resolver.resolve(name)
+            # ponytail: флаги только при расхождении с PATH — yt-dlp без EJS не знает
+            # --js-runtimes; передавать всегда, когда такие сборки уйдут из обихода.
+            if location.origin == ToolOrigin.MANAGED and self._resolver.system(name).found:
+                args.extend([flag, value.format(location.path)])
+        return args
+
+    def build_command(self, exe: str, snapshot: DownloadSnapshot) -> list[str]:
+        s    = snapshot
+        args = [exe, *self._network_args(s), *self._tool_args()]
 
         args.append(s.playlist_flag_on if s.playlist_enabled else s.playlist_flag_off)
 
@@ -307,6 +363,12 @@ class YtDlpProvider(_SubprocessProvider):
     def format_status(cls, line: str) -> str:
         return line.replace("[download]", "").strip()
 
+    def failure_reason(self, output: str) -> str:
+        normalized = output.casefold().replace("�", "'")
+        if any(marker in normalized for marker in self._AUTH_ERROR_MARKERS):
+            return "youtube_auth_required"
+        return ""
+
     @classmethod
     def is_valid_url(cls, url: str) -> bool:
         return bool(url.strip())
@@ -315,7 +377,7 @@ class YtDlpProvider(_SubprocessProvider):
     def post_processing_tags(cls) -> list[str]:
         return cls._POST_TAGS
 
-    async def fetch_thumbnail(self, exe: str, url: str, proxy_url: str | None = None,
+    async def fetch_thumbnail(self, exe: str, snapshot: DownloadSnapshot,
                               connect_timeout: float = THUMBNAIL_SOCK_TIMEOUT,
                               read_timeout: float = THUMBNAIL_TIMEOUT,
                               meta_timeout: float = 20.0) -> tuple:
@@ -325,12 +387,17 @@ class YtDlpProvider(_SubprocessProvider):
              Для плейлиста: _type="playlist", entries — плоский список без деталей.
              Для видео:     _type="video", thumbnails есть сразу.
           2. Thumbnail берём из самого объекта (видео) или первого entries (плейлист).
-          3. httpx скачивает байты превью через proxy_url (если задан).
+          3. httpx скачивает байты превью через прокси снимка (если включён).
+        Прокси, cookies и пути зависимостей — те же, что у самой загрузки: иначе при
+        обязательном входе метаданные не придут, а запрос уйдёт мимо прокси.
         Возвращает (bytes, meta_dict).
         """
         import json as _json
         import httpx
 
+        url = snapshot.url
+        proxy_url = ((safe_str(snapshot.proxy_address).strip() or None)
+                     if snapshot.proxy_enabled else None)
         try:
             startup = None
             if os.name == "nt":
@@ -338,7 +405,8 @@ class YtDlpProvider(_SubprocessProvider):
                 startup.dwFlags |= subprocess.STARTF_USESHOWWINDOW
 
             proc = await asyncio.create_subprocess_exec(
-                exe, "--dump-single-json", "--no-playlist", url,
+                exe, *self._network_args(snapshot), *self._tool_args(),
+                "--dump-single-json", "--no-playlist", url,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.DEVNULL,
                 env=self._resolver.process_env(),
@@ -414,6 +482,7 @@ class Aria2cProvider(_SubprocessProvider):
     _DL_RE       = re.compile(r"DL:([^\s\]]+)")
     _ETA_RE      = re.compile(r"ETA:([^\s\]]+)")
     _GID_RE      = re.compile(r"\[#(\w+)")
+    _PART_ID_RE  = re.compile(r"[0-9a-f]{16}")   # имя папки задания внутри .part
 
     def __init__(self, paths, resolver: ToolResolver | None = None) -> None:
         super().__init__(paths, resolver)
@@ -483,7 +552,7 @@ class Aria2cProvider(_SubprocessProvider):
         # --continue. Разные ссылки практически не сталкиваются (коллизия ~n²/2⁶⁵).
         self._final_dir = safe_str(s.download_path)
         part_id = hashlib.sha256(safe_str(s.url).encode("utf-8")).hexdigest()[:16]
-        part_dirname = safe_str(s.aria2_part_dirname) or ".part"
+        part_dirname = _part_dirname(s.aria2_part_dirname)
         self._part_dir  = (os.path.join(self._final_dir, part_dirname, part_id)
                            if self._final_dir else "")
         dl_dir = self._part_dir or self._final_dir
@@ -525,27 +594,41 @@ class Aria2cProvider(_SubprocessProvider):
     def _move_to_final(self) -> None:
         """Перенести готовые файлы из .part/<id> в папку загрузки.
 
-        Остаточные .aria2 (контрольные) пропускаем; существующий приёмник
-        перезаписываем (политика --allow-overwrite). В конце убираем временную
-        подпапку и, если опустела, родительский .part."""
-        os.makedirs(self._final_dir, exist_ok=True)
+        Остаточные .aria2 (контрольные) пропускаем. Существующее в папке загрузки
+        не трогаем: если имя занято, результат целиком ложится в свободную подпапку
+        «name (N)» под ИСХОДНЫМИ именами. Переименовывать сам контент нельзя:
+        раздача ищет его по имени из торрента (см. seed_dir) и иначе дописывала бы
+        куски в одноимённый чужой файл. В конце убираем временную подпапку и, если
+        опустела, родительский .part."""
+        names = [n for n in os.listdir(self._part_dir) if not n.endswith(".aria2")]
+        target = self._final_dir
+        if any(os.path.exists(os.path.join(target, n)) for n in names):
+            first = os.path.join(self._part_dir, names[0])
+            base = names[0] if os.path.isdir(first) else os.path.splitext(names[0])[0]
+            target = _free_dir(os.path.join(self._final_dir, base))
+        os.makedirs(target, exist_ok=True)
         moved: list[str] = []
-        for name in os.listdir(self._part_dir):
-            if name.endswith(".aria2"):
-                continue
-            src = os.path.join(self._part_dir, name)
-            dst = os.path.join(self._final_dir, name)
-            if os.path.exists(dst):
-                shutil.rmtree(dst, ignore_errors=True) if os.path.isdir(dst) else os.remove(dst)
-            shutil.move(src, dst)
+        for name in names:
+            dst = os.path.join(target, name)
+            shutil.move(os.path.join(self._part_dir, name), dst)
             moved.append(dst)
         # Один файл/папка торрента → это и есть результат; несколько — папка.
-        self._final_path = moved[0] if len(moved) == 1 else (self._final_dir if moved else "")
+        self._final_path = moved[0] if len(moved) == 1 else (target if moved else "")
         shutil.rmtree(self._part_dir, ignore_errors=True)
         try:
             os.rmdir(os.path.dirname(self._part_dir))   # .part — только если пуста
         except OSError:
             pass
+
+    @staticmethod
+    def seed_dir(download_path: str, file_path: str) -> str:
+        """--dir для раздачи: aria2 ищет в ней контент по имени из торрента.
+        Результат торрента — один элемент (файл или корневая папка), значит нужен
+        его родитель: при конфликте имён это «name (N)», а не папка загрузки.
+        Старые записи без file_path (и результат из нескольких элементов) — папка загрузки."""
+        if file_path and os.path.normcase(file_path) != os.path.normcase(download_path):
+            return os.path.dirname(file_path)
+        return download_path
 
     @classmethod
     def clean_temp_dirs(cls, download_dir: str, exclude: "set[str] | None" = None,
@@ -557,14 +640,16 @@ class Aria2cProvider(_SubprocessProvider):
         из конфига (Aria2cConfig.part_dirname). Очистка только ручная (эта функция).
         """
         exclude = {os.path.abspath(p) for p in (exclude or set())}
-        root = os.path.join(safe_str(download_dir), safe_str(part_dirname) or ".part")
+        root = os.path.join(safe_str(download_dir), _part_dirname(part_dirname))
         if not safe_str(download_dir) or not os.path.isdir(root):
             return (0, 0)
 
         removed = freed = 0
         for name in os.listdir(root):
             sub = os.path.join(root, name)
-            if not os.path.isdir(sub) or os.path.abspath(sub) in exclude:
+            # Удаляем только папки заданий (<sha256(url)[:16]>), чужое внутри не трогаем.
+            if (not cls._PART_ID_RE.fullmatch(name) or not os.path.isdir(sub)
+                    or os.path.abspath(sub) in exclude):
                 continue
             size = _dir_size(sub)
             shutil.rmtree(sub, ignore_errors=True)
@@ -755,6 +840,24 @@ def content_hash(url: str) -> str:
     if low.endswith(".torrent"):
         return torrent_infohash(u)
     return ""
+
+
+def _part_dirname(raw: str) -> str:
+    """Имя служебной temp-папки из конфига. Допустимо только простое имя внутри
+    папки загрузки: '..', абсолютный или вложенный путь увели бы --dir и ручную
+    очистку (она удаляет каталоги) за её пределы — тогда берём дефолт."""
+    name = safe_str(raw).strip()
+    if name in ("", ".", "..") or os.path.isabs(name) or os.path.basename(name) != name:
+        return DEFAULT_ARIA2_PART_DIRNAME
+    return name
+
+
+def _free_dir(base: str) -> str:
+    """Первый несуществующий путь вида 'base (N)' — папка результата при конфликте имён."""
+    n = 1
+    while os.path.exists(f"{base} ({n})"):
+        n += 1
+    return f"{base} ({n})"
 
 
 def _dir_size(path: str) -> int:

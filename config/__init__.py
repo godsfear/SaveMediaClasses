@@ -29,7 +29,7 @@ from config.constants import (
 )
 from config.utils import (
     hex_to_flet, is_valid_hex, download_display_name, magnet_btih,
-    parse_url_lines, safe_str, safe_int, get_fallback_bool,
+    parse_url_lines, safe_str, safe_int, safe_float, get_fallback_bool,
 )
 from config.theme import (
     ThemeConfig, NamedTheme, THEME_FIELDS, THEME_GROUPS, PALETTE,

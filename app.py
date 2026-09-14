@@ -141,7 +141,7 @@ class SaveMediaApp:
             svc.state.last_needs_update = e.needs_update
             svc.bus.emit(SettingsChangedEvent())
 
-        # ToolsRestoredEvent обрабатывает сам SettingsScreen (подписан в конструкторе).
+        # ToolsRestoredEvent обрабатывают сами SettingsScreen и MainScreen (подписаны в конструкторах).
         # Возобновление из истории: загрузку запустит DownloadOrchestrator
         # (svc.downloads, подписан на ResumeDownloadEvent в Services.create),
         # карточку нарисует MainScreen (по DownloadAcceptedEvent), а здесь —
@@ -188,12 +188,13 @@ class SaveMediaApp:
             mins_left = int(
                 (CHECK_INTERVAL_SECONDS - (now - svc.state.last_check_time)) / 60
             )
+            # Только Restored: ToolsCheckedEvent обновил бы last_check_time, и при
+            # частых перезапусках автопроверка не наступала бы никогда.
             svc.bus.emit(ToolsRestoredEvent(
                 needs_update=svc.state.last_needs_update,
                 versions=svc.state.tool_versions,
                 mins_until_check=mins_left,
             ))
-            svc.bus.emit(ToolsCheckedEvent(needs_update=svc.state.last_needs_update))
             safe_update()
 
         # Окно стартует скрытым (hide_window_on_start в pyproject) — показываем его

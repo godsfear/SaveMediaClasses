@@ -54,15 +54,15 @@ class FakeThumbs:
     def supports(provider_key):
         return provider_key == "yt-dlp"
 
-    async def fetch(self, task_id, url):  # pragma: no cover — не исполняется
+    async def fetch(self, task_id, snapshot):  # pragma: no cover — не исполняется
         pass
 
 
-def make_orch(dm=None, db=None, bus=None, runner_calls=None):
+def make_orch(dm=None, db=None, bus=None, runner_calls=None, state=None):
     runner_calls = runner_calls if runner_calls is not None else []
     return DownloadOrchestrator(
         bus=bus or EventBus(),
-        state=AppState(),
+        state=state or AppState(),
         dm=dm or FakeDM(),
         db=db if db is not None else FakeDB(),
         thumbs=FakeThumbs(),
@@ -188,3 +188,40 @@ def test_resume_unknown_source_falls_back_to_default_provider():
     orch._on_resume_download(ResumeDownloadEvent(
         task_id="t", url="https://a/page", source="nonexistent", params={}))
     assert dm.added[0][1] == "yt-dlp"
+
+
+def test_resume_keeps_history_record_when_exe_missing():
+    dm, db = FakeDM(add_result=None), FakeDB()
+    orch, _ = make_orch(dm=dm, db=db)
+    orch._on_resume_download(ResumeDownloadEvent(
+        task_id="t-old", url="https://a/b.zip", source="aria2c", params={}))
+    assert db.deleted == []                      # запуск не принят — запись остаётся
+
+
+def test_resume_skips_url_already_downloading():
+    url = "https://a/b.zip"
+    dm, db = FakeDM(active_url=url), FakeDB()
+    orch, _ = make_orch(dm=dm, db=db)
+    orch._on_resume_download(ResumeDownloadEvent(
+        task_id="t-old", url=url, source="aria2c", params={}))
+    assert dm.added == [] and db.deleted == []   # второй процесс на тот же .part не нужен
+
+
+def test_retry_uses_current_cookies_and_proxy_but_keeps_snapshot_format():
+    """После сбоя пользователь включил cookies — повтор из истории их применяет."""
+    state = AppState()
+    state.proxy_enabled, state.proxy_address = True, "http://proxy:3128"
+    state.ytdlp.parameters.cookies.state = True
+    state.ytdlp.parameters.cookies.browser = "firefox"
+    dm = FakeDM()
+    orch, _ = make_orch(dm=dm, state=state)
+
+    orch._on_resume_download(ResumeDownloadEvent(
+        task_id="t-old", url="https://youtu.be/x", source="yt-dlp",
+        params={"cookies_enabled": False, "cookies_browser": "none",
+                "proxy_enabled": False, "audio_only": True}))
+
+    snapshot, _ = dm.added[0]
+    assert (snapshot.cookies_enabled, snapshot.cookies_browser) == (True, "firefox")
+    assert (snapshot.proxy_enabled, snapshot.proxy_address) == (True, "http://proxy:3128")
+    assert snapshot.audio_only is True           # формат — из исходного снимка

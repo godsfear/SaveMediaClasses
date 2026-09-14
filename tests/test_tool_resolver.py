@@ -77,20 +77,22 @@ def test_child_env_does_not_leak_embedded_python_runtime(tmp_path, monkeypatch):
     assert "virtual_env" not in keys
 
 
-@pytest.mark.parametrize("package_id,binary", [
-    ("DenoLand.Deno", "deno.exe"),
-    ("Gyan.FFmpeg", "ffmpeg.exe"),
-    ("BtbN.FFmpeg.GPL.8.1", "ffmpeg.exe"),
-    ("yt-dlp.FFmpeg", "ffprobe.exe"),
+@pytest.mark.parametrize("package_id,binary,subdir", [
+    ("DenoLand.Deno", "deno.exe", ""),
+    ("Gyan.FFmpeg", "ffmpeg.exe", ""),
+    # Реальная раскладка Gyan.FFmpeg: бинарник во вложенной bin пакета.
+    ("Gyan.FFmpeg", "ffmpeg.exe", r"ffmpeg-8.0-full_build\bin"),
+    ("BtbN.FFmpeg.GPL.8.1", "ffmpeg.exe", ""),
+    ("yt-dlp.FFmpeg", "ffprobe.exe", ""),
 ])
 def test_winget_link_is_identified_as_package_managed(
-    tmp_path, monkeypatch, package_id, binary,
+    tmp_path, monkeypatch, package_id, binary, subdir,
 ):
     paths = _paths(tmp_path)
     link = rf"C:\Users\tester\AppData\Local\Microsoft\WinGet\Links\{binary}"
     packages = r"C:\Users\tester\AppData\Local\Microsoft\WinGet\Packages"
-    target = (packages + "\\" + package_id
-              + rf"_Microsoft.Winget.Source_8wekyb3d8bbwe\{binary}")
+    target = (packages + "\\" + package_id + "_Microsoft.Winget.Source_8wekyb3d8bbwe\\"
+              + (subdir + "\\" if subdir else "") + binary)
     monkeypatch.setattr(resolver_module.shutil, "which", lambda *a, **k: link)
     monkeypatch.setattr(resolver_module.os.path, "realpath", lambda path: target)
 

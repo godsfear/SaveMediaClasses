@@ -101,6 +101,11 @@ class ToolResolver:
         else:
             self._managed_overrides.discard(filename)
 
+    @property
+    def managed_overrides(self) -> list[str]:
+        """Имена, для которых сейчас выбрана managed-копия (персистится в state)."""
+        return sorted(self._managed_overrides)
+
     def process_env(self) -> dict[str, str]:
         """Окружение для CLI: исходный системный PATH первым, fallback-папки после."""
         env = os.environ.copy()
@@ -147,19 +152,21 @@ class ToolResolver:
 
     @staticmethod
     def _detect_resolved_link_parent(path: str, detector: InstallationDetector) -> str:
-        """ID пакета берётся из имени родителя цели launcher/symlink."""
+        """ID пакета берётся из имени папки пакета в пути цели launcher/symlink."""
         normalized = os.path.abspath(path).replace("\\", "/").casefold()
         fragment = detector.path_fragment.replace("\\", "/").casefold()
         if not fragment or fragment not in normalized or not detector.target_marker:
             return ""
 
         target = os.path.realpath(path).replace("\\", "/")
-        parts = target.rstrip("/").split("/")
-        if len(parts) < 2:
-            return ""
-        package_dir = parts[-2]
-        marker_index = package_dir.casefold().find(detector.target_marker.casefold())
-        return package_dir[:marker_index] if marker_index > 0 else ""
+        marker = detector.target_marker.casefold()
+        # Папка пакета — ближайший предок с маркером: бинарник может лежать глубже
+        # (Gyan.FFmpeg: <package>/ffmpeg-8.0-full_build/bin/ffmpeg.exe).
+        for package_dir in reversed(target.rstrip("/").split("/")[:-1]):
+            marker_index = package_dir.casefold().find(marker)
+            if marker_index > 0:
+                return package_dir[:marker_index]
+        return ""
 
     @staticmethod
     def _detect_bin_directory(path: str, detector: InstallationDetector) -> str:

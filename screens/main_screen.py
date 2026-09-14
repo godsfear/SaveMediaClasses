@@ -19,6 +19,7 @@ from events import (
     DownloadPausedEvent,
     DownloadResumedEvent,
     ToolsCheckedEvent,
+    ToolsRestoredEvent,
     StatusMessageEvent,
     ClipboardUrlEvent,
     CookiesChangedEvent,
@@ -197,6 +198,7 @@ class MainScreen(ThemeTarget, I18nTarget):
             self._bus.on(DownloadPausedEvent,         self._on_paused),
             self._bus.on(DownloadResumedEvent,        self._on_resumed),
             self._bus.on(ToolsCheckedEvent,           self._on_tools_checked),
+            self._bus.on(ToolsRestoredEvent,          self._on_tools_checked),   # статус из кэша
             self._bus.on(CookiesChangedEvent,         self._on_cookies_changed),
             self._bus.on(DownloadPathChangedEvent,    self._on_path_changed),
             # Лимит параллельных мог измениться в настройках — переоценить кнопку.
@@ -251,6 +253,8 @@ class MainScreen(ThemeTarget, I18nTarget):
             s = self._s()
             if e.success:
                 msg = s.download_completed
+            elif e.error_kind == "youtube_auth_required":
+                msg = s.download_error_youtube_auth
             elif e.error_detail:
                 msg = s.fmt("download_error_os", detail=e.error_detail)
             else:
@@ -261,7 +265,12 @@ class MainScreen(ThemeTarget, I18nTarget):
         # При ошибке подсказываем проверить выбор загрузчика (ссылка могла уйти
         # не тому инструменту — особенно в auto).
         if not e.success:
-            self._show_status(self._s().err_check_downloader, "warning")
+            hint = (
+                self._s().download_error_youtube_auth
+                if e.error_kind == "youtube_auth_required"
+                else self._s().err_check_downloader
+            )
+            self._show_status(hint, "warning")
 
     def _on_cancelled(self, e: DownloadCancelledEvent) -> None:
         card = self._cards.get(e.task_id)
@@ -270,7 +279,7 @@ class MainScreen(ThemeTarget, I18nTarget):
             self._safe_update()
             self._page.run_task(self._remove_card_after_delay, e.task_id)
 
-    def _on_tools_checked(self, e: ToolsCheckedEvent) -> None:
+    def _on_tools_checked(self, e: ToolsCheckedEvent | ToolsRestoredEvent) -> None:
         s = self._s()
         if e.needs_update:
             self._show_status(s.status_tools_update, "warning")

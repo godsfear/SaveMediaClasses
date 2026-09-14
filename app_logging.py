@@ -1,4 +1,5 @@
 import logging
+import logging.handlers
 import os
 
 
@@ -40,7 +41,9 @@ def configure_logging(log_path: str) -> logging.Logger:
         handler.close()
 
     os.makedirs(os.path.dirname(abs_path), exist_ok=True)
-    handler = logging.FileHandler(abs_path, encoding="utf-8")
+    # Долгие загрузки и раздачи пишут в лог часами — ограничиваем размер.
+    handler = logging.handlers.RotatingFileHandler(
+        abs_path, maxBytes=5_000_000, backupCount=3, encoding="utf-8")
     handler.addFilter(SourceFilter())
     handler.setFormatter(LinePrefixFormatter(LOG_FORMAT, LOG_DATE_FORMAT))
     logger.addHandler(handler)

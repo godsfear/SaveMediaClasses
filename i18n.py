@@ -137,8 +137,9 @@ class Strings:
 
     # Загрузки — финальные сообщения в карточке
     download_completed:  str = ""  # "Download complete!" / "Загрузка завершена!"
-    download_error_os:   str = ""  # "OS error: {detail}"
-    download_error_code: str = ""  # "Error (code {code})"
+    download_error_os:           str = ""  # "OS error: {detail}"
+    download_error_code:         str = ""  # "Error (code {code})"
+    download_error_youtube_auth: str = ""
 
     # URL поля
     url_yt_api:          str = ""

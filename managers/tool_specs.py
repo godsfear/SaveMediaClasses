@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import abc
 import os
+import re
 import zipfile
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Callable, Optional, Protocol, runtime_checkable
@@ -55,20 +56,35 @@ _INSTALLABLE_STATUSES = (STATUS_MISSING, STATUS_OUTDATED)
 
 # ── Единственная функция сравнения версий ─────────────────────────────────────
 
+_VERSION_NUM_RE = re.compile(r"\d+")
+
+
+def _version_key(version: str) -> tuple[int, ...]:
+    """Числовые компоненты: '7.1.1-full_build' → (7, 1, 1), '2025.06.30' → (2025, 6, 30)."""
+    return tuple(int(n) for n in _VERSION_NUM_RE.findall(version))
+
+
 def classify_version(local: str, remote: str) -> str:
-    """Определить статус по локальной и удалённой версии. Единый источник истины."""
+    """Определить статус по локальной и удалённой версии. Единый источник истины.
+
+    Сравнивается порядок числовых компонентов (недостающие = 0). Установленная
+    версия новее удалённой — тоже ok: иначе «обновление» откатило бы её назад."""
     if local == TOOL_VERSION_MISSING:
         return STATUS_MISSING
-    if local in (TOOL_VERSION_CALL_ERROR, TOOL_VERSION_NEEDS_RUNTIME) or remote in _REMOTE_BAD:
+    if local in (TOOL_VERSION_CALL_ERROR, TOOL_VERSION_NEEDS_RUNTIME) or not remote_is_known(remote):
         return STATUS_ERROR
-    if local == remote or remote in local or local in remote:
-        return STATUS_OK
-    return STATUS_OUTDATED
+    lk, rk = _version_key(local), _version_key(remote)
+    if not lk or not rk:   # нечисловая версия — только точное совпадение
+        return STATUS_OK if local == remote else STATUS_OUTDATED
+    width = max(len(lk), len(rk))
+    lk += (0,) * (width - len(lk))
+    rk += (0,) * (width - len(rk))
+    return STATUS_OK if lk >= rk else STATUS_OUTDATED
 
 
 def remote_is_known(remote: str) -> bool:
     """True если удалённую версию удалось получить (можно обновлять)."""
-    return remote not in _REMOTE_BAD
+    return bool(remote) and remote not in _REMOTE_BAD
 
 
 def status_needs_update(status: str, remote: str, local: str = "") -> bool:

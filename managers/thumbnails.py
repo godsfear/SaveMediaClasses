@@ -20,6 +20,8 @@ from managers.providers import YtDlpProvider
 
 if TYPE_CHECKING:
     from managers.download_repository import DownloadRepository
+    from managers.snapshot import DownloadSnapshot
+    from managers.tool_resolver import ToolResolver
     from paths import AppPaths
     from state import AppState
 
@@ -27,31 +29,35 @@ if TYPE_CHECKING:
 class ThumbnailService:
 
     def __init__(self, paths: "AppPaths", bus: EventBus,
-                 db: "DownloadRepository | None", state: "AppState") -> None:
-        self._paths = paths
-        self._bus   = bus
-        self._db    = db
-        self._state = state
-        self._log   = get_logger("app")
+                 db: "DownloadRepository | None", state: "AppState",
+                 resolver: "ToolResolver | None" = None) -> None:
+        """resolver — общий с загрузками (Services.tool_resolver): иначе метаданные
+        запрашивал бы не тот yt-dlp, что выбран проверкой инструментов."""
+        self._paths    = paths
+        self._bus      = bus
+        self._db       = db
+        self._state    = state
+        self._resolver = resolver
+        self._log      = get_logger("app")
 
     @staticmethod
     def supports(provider_key: str) -> bool:
         """Умеет ли провайдер отдавать превью/метаданные (только yt-dlp)."""
         return provider_key == YtDlpProvider.SOURCE_NAME
 
-    async def fetch(self, task_id: str, url: str) -> None:
+    async def fetch(self, task_id: str, snapshot: "DownloadSnapshot") -> None:
         """Получить превью и метаданные, сохранить в БД и оповестить шину.
-        Ошибки не фатальны: загрузка идёт независимо от превью."""
+        Сеть и авторизация — из снимка загрузки. Ошибки не фатальны: загрузка
+        идёт независимо от превью."""
+        url = snapshot.url
         try:
-            provider = YtDlpProvider(self._paths)
+            provider = YtDlpProvider(self._paths, self._resolver)
             exe = provider.resolve_exe()
             if not exe:
                 return
-            st        = self._state
-            proxy_url = st.proxy_address.strip() if st.proxy_enabled else None
-            to        = st.timeouts
+            to = self._state.timeouts
             thumb_data, meta = await provider.fetch_thumbnail(
-                exe, url, proxy_url=proxy_url,
+                exe, snapshot,
                 connect_timeout=to.thumbnail_connect, read_timeout=to.thumbnail_read,
                 meta_timeout=to.thumbnail_meta)
             if self._db is not None:

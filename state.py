@@ -52,6 +52,9 @@ class AppState:
     # ── Мета-состояние ────────────────────────────────────────────────────────
     last_check_time:   float = 0.0
     last_needs_update: bool  = False
+    # Бинарники, для которых проверка выбрала managed-копию вместо устаревшей
+    # системной (ToolResolver.prefer_managed), — восстанавливаются при старте.
+    managed_overrides: list[str] = field(default_factory=list)
 
     # ── Инструменты: СТАТИЧЕСКИЙ конфиг (URL, имена, команды) ─────────────────
     tools: Dict[str, ToolConfig] = field(default_factory=default_tools_config)

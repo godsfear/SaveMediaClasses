@@ -25,6 +25,7 @@ from events import (
 from i18n import Locale, Strings
 from managers.snapshot import DownloadSnapshot
 from managers.download_repository import DownloadRecord, DownloadRepository
+from managers.providers import Aria2cProvider
 from services import Services
 
 # Карта статус → токен темы живёт в config (DOWNLOAD_STATUS_TOKENS);
@@ -488,7 +489,11 @@ class HistoryScreen(ThemeTarget, I18nTarget):
         отдаём в менеджер с тем же task_id (запись перейдёт в статус 'seeding').
         Карточки на главном экране нет — статусом управляет эта кнопка."""
         snapshot = DownloadSnapshot.from_params(rec.url, rec.params)
-        snapshot = replace(snapshot, seed=True, aria2_seed_args=self._state.aria2c.parameters.seed)
+        # Контент ищется по имени из торрента там, где он реально лежит (при
+        # конфликте имён — в «name (N)»), а не в исходной папке загрузки.
+        snapshot = replace(
+            snapshot, seed=True, aria2_seed_args=self._state.aria2c.parameters.seed,
+            download_path=Aria2cProvider.seed_dir(snapshot.download_path, rec.file_path))
         tool = rec.source or "aria2c"
         self._dm.add(snapshot, provider_key=tool, task_id=rec.task_id)
         self.refresh()

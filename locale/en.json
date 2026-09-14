@@ -188,6 +188,7 @@
     "download_completed": "Download complete!",
     "download_error_os": "OS error: {detail}",
     "download_error_code": "Error (code {code})",
+    "download_error_youtube_auth": "YouTube requires sign-in: select a signed-in browser in Cookies settings, enable cookies, and retry.",
     "tool_update_downloading": "downloading...",
     "tool_update_ok": "updated successfully",
     "tool_update_error": "error: {detail}",

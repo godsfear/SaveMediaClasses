@@ -3,6 +3,7 @@ config/utils.py — примитивные хелперы без зависим�
 безопасные преобразования, hex-цвета, разбор URL.
 """
 
+import math
 import os
 from typing import Any, Dict
 
@@ -76,6 +77,15 @@ def safe_int(value: Any, default: int = 0) -> int:
         return int(float(str(value)))
     except (ValueError, TypeError):
         return default
+
+
+def safe_float(value: Any, default: float = 0.0) -> float:
+    """Конечное число или default: мусор, NaN и бесконечность из конфига не проходят."""
+    try:
+        result = float(value)
+    except (ValueError, TypeError):
+        return default
+    return result if math.isfinite(result) else default
 
 
 def get_fallback_bool(source_dict: Dict[str, Any], key: str, default_bool: bool) -> bool:

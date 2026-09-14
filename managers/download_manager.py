@@ -31,6 +31,7 @@ from events import (
     DownloadPausedEvent,
     DownloadResumedEvent,
     DownloadSeedingEvent,
+    AppClosingEvent,
 )
 
 if TYPE_CHECKING:
@@ -50,12 +51,17 @@ class DownloadTask:
     cancelled: bool  = False
     paused:    bool  = False   # на паузе: процесс убит, partial цел, задача ждёт resume
     seed:      bool  = False   # задача-раздача: завершение/стоп → запись снова 'completed'
-    started:   bool  = False   # DownloadStartedEvent уже отправлен (не дублируем на resume)
+    # Номер актуальной попытки (растёт на resume и при закрытии приложения).
+    # Попытка с устаревшим номером завершается молча — итог решает актуальная.
+    attempt:   int   = 0
     _last_pct: float = -1.0   # последний эмитированный прогресс; -1 = ещё не было
     _last_seed_log: float = -1e9   # monotonic последнего залогированного SEED (троттлинг)
     # Кольцевой буфер последних НЕ-прогрессных строк вывода — диагностика при сбое.
     _tail: deque = field(default_factory=lambda: deque(maxlen=ERROR_TAIL_LINES), repr=False)
     _handle:   Optional[asyncio.Task] = field(default=None, repr=False)
+    # Попытки одной задачи строго последовательны: новая ждёт выхода прежней
+    # (у них общие provider._proc и .part-папка).
+    _lock:     asyncio.Lock = field(default_factory=asyncio.Lock, repr=False)
 
 
 # ── Менеджер ──────────────────────────────────────────────────────────────────
@@ -91,6 +97,7 @@ class DownloadManager:
         self._slot_free = asyncio.Event()
         # Лимит могли увеличить — разбудить ожидающих перепроверить условие.
         self._bus.on(SettingsChangedEvent, lambda _e: self._slot_free.set())
+        self._bus.on(AppClosingEvent, lambda _e: self.shutdown())
 
         self._active: Dict[str, DownloadTask] = {}
 
@@ -167,11 +174,14 @@ class DownloadManager:
         task_id  = task_id or str(uuid.uuid4())
         task     = DownloadTask(task_id=task_id, snapshot=snapshot, provider=provider,
                                 seed=snapshot.seed)
+        source   = self._provider_source(provider)
         self._active[task_id] = task
+        # Запись истории — при принятии, а не при старте процесса: meta и превью
+        # приходят раньше свободного слота и иначе ушли бы в UPDATE без строки.
+        self._bus.emit(DownloadStartedEvent(task_id=task_id, snapshot=snapshot, source=source))
         if snapshot.seed:   # запись истории сразу помечается раздающейся
-            self._bus.emit(DownloadSeedingEvent(
-                task_id=task_id, source=self._provider_source(provider)))
-        task._handle = self._task_runner(self._run, task)
+            self._bus.emit(DownloadSeedingEvent(task_id=task_id, source=source))
+        task._handle = self._task_runner(self._run, task, task.attempt)
         return task_id
 
     def cancel(self, task_id: str) -> None:
@@ -192,6 +202,15 @@ class DownloadManager:
         for task_id in list(self._active):
             self.cancel(task_id)
 
+    def shutdown(self) -> None:
+        """Закрытие приложения: убить процессы всех задач — на Windows дочерние
+        загрузчики переживают родителя и продолжали бы качать/раздавать.
+        Событий не шлём: подписчики уже освобождаются, а записи 'running'
+        при следующем старте станут 'incomplete' (DownloadRepository)."""
+        for task in self._active.values():
+            task.attempt += 1   # текущие попытки завершатся молча
+            task.provider.cancel()
+
     def pause(self, task_id: str) -> None:
         """Поставить на паузу: убить процесс (partial и .aria2 остаются для докачки).
         Задача остаётся в _active в состоянии paused до resume(). БД → 'incomplete'."""
@@ -208,9 +227,10 @@ class DownloadManager:
         task = self._active.get(task_id)
         if task and task.paused and not task.cancelled:
             task.paused = False
+            task.attempt += 1   # прежняя попытка могла ещё не выйти — она уступит новой
             self._bus.emit(DownloadResumedEvent(
                 task_id=task_id, source=self._provider_source(task.provider)))
-            task._handle = self._task_runner(self._run, task)
+            task._handle = self._task_runner(self._run, task, task.attempt)
 
     def can_pause(self, task_id: str) -> bool:
         task = self._active.get(task_id)
@@ -232,8 +252,12 @@ class DownloadManager:
 
     # ── Внутренняя логика ─────────────────────────────────────────────────────
 
-    async def _run(self, task: DownloadTask) -> None:
-        async with self._slot():
+    async def _run(self, task: DownloadTask, attempt: int = 0) -> None:
+        async with task._lock, self._slot():
+            if attempt != task.attempt or self._active.get(task.task_id) is not task:
+                return   # устаревшая попытка или задача уже финализирована
+            if task.paused:
+                return   # пауза пришла, пока задача ждала слот — ждём resume()
             if task.cancelled:
                 self._finish(task)
                 self._bus.emit(DownloadCancelledEvent(task_id=task.task_id))
@@ -241,18 +265,7 @@ class DownloadManager:
 
             provider = task.provider
             snap     = task.snapshot
-            exe      = provider.resolve_exe()
             source   = self._provider_source(provider)
-
-            # Сообщаем репозиторию о старте — он запишет snapshot в БД.
-            # Только один раз: resume перезапускает _run, повторно слать не нужно.
-            if not task.started:
-                task.started = True
-                self._bus.emit(DownloadStartedEvent(
-                    task_id=task.task_id,
-                    snapshot=snap,
-                    source=source,
-                ))
 
             if snap.download_path:
                 try:
@@ -260,11 +273,10 @@ class DownloadManager:
                 except Exception:
                     self._log.exception("Failed to create download directory: %s", snap.download_path)
 
-            cmd_args = provider.build_command(exe, snap)
             returncode = 0
 
             def on_line(line: str) -> None:
-                if task.cancelled:
+                if task.cancelled or attempt != task.attempt:
                     return
                 provider.observe_line(line)   # провайдер собирает своё (финальный путь и т.п.)
                 pct = provider.parse_progress(line)
@@ -299,8 +311,13 @@ class DownloadManager:
                 returncode = rc
 
             try:
+                # Сборка команды — тоже внутри: её сбой должен финализировать задачу,
+                # иначе она навсегда осталась бы в _active.
+                cmd_args = provider.build_command(provider.resolve_exe(), snap)
                 await provider.run(cmd_args, on_line, on_finish)
             except Exception as err:
+                if attempt != task.attempt:
+                    return
                 self._log.exception("Download process failed: %s", snap.url)
                 self._finish(task)
                 # Сбой раздачи не ошибка контента — запись остаётся завершённой.
@@ -311,6 +328,11 @@ class DownloadManager:
                     output_tail="" if task.seed else "\n".join(task._tail),
                     source=source,
                 ))
+                return
+
+            # Пока процесс умирал, задачу сняли с паузы или закрывается приложение —
+            # итог решает новая попытка (или следующий старт).
+            if attempt != task.attempt:
                 return
 
             # Раздача завершилась/остановлена — контент цел, запись снова 'completed'.
@@ -334,15 +356,20 @@ class DownloadManager:
                 return
 
             success = returncode == 0
-            # Технический текст для БД; перевод для UI строится в main_screen
-            message = "" if success else f"Exit code {returncode}"
+            output_tail = "" if success else "\n".join(task._tail)
+            error_kind = "" if success else provider.failure_reason(output_tail)
+            # Технический текст для БД; перевод для UI строится в main_screen по
+            # error_kind — семантику сбоя знает провайдер, а не менеджер.
+            message = "" if success else (
+                f"Exit code {returncode}" + (f" ({error_kind})" if error_kind else ""))
             if not success:
                 get_logger(source).error("Process finished with return code %s", returncode)
             self._finish(task)
             self._bus.emit(DownloadCompletedEvent(
                 task_id=task.task_id, success=success, message=message,
                 error_code=returncode if not success else None,
-                output_tail="" if success else "\n".join(task._tail),
+                error_kind=error_kind,
+                output_tail=output_tail,
                 file_path=provider.final_path() if success else "",
                 source=source,
             ))

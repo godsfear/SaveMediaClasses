@@ -111,6 +111,9 @@ UPDATE downloads SET status = :status WHERE task_id = :task_id;
 # Раздача не переживает перезапуск (процесс умер вместе с приложением) — на старте
 # возвращаем «зависшие» seeding-записи в completed (контент-то скачан).
 _FIX_STALE_SEEDING = "UPDATE downloads SET status = 'completed' WHERE status = 'seeding';"
+# Загрузка, прерванная закрытием или аварией приложения (процесс убит), не «идёт
+# вечно»: возвращаем её как незавершённую, чтобы её можно было возобновить.
+_FIX_STALE_RUNNING = "UPDATE downloads SET status = 'incomplete' WHERE status = 'running';"
 
 _UPDATE_THUMBNAIL = """
 UPDATE downloads SET thumbnail = :thumbnail WHERE task_id = :task_id;
@@ -188,6 +191,7 @@ class DownloadRepository:
             for idx in _CREATE_INDEXES:
                 conn.execute(idx)
             conn.execute(_FIX_STALE_SEEDING)
+            conn.execute(_FIX_STALE_RUNNING)
             self._backfill_content_hash(conn)
 
     def _backfill_content_hash(self, conn) -> None:

@@ -38,6 +38,7 @@ class ToolsController:
         """task_runner — планировщик coroutine (в app.py: page.run_task);
         нужен, чтобы запускать async-проверку из синхронного обработчика шины."""
         self._tools       = svc.tools
+        self._resolver    = svc.tool_resolver
         self._state       = svc.state
         self._bus         = svc.bus
         self._task_runner = task_runner
@@ -98,6 +99,9 @@ class ToolsController:
             self._bus.emit(ToolButtonStateEvent("check"))
             self._bus.emit(ToolProgressMessageEvent("ok", "ok"))
 
+        # Выбор fallback-копий переживает перезапуск (на диск его запишет
+        # SettingsChangedEvent из обработчика ToolsCheckedEvent в app.py).
+        self._state.managed_overrides = self._resolver.managed_overrides
         self._bus.emit(ToolsCheckedEvent(needs_update=needs))
 
     # ── Обновление ────────────────────────────────────────────────────────────

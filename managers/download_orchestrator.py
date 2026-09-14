@@ -18,7 +18,7 @@ managers/download_orchestrator.py — оркестрация запуска за
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING, Any, Callable
 
 from app_logging import get_logger
@@ -36,6 +36,13 @@ if TYPE_CHECKING:
     from managers.download_repository import DownloadRepository
     from managers.thumbnails import ThumbnailService
     from state import AppState
+
+
+# Поля снимка, которые повтор из истории берёт из ТЕКУЩИХ настроек: после сбоя
+# пользователь мог включить cookies или поправить прокси. На частичные файлы
+# они не влияют; формат, путь и шаблоны остаются из исходного снимка.
+_LIVE_RETRY_FIELDS = ("proxy_enabled", "proxy_address",
+                      "cookies_enabled", "cookies_browser", "cookies_flag")
 
 
 @dataclass(frozen=True)
@@ -151,7 +158,7 @@ class DownloadOrchestrator:
         ))
         # Превью качает сервис; готовая картинка придёт ThumbnailReadyEvent.
         if self._thumbs.supports(tool):
-            self._task_runner(self._thumbs.fetch, task_id, snapshot.url)
+            self._task_runner(self._thumbs.fetch, task_id, snapshot)
         return task_id
 
     # ── Возобновление из истории ──────────────────────────────────────────────
@@ -164,16 +171,25 @@ class DownloadOrchestrator:
         if self._dm.is_paused(e.task_id):
             self._dm.resume(e.task_id)
             return
+        # Та же проверка, что в submit: два процесса на одну ссылку делят .part.
+        if self._dm.is_active_url(e.url):
+            self._log.info("Resume skipped, URL is already downloading: %s", e.url)
+            return
+        current = DownloadSnapshot.from_state(self._state, e.url)
         try:
             snapshot = DownloadSnapshot.from_params(e.url, e.params or {})
+            snapshot = replace(snapshot, **{f: getattr(current, f) for f in _LIVE_RETRY_FIELDS})
         except Exception:
             self._log.warning("Failed to rebuild snapshot for resume: %s", e.url, exc_info=True)
-            snapshot = DownloadSnapshot.from_state(self._state, e.url)
-        # Старую incomplete-запись заменит новая (новый task_id) — не плодим дубли.
+            snapshot = current
+        tool = e.source if e.source in PROVIDERS else DEFAULT_PROVIDER
+        if self.launch(snapshot, tool, e.title or self.download_name(e.url)) is None:
+            # exe не найден — прежняя запись остаётся в истории.
+            self._log.warning("Resume failed, %s executable not found: %s", tool, e.url)
+            return
+        # Старую запись заменила новая (новый task_id) — не плодим дубли.
         if self._db is not None:
             self._db.delete(e.task_id)
-        tool = e.source if e.source in PROVIDERS else DEFAULT_PROVIDER
-        self.launch(snapshot, tool, e.title or self.download_name(e.url))
 
     # ── Обслуживание ──────────────────────────────────────────────────────────
 

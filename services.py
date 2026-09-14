@@ -80,6 +80,10 @@ class Services:
         config_mgr = ConfigManager(paths.config_file)
         state      = config_mgr.load()
         tool_resolver = ToolResolver(paths, state.tooling.detectors)
+        # Fallback-копии, выбранные прошлой проверкой: при восстановлении версий
+        # из кэша проверки нет, и без этого запускались бы системные.
+        for filename in state.managed_overrides:
+            tool_resolver.prefer_managed(filename)
         tools      = ToolsManager(paths, tool_resolver)
         db         = DownloadRepository(db_path=paths.db_file, bus=bus)
         dm         = DownloadManager(
@@ -89,7 +93,8 @@ class Services:
             task_runner=task_runner,
             max_parallel=lambda: state.max_parallel,
         )
-        thumbs     = ThumbnailService(paths=paths, bus=bus, db=db, state=state)
+        thumbs     = ThumbnailService(paths=paths, bus=bus, db=db, state=state,
+                                      resolver=tool_resolver)
         downloads  = DownloadOrchestrator(bus=bus, state=state, dm=dm, db=db,
                                           thumbs=thumbs, task_runner=task_runner)
 

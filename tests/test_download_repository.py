@@ -86,6 +86,14 @@ def test_migration_adds_error_output_to_old_db(tmp_path, bus):
     assert repo.get_history()[0].error_output == "boom"
 
 
+def test_interrupted_download_is_resumable_after_restart(tmp_path, bus):
+    """Приложение закрылось посреди загрузки: при старте 'running' → 'incomplete'."""
+    db_path = str(tmp_path / "restart.db")
+    DownloadRepository(db_path=db_path, bus=bus)
+    _start(bus, "t1")
+    assert DownloadRepository(db_path=db_path, bus=EventBus()).get("t1").status == "incomplete"
+
+
 def test_get_by_task_id(repo, bus):
     _start(bus, "t9", "https://nine")
     rec = repo.get("t9")

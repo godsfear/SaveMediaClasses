@@ -35,6 +35,7 @@ class WindowConfig:
     @staticmethod
     def from_dict(d: Dict[str, Any]) -> "WindowConfig":
         defaults = WindowConfig()
+        d = d if isinstance(d, dict) else {}   # null/список в config.json не роняет старт
         screen_width, screen_height = WindowConfig._get_screen_metrics()
 
         width = min(
