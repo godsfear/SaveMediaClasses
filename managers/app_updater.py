@@ -29,6 +29,7 @@ from typing import Callable, Optional
 import httpx
 
 from config import safe_str
+from managers.tool_resolver import _EMBEDDED_PYTHON_ENV
 from managers.tool_specs import STATUS_OUTDATED, classify_version, stream_to_file
 
 RELEASES_API = "https://api.github.com/repos/godsfear/SaveMediaClasses/releases/latest"
@@ -149,6 +150,16 @@ def build_install_script(new_dir: Path, install_dir: Path, pid: int,
     )
 
 
+def _launch_env() -> dict[str, str]:
+    """Окружение установщика — а значит и перезапущенного exe — без переменных хоста
+    flet и встроенного Python. Хост собирает окружение Python из унаследованного
+    (Map.from(Platform.environment) + putIfAbsent): с FLET_DART_BRIDGE_PORT закрытого
+    приложения новый процесс ждал бы мёртвый мост, и окно не появлялось."""
+    embedded = {name.casefold() for name in _EMBEDDED_PYTHON_ENV}
+    return {name: value for name, value in os.environ.items()
+            if not name.upper().startswith("FLET_") and name.casefold() not in embedded}
+
+
 def start_install(new_dir: Path, install_dir: Path) -> None:
     """Запустить установщик отдельным скрытым процессом: он переживёт выход
     приложения и дождётся его. Лог robocopy — %TEMP%\\SaveMedia-update.log."""
@@ -163,5 +174,5 @@ def start_install(new_dir: Path, install_dir: Path) -> None:
         creationflags=(getattr(subprocess, "CREATE_NO_WINDOW", 0)
                        | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)),
         stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-        close_fds=True,
+        close_fds=True, env=_launch_env(),
     )

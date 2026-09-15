@@ -102,3 +102,24 @@ def test_install_script_updates_program_and_keeps_user_data(tmp_path):
     assert (install / "tools" / "yt-dlp.exe").read_bytes() == b"user tool"
     assert (install / "old-only.dll").exists()
     assert not work.exists()
+
+
+def test_installer_and_relaunched_app_get_clean_environment(tmp_path, monkeypatch):
+    """Перезапущенный exe наследует окружение установщика. Хост flet берёт
+    FLET_DART_BRIDGE_PORT из унаследованного окружения — с портом закрытого
+    приложения окно новой версии не появлялось."""
+    import managers.app_updater as app_updater
+    launched = {}
+    monkeypatch.setenv("FLET_DART_BRIDGE_PORT", "12345")
+    monkeypatch.setenv("FLET_APP_STORAGE_DATA", "C:/old-app-data")
+    monkeypatch.setenv("PYTHONHOME", "C:/embedded-python")
+    monkeypatch.setenv("SAVEMEDIA_TEST_KEEP", "1")
+    monkeypatch.setattr(app_updater.tempfile, "gettempdir", lambda: str(tmp_path))
+    monkeypatch.setattr(app_updater.subprocess, "Popen",
+                        lambda args, **kwargs: launched.update(kwargs))
+
+    app_updater.start_install(tmp_path / "new", tmp_path / "install")
+
+    names = {name.upper() for name in launched["env"]}
+    assert "SAVEMEDIA_TEST_KEEP" in names and "PATH" in names
+    assert not any(name.startswith("FLET_") or name == "PYTHONHOME" for name in names)
