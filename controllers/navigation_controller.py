@@ -377,12 +377,16 @@ class NavigationController(I18nTarget):
 
     def _build_update_section(self) -> ft.Control:
         self._update_btn  = ft.TextButton()
-        self._update_text = ft.Text("", size=12,
+        self._update_text = ft.Text("", size=12, no_wrap=True, overflow=ft.TextOverflow.ELLIPSIS,
                                     color=hex_to_flet(self._svc.state.theme.text_muted_color))
         self._update_bar  = ft.ProgressBar(value=0.0, visible=False)
         self._render_update()
-        return ft.Column([ft.Row([self._update_btn, self._update_text], wrap=True),
-                          self._update_bar], spacing=2, tight=True)
+        # Строка статуса и прогресс — в контейнерах фиксированной высоты: иначе окно
+        # «прыгает», когда текст появляется, исчезает или переносится на новую строку.
+        return ft.Column([self._update_btn,
+                          ft.Container(content=self._update_text, height=18),
+                          ft.Container(content=self._update_bar, height=4)],
+                         spacing=2, tight=True)
 
     def _render_update(self, message: str = "", busy: bool = False) -> None:
         """Кнопка About по состоянию: проверить / обновить до vX / скачать vX."""
@@ -397,6 +401,7 @@ class NavigationController(I18nTarget):
                 btn.content = s.fmt("update_open_page", version=rel.version)
                 btn.on_click, btn.url = None, rel.page_url
         self._update_text.value = message
+        self._update_text.tooltip = message or None   # полный текст, если обрезан многоточием
         self._svc.safe_update()
 
     async def _on_check_update(self, _=None) -> None:
