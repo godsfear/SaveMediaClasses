@@ -141,6 +141,18 @@ class Strings:
     download_error_code:         str = ""  # "Error (code {code})"
     download_error_youtube_auth: str = ""
 
+    # Обновление SaveMedia (строка статуса при старте и кнопка в About)
+    update_check:        str = ""
+    update_checking:     str = ""
+    update_latest:       str = ""
+    update_available:    str = ""  # {version}
+    update_install:      str = ""  # {version}
+    update_open_page:    str = ""  # {version}
+    update_downloading:  str = ""
+    update_busy:         str = ""
+    update_failed:       str = ""  # {detail}
+    update_check_failed: str = ""
+
     # URL поля
     url_yt_api:          str = ""
     url_yt_download:     str = ""

@@ -182,9 +182,8 @@ class SaveMediaApp:
         # ── Фоновая проверка версий ───────────────────────────────────────────
         now         = time.time()
         force_check = not any(vs.current for vs in svc.state.tool_versions.values())
-        if force_check or now - svc.state.last_check_time >= CHECK_INTERVAL_SECONDS:
-            page.run_task(tools_ctrl.check_tools)
-        else:
+        tools_due   = force_check or now - svc.state.last_check_time >= CHECK_INTERVAL_SECONDS
+        if not tools_due:
             mins_left = int(
                 (CHECK_INTERVAL_SECONDS - (now - svc.state.last_check_time)) / 60
             )
@@ -196,6 +195,18 @@ class SaveMediaApp:
                 mins_until_check=mins_left,
             ))
             safe_update()
+
+        async def _startup_checks() -> None:
+            # Последовательно: строка статуса о новой версии SaveMedia не должна
+            # затираться статусом инструментов, пришедшим позже.
+            if tools_due:
+                try:
+                    await tools_ctrl.check_tools()
+                except Exception:
+                    log.exception("Tools check failed")
+            await nav_ctrl.check_app_update()
+
+        page.run_task(_startup_checks)
 
         # Окно стартует скрытым (hide_window_on_start в pyproject) — показываем его
         # ОДИН раз в самом конце main(), когда UI готов. reveal() из середины main()

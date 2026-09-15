@@ -28,8 +28,12 @@ from events import (
     DownloadPathChangedEvent, SettingsChangedEvent, StatusMessageEvent, ThemeChangedEvent,
 )
 from i18n import Locale
+from managers.app_updater import (
+    can_self_update, current_version, download_release, fetch_latest, is_newer, start_install,
+)
 
 if TYPE_CHECKING:
+    from managers.app_updater import AppRelease
     from controllers.theme_controller import ThemeController
     from controllers.window_controller import WindowController
     from screens.history_screen import HistoryScreen
@@ -64,6 +68,10 @@ class NavigationController(I18nTarget):
         # не отображается (flet отдаёт картинки только из assets/URL/base64).
         # Встраиваем PNG как data-URI в src — работает и в pack, и в build.
         self._icon_src = self._load_icon_src()
+
+        # Последний релиз SaveMedia на GitHub: проверка при старте или из About.
+        self._latest_release: AppRelease | None = None
+        self._update_pct = -1.0
 
         self._folder_picker = ft.FilePicker()
 
@@ -303,16 +311,6 @@ class NavigationController(I18nTarget):
             tooltip="About",
         )
 
-    def _app_version(self) -> str:
-        """Версия из pyproject.toml — единый источник: из него же flet build берёт
-        версию exe, а CI подставляет туда номер из тега релиза."""
-        try:
-            import tomllib
-            with open(self._svc.paths.pyproject, "rb") as f:
-                return tomllib.load(f)["project"]["version"]
-        except Exception:
-            return ""
-
     def _show_about(self, _) -> None:
         t         = self._svc.state.theme
         muted_c   = hex_to_flet(t.text_muted_color)
@@ -334,7 +332,7 @@ class NavigationController(I18nTarget):
                     if self._icon_src else ft.Container(width=0),
                     ft.Text("SaveMedia", size=20, weight=ft.FontWeight.BOLD),
                     ft.Text(
-                        f"v{ver}" if (ver := self._app_version()) else "",
+                        f"v{ver}" if (ver := current_version(self._svc.paths)) else "",
                         size=12, color=muted_c,
                     ),
                 ],
@@ -349,6 +347,7 @@ class NavigationController(I18nTarget):
                     ft.Divider(height=10),
                     *[ft.Text(f"• {f}", size=12) for f in features],
                     ft.Divider(height=10),
+                    self._build_update_section(),
                     ft.TextButton(
                         "github.com/godsfear/SaveMediaClasses",
                         url="https://github.com/godsfear/SaveMediaClasses",
@@ -363,6 +362,95 @@ class NavigationController(I18nTarget):
             ],
         )
         self._page.show_dialog(dlg)
+
+    # ── Обновление SaveMedia ──────────────────────────────────────────────────
+
+    def _proxy_url(self) -> "str | None":
+        st = self._svc.state
+        return st.proxy_address.strip() if st.proxy_enabled else None
+
+    async def check_app_update(self) -> None:
+        """Фоновая проверка при старте: о новой версии сообщает строка статуса,
+        а кнопка в About сразу предложит обновиться. Ошибка сети — только в лог."""
+        try:
+            self._latest_release = await fetch_latest(
+                self._proxy_url(), self._svc.state.timeouts.read)
+        except Exception:
+            self._log.info("App update check failed", exc_info=True)
+            return
+        rel = self._latest_release
+        if rel and is_newer(current_version(self._svc.paths), rel.version):
+            s = Locale.load(self._svc.state.language)
+            self._svc.bus.emit(StatusMessageEvent(
+                s.fmt("update_available", version=rel.version), "warning"))
+
+    def _build_update_section(self) -> ft.Control:
+        self._update_btn  = ft.TextButton()
+        self._update_text = ft.Text("", size=12,
+                                    color=hex_to_flet(self._svc.state.theme.text_muted_color))
+        self._update_bar  = ft.ProgressBar(value=0.0, visible=False)
+        self._render_update()
+        return ft.Column([ft.Row([self._update_btn, self._update_text], wrap=True),
+                          self._update_bar], spacing=2, tight=True)
+
+    def _render_update(self, message: str = "", busy: bool = False) -> None:
+        """Кнопка About по состоянию: проверить / обновить до vX / скачать vX."""
+        s, rel, btn = Locale.load(self._svc.state.language), self._latest_release, self._update_btn
+        btn.content, btn.on_click, btn.url, btn.disabled = (
+            s.update_check, self._on_check_update, None, busy)
+        if rel and is_newer(current_version(self._svc.paths), rel.version):
+            if rel.asset_url and can_self_update(self._svc.paths):
+                btn.content = s.fmt("update_install", version=rel.version)
+                btn.on_click = self._on_install_update
+            else:   # запуск из исходников или папка только на чтение — вручную со страницы
+                btn.content = s.fmt("update_open_page", version=rel.version)
+                btn.on_click, btn.url = None, rel.page_url
+        self._update_text.value = message
+        self._svc.safe_update()
+
+    async def _on_check_update(self, _=None) -> None:
+        s = Locale.load(self._svc.state.language)
+        self._render_update(s.update_checking, busy=True)
+        try:
+            self._latest_release = await fetch_latest(
+                self._proxy_url(), self._svc.state.timeouts.read)
+        except Exception:
+            self._log.warning("App update check failed", exc_info=True)
+            self._render_update(s.update_check_failed)
+            return
+        rel = self._latest_release
+        newer = rel is not None and is_newer(current_version(self._svc.paths), rel.version)
+        self._render_update("" if newer else s.update_latest)
+
+    async def _on_install_update(self, _=None) -> None:
+        s, rel = Locale.load(self._svc.state.language), self._latest_release
+        # Перезапуск прервал бы загрузки — пусть сначала завершатся.
+        if self._svc.dm.active_count:
+            self._render_update(s.update_busy)
+            return
+        self._update_pct = -1.0
+        self._update_bar.value, self._update_bar.visible = 0.0, True
+        self._render_update(s.update_downloading, busy=True)
+        try:
+            new_dir = await download_release(rel, self._proxy_url(),
+                                             self._svc.state.timeouts.tool_download,
+                                             self._on_update_progress)
+            start_install(new_dir, self._svc.paths.app_dir)
+        except Exception as err:
+            self._log.exception("App update failed")
+            self._update_bar.visible = False
+            self._render_update(s.fmt("update_failed", detail=str(err)))
+            return
+        # Установщик ждёт выхода приложения: закрываем штатно (конфиг, загрузки).
+        await self._window_ctrl.force_exit(None)
+
+    def _on_update_progress(self, pct: "float | None") -> None:
+        # Прогресс приходит на каждый чанк — перерисовываем не чаще, чем на 1%.
+        if pct is not None and pct - self._update_pct < 0.01:
+            return
+        self._update_pct = 1.0 if pct is None else pct
+        self._update_bar.value = pct
+        self._svc.safe_update()
 
     def _close_dlg(self, dlg: ft.AlertDialog) -> None:
         self._page.pop_dialog()
