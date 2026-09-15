@@ -153,6 +153,11 @@ class Strings:
     update_failed:       str = ""  # {detail}
     update_check_failed: str = ""
 
+    # Окно «О программе»
+    about_tooltip:       str = ""
+    about_subtitle:      str = ""
+    about_features:      str = ""  # пункты через перевод строки
+
     # URL поля
     url_yt_api:          str = ""
     url_yt_download:     str = ""

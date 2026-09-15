@@ -18,7 +18,9 @@ def fixed_screen(monkeypatch):
 
 @pytest.fixture
 def mgr(tmp_path):
-    return ConfigManager(str(tmp_path / "config.json"))
+    # Path, как в приложении (AppPaths.config_file): со строкой тесты пропустили
+    # TypeError в save(), и настройки не сохранялись.
+    return ConfigManager(tmp_path / "config.json")
 
 
 def test_load_missing_file_returns_defaults(mgr):

@@ -23,8 +23,8 @@ APP_NAME = "savemediaclasses"
 class AppPaths:
     """Все пути приложения, производные от app_dir.
 
-    app_dir  — корень рядом с .exe/исходниками (портативный режим, ресурсы только
-               на чтение: locale, иконка).
+    app_dir  — корень рядом с .exe/исходниками (портативный режим: config.json,
+               база и tools здесь, если папка записываемая).
     data_dir — записываемая база для скачиваемых инструментов. Совпадает с app_dir,
                когда тот доступен для записи (портативный режим), иначе — папка в
                профиле пользователя (Linux/macOS, либо Windows в Program Files).
@@ -58,8 +58,9 @@ class AppPaths:
         serious_python распаковывает КОД приложения в %APPDATA%\\...\\flet\\app
         и запускает оттуда, поэтому __file__ указывает не на папку с exe. Но
         рантайм (папка с exe) лежит на sys.path как <exe_dir>\\site-packages и т.п.,
-        и в ней есть flutter_windows.dll — по нему её и находим, чтобы config.json
-        и locale читались рядом с exe (а не из папки распаковки)."""
+        и в ней есть flutter_windows.dll — по нему её и находим, чтобы config.json,
+        база и tools жили рядом с exe (а не в папке распаковки). Ресурсы кода
+        (locale, pyproject.toml) ищутся рядом с модулями — см. locale_dir."""
         for entry in sys.path:
             try:
                 parent = Path(entry).parent
@@ -124,7 +125,10 @@ class AppPaths:
 
     @property
     def locale_dir(self) -> Path:
-        return self.app_dir / "locale"
+        """Переводы лежат рядом с КОДОМ (как pyproject.toml): в flet build — в app/.
+        Папка exe для них не годится: там либо ничего нет (чистая установка — пустой
+        интерфейс), либо копия от старой версии (новые строки пустые)."""
+        return Path(__file__).resolve().parent / "locale"
 
     @property
     def assets_dir(self) -> Path:

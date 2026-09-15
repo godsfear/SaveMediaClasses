@@ -71,10 +71,10 @@ def test_install_script_updates_program_and_keeps_user_data(tmp_path):
         shutil.copy(harmless_exe, root / EXE_NAME)
     (install / "app" / "main.pyc").write_bytes(b"old")
     (new / "app" / "main.pyc").write_bytes(b"new")
-    # Тот же размер и время изменения: robocopy по умолчанию счёл бы файлы
-    # одинаковыми и пропустил (так упал CI) — установка обязана перезаписать.
-    same_time = (install / "app" / "main.pyc").stat().st_mtime
-    os.utime(new / "app" / "main.pyc", (same_time, same_time))
+    # Тот же размер и время записи (точно, до наносекунд): robocopy считает такие
+    # файлы Same/Modified и пропускает (так падал CI) — установка обязана перезаписать.
+    old_stat = (install / "app" / "main.pyc").stat()
+    os.utime(new / "app" / "main.pyc", ns=(old_stat.st_atime_ns, old_stat.st_mtime_ns))
     (install / "config.json").write_bytes(b"user config")
     (install / "savemedia.db").write_bytes(b"user db")
     (new / "config.json").write_bytes(b"default config")     # окажись дефолт в архиве
@@ -94,7 +94,9 @@ def test_install_script_updates_program_and_keeps_user_data(tmp_path):
 
     assert done.returncode == 0, done.stderr
     assert app.poll() is not None                              # дождался выхода приложения
-    assert (install / "app" / "main.pyc").read_bytes() == b"new"
+    log_file = tmp_path / "update.log"                         # Out-File в PowerShell 5.1 — UTF-16
+    log = log_file.read_text(encoding="utf-16", errors="replace") if log_file.exists() else ""
+    assert (install / "app" / "main.pyc").read_bytes() == b"new", log
     assert (install / "config.json").read_bytes() == b"user config"
     assert (install / "savemedia.db").read_bytes() == b"user db"
     assert (install / "tools" / "yt-dlp.exe").read_bytes() == b"user tool"

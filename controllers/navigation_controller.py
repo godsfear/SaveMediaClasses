@@ -308,21 +308,15 @@ class NavigationController(I18nTarget):
             content=img,
             padding=ft.Padding(left=8, top=0, right=0, bottom=0),
             on_click=self._show_about,
-            tooltip="About",
+            tooltip=Locale.load(self._svc.state.language).about_tooltip,
         )
 
     def _show_about(self, _) -> None:
+        s         = Locale.load(self._svc.state.language)
         t         = self._svc.state.theme
         muted_c   = hex_to_flet(t.text_muted_color)
         secondary = hex_to_flet(t.text_secondary_color)
-        features = [
-            "Thousands of sites — YouTube, VK, Rutube, Telegram and more",
-            "Video, audio, playlists, subtitles",
-            "Auto-update for yt-dlp and ffmpeg",
-            "Proxy, cookies, custom arguments",
-            "Download history · Thumbnail previews",
-            "Localization: RU / EN",
-        ]
+        features  = [line for line in s.about_features.splitlines() if line.strip()]
         dlg = ft.AlertDialog(
             modal=False,
             bgcolor=hex_to_flet(t.card_color),
@@ -340,10 +334,7 @@ class NavigationController(I18nTarget):
             ),
             content=ft.Column(
                 [
-                    ft.Text(
-                        "Graphical interface for yt-dlp + ffmpeg",
-                        size=13, color=secondary,
-                    ),
+                    ft.Text(s.about_subtitle, size=13, color=secondary),
                     ft.Divider(height=10),
                     *[ft.Text(f"• {f}", size=12) for f in features],
                     ft.Divider(height=10),
