@@ -71,6 +71,10 @@ def test_install_script_updates_program_and_keeps_user_data(tmp_path):
         shutil.copy(harmless_exe, root / EXE_NAME)
     (install / "app" / "main.pyc").write_bytes(b"old")
     (new / "app" / "main.pyc").write_bytes(b"new")
+    # Тот же размер и время изменения: robocopy по умолчанию счёл бы файлы
+    # одинаковыми и пропустил (так упал CI) — установка обязана перезаписать.
+    same_time = (install / "app" / "main.pyc").stat().st_mtime
+    os.utime(new / "app" / "main.pyc", (same_time, same_time))
     (install / "config.json").write_bytes(b"user config")
     (install / "savemedia.db").write_bytes(b"user db")
     (new / "config.json").write_bytes(b"default config")     # окажись дефолт в архиве
